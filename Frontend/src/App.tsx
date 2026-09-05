@@ -1,122 +1,128 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useState } from "react";
 
-function App() {
-  const [count, setCount] = useState(0)
+export default function InteractionPlayground() {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [message, setMessage] = useState("");
+
+  function handleDoubleClick() {
+    setMessage("Double click detected");
+  }
+
+  function handleContextMenu(e: React.MouseEvent<HTMLButtonElement>) {
+    e.preventDefault();
+    setMessage("Right click detected");
+  }
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
+    <div style={{ padding: 40 }}>
+      <h1>Interaction Playground</h1>
+
+      {/* Hover */}
+      <div
+        onMouseEnter={() => setMenuOpen(true)}
+        onMouseLeave={() => setMenuOpen(false)}
+      >
+        <button>Profile</button>
+
+        {menuOpen && (
+          <div>
+            <button>Settings</button>
+            <button>Logout</button>
+          </div>
+        )}
+      </div>
+
+      {/* Focus / Blur */}
+      <input
+        aria-label="Focus Input"
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+      />
+
+      <p>{focused ? "Input focused" : "Input not focused"}</p>
+
+      {/* Keyboard */}
+      <input
+        aria-label="Keyboard Input"
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            setMessage("Enter pressed");
+          }
+
+          if (e.key === "Escape") {
+            setMessage("Escape pressed");
+          }
+        }}
+      />
+
+      {/* Double click */}
+      <button onDoubleClick={handleDoubleClick}>Double Click Me</button>
+
+      {/* Right click */}
+      <button onContextMenu={handleContextMenu}>Right Click Me</button>
+
+      {/* Modifier */}
+      <button
+        onClick={(e) => {
+          if (e.ctrlKey) {
+            setMessage("Ctrl + Click detected");
+          } else {
+            setMessage("Normal click detected");
+          }
+        }}
+      >
+        Modifier Button
+      </button>
+
+      {/* Drag & Drop */}
+      <div>
+        <h2>Drag & Drop</h2>
+
+        <div
+          draggable
+          onDragStart={(e) => {
+            e.dataTransfer.setData("text/plain", "Job A");
+          }}
+          style={{
+            padding: 20,
+            border: "1px solid black",
+            width: 150,
+          }}
         >
-          Count is {count}
+          Job A
+        </div>
+
+        <div
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            const job = e.dataTransfer.getData("text/plain");
+            setMessage(`${job} dropped successfully`);
+          }}
+          style={{
+            marginTop: 20,
+            padding: 40,
+            border: "2px dashed black",
+          }}
+        >
+          Drop Job Here
+        </div>
+      </div>
+
+      {/* Scroll target */}
+      <div style={{ height: 1200 }}>
+        <p>Scroll down...</p>
+
+        <button
+          style={{ marginTop: 1000 }}
+          onClick={() => setMessage("Bottom button clicked")}
+        >
+          Bottom Button
         </button>
-      </section>
+      </div>
 
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+      {/* Result */}
+      <h2 role="status">{message}</h2>
+    </div>
+  );
 }
-
-export default App
