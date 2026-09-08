@@ -1,12 +1,17 @@
-//create a basic ts server using express
-import express, { Request, Response } from "express";
-const app = express();
-const port = 3000;
-
-app.get("/", (req: Request, res: Response) => {
-  res.send("Hello World!");
+// require('dotenv').config({path: './env'})
+import dotenv from "dotenv";
+import app from "./app.js";
+import connectToMongoDb from "./db/MongoDb.js";
+dotenv.config({
+  path: "./.env",
 });
 
-app.listen(port, () => {
-  console.log(`Server is running at http://localhost:${port}`);
-});
+connectToMongoDb()
+  .then(() => {
+    app.listen(process.env.PORT || 8000, () => {
+      console.log(`⚙️ Server is running at port : ${process.env.PORT}`);
+    });
+  })
+  .catch((err: unknown) => {
+    console.log("MONGO db connection failed !!! ", err);
+  });

@@ -37,4 +37,7 @@ Backend/src/playwright-report/
 Backend/src/blob-report/
 Backend/src/playwright/.cache/
 Backend/src/playwright/.auth/
+Backend/src/Learn
+Backend/playwright-report
 Backend/src/Phase*
+test-results
