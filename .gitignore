@@ -27,3 +27,14 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+
+
+# Playwright
+node_modules/
+Backend/src/test-results/
+Backend/src/playwright-report/
+Backend/src/blob-report/
+Backend/src/playwright/.cache/
+Backend/src/playwright/.auth/
+Backend/src/Phase*
