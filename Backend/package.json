@@ -19,6 +19,7 @@
   "type": "module",
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "cloudinary": "^2.11.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
@@ -26,6 +27,7 @@
     "mongoose": "^9.9.5",
     "mongoose-aggregate-paginate-v2": "^1.1.5",
     "multer": "^2.3.0",
+    "next-cloudinary": "^6.18.8",
     "uninstall": "^0.0.0",
     "uuid": "^14.0.2",
     "winston": "^3.19.0"
