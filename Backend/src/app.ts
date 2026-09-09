@@ -14,5 +14,6 @@ app.use(cookieParser())
 import jobRoutes from "./routes/job.routes.js";
 
 app.use("/api/v1/jobs", jobRoutes);
+// app.use("/api/v1/users", UserRoutes);
 
 export default app

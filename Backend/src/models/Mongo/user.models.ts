@@ -33,25 +33,6 @@ const userSchema = new Schema<User>(
       lowercase: true,
       trim: true,
     },
-    fullname: {
-      type: String,
-      required: true,
-      trim: true,
-      index: true,
-    },
-    avatar: {
-      type: String, // cloudinary url
-      required: true,
-    },
-    coverImage: {
-      type: String, // cloudinary url
-    },
-    watchHistory: [
-      {
-        type: Schema.Types.ObjectId,
-        ref: "Video",
-      },
-    ],
     password: {
       type: String,
       required: [true, "Password is required"],
@@ -83,7 +64,6 @@ userSchema.methods.generateAccessToken = function ():string {
       _id: this._id,
       email: this.email,
       username: this.username,
-      fullname: this.fullname,
     },
     process.env.ACCESS_TOKEN_SECRET as string,
     {
