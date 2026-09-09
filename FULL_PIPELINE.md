@@ -16,7 +16,7 @@ The **Full Automation Pipeline** is the ultimate one-command solution that orche
 
 ### Via CLI Script
 ```bash
-npm run automation:full <userId>
+npm run automation:full -- <24-character-mongodb-user-id>
 ```
 
 ### Via API
@@ -30,9 +30,10 @@ curl -X POST http://localhost:8000/api/v1/automation/full \
 
 ## What Happens Step by Step
 
-### Step 1: Authentication (2 min)
+### Step 1: Authentication (your pace)
 - Checks if you have valid Naukri session stored
-- If not, opens headed browser for manual login
+- If not, opens a headed browser and waits until you complete the manual login
+- Supports OTP and CAPTCHA steps; press Ctrl+C to cancel
 - Session encrypted and saved to MongoDB
 
 ### Step 2: Job Scraping (5-10 min)
@@ -72,12 +73,12 @@ curl -X POST http://localhost:8000/api/v1/automation/full \
 
 ### Basic (all defaults)
 ```bash
-npm run automation:full 66e4f1234567890abcdef123
+npm run automation:full -- <24-character-mongodb-user-id>
 ```
 
 ### With Custom Options
 ```bash
-npm run automation:full <userId> [options]
+npm run automation:full -- <24-character-mongodb-user-id> [options]
 ```
 
 **Available Options:**
@@ -93,22 +94,22 @@ npm run automation:full <userId> [options]
 
 **Conservative: High quality matches only**
 ```bash
-npm run automation:full 66e4f1234567890abcdef123 --max-jobs=20 --threshold=85
+npm run automation:full -- <24-character-mongodb-user-id> --max-jobs=20 --threshold=85
 ```
 
 **Aggressive: Apply to more jobs**
 ```bash
-npm run automation:full 66e4f1234567890abcdef123 --max-jobs=100 --threshold=60
+npm run automation:full -- <24-character-mongodb-user-id> --max-jobs=100 --threshold=60
 ```
 
 **Fast: Skip resume tailoring**
 ```bash
-npm run automation:full 66e4f1234567890abcdef123 --no-tailor --no-upload
+npm run automation:full -- <24-character-mongodb-user-id> --no-tailor --no-upload
 ```
 
 **Resume test: Tailor but don't apply**
 ```bash
-npm run automation:full 66e4f1234567890abcdef123 --no-upload
+npm run automation:full -- <24-character-mongodb-user-id> --no-upload
 ```
 
 ---

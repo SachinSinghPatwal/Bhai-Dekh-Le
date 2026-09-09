@@ -1,5 +1,4 @@
 import { Request, Response } from 'express';
-import multer from 'multer';
 import { CloudinaryResumeService } from '../services/resume/CloudinaryResumeService.js';
 import { User } from '../models/Mongo/user.models.js';
 import logger from '../utility/logger.js';

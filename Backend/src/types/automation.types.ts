@@ -1,5 +1,3 @@
-import { Browser, BrowserContext, Page } from 'playwright';
-
 export interface AutomationStatus {
   isRunning: boolean;
   currentAction: string | null;

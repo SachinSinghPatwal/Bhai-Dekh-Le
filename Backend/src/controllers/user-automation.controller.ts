@@ -1,5 +1,4 @@
 import { Request, Response } from 'express';
-import multer from 'multer';
 import { ResumeService } from '../services/resume/ResumeService.js';
 import { User } from '../models/Mongo/user.models.js';
 import { JobModel } from '../models/Mongo/job.models.js';

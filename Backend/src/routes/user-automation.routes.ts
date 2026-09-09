@@ -1,4 +1,4 @@
-import express, { Request, Response } from 'express';
+import express from 'express';
 import multer from 'multer';
 import { asyncHandler } from '../utility/asyncHandler.js';
 import {

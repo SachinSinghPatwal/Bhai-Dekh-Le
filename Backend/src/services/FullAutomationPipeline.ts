@@ -4,11 +4,10 @@ import { NaukriApplierService } from './playwright/naukri/NaukriApplierService.j
 import { NaukriProfileService } from './playwright/naukri/NaukriProfileService.js';
 import { GeminiMatchingService } from './gemini/GeminiMatchingService.js';
 import { ResumeTailoringService } from './gemini/ResumeTailoringService.js';
-import { ResumeService } from './resume/ResumeService.js';
 import { User } from '../models/Mongo/user.models.js';
 import { JobModel } from '../models/Mongo/job.models.js';
 import logger from '../utility/logger.js';
-import fs from 'fs';
+import { assertMongoObjectId } from '../utility/user-id.js';
 
 /**
  * Parent automation orchestrator
@@ -21,7 +20,6 @@ export class FullAutomationPipeline {
   private profileService: NaukriProfileService;
   private geminiService: GeminiMatchingService;
   private resumeTailoringService: ResumeTailoringService;
-  private resumeService: ResumeService;
 
   private status = {
     currentStep: '',
@@ -40,7 +38,6 @@ export class FullAutomationPipeline {
     this.profileService = new NaukriProfileService();
     this.geminiService = new GeminiMatchingService();
     this.resumeTailoringService = new ResumeTailoringService();
-    this.resumeService = new ResumeService();
   }
 
   /**
@@ -65,6 +62,7 @@ export class FullAutomationPipeline {
       uploadToProfile?: boolean;
     } = {}
   ): Promise<typeof this.status> {
+    assertMongoObjectId(userId);
     logger.info('Starting full automation pipeline', { userId, options });
 
     try {

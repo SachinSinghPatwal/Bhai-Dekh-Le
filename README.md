@@ -197,13 +197,13 @@ DELETE /api/v1/jobs/:id                     # Delete job
 
 ### 1. Authenticate with Naukri
 ```bash
-npm run automation:auth
+npm run automation:auth -- <24-character-mongodb-user-id>
 ```
-Opens a headed browser for manual login. Session is saved encrypted in MongoDB.
+Opens a headed browser and waits until you finish the manual login. Session is then saved encrypted in MongoDB; press Ctrl+C to cancel.
 
 ### 2. Scrape Jobs
 ```bash
-npm run automation:scrape
+npm run automation:scrape -- <24-character-mongodb-user-id>
 ```
 Scrapes jobs based on your preferences and saves to database.
 

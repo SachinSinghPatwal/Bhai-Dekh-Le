@@ -87,11 +87,6 @@ export class NaukriProfileService {
       // Wait for upload to complete
       await page.waitForTimeout(3000);
 
-      // Check for success message
-      const successMessage = await page.$('text=/resume uploaded successfully/i') ||
-                            await page.$('.success-message') ||
-                            await page.$('.toast-success');
-
       // Save updated profile
       const saveButton = await page.$('button:has-text("Save")') ||
                         await page.$('[type="submit"]');

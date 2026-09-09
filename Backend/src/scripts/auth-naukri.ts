@@ -1,20 +1,22 @@
 import '../config/load-env.js';
-import { BrowserManager } from '../services/playwright/BrowserManager.js';
-import { StorageStateManager } from '../services/playwright/StorageStateManager.js';
 import { NaukriAuthService } from '../services/playwright/naukri/NaukriAuthService.js';
-import { NaukriScraperService } from '../services/playwright/naukri/NaukriScraperService.js';
-import { NaukriApplierService } from '../services/playwright/naukri/NaukriApplierService.js';
+import { isMongoObjectId } from '../utility/user-id.js';
 import logger from '../utility/logger.js';
 
 /**
  * CLI script to authenticate with Naukri
- * Run: npm run automation:auth <userId>
+ * Run: npm run automation:auth -- <24-character-mongodb-user-id>
  */
 async function main() {
   try {
     const userId = process.argv[2];
     if (!userId) {
-      console.error('Usage: npm run automation:auth <userId>');
+      console.error('Usage: npm run automation:auth -- <24-character-mongodb-user-id>');
+      process.exit(1);
+    }
+
+    if (!isMongoObjectId(userId)) {
+      console.error('Invalid user ID. Pass the user\'s MongoDB _id (a 24-character hexadecimal value).');
       process.exit(1);
     }
 

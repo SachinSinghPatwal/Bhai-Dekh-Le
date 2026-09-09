@@ -97,15 +97,15 @@ MongoDB connected !! DB HOST: ...
 
 ---
 
-## Step 5: Test Authentication (2 minutes)
+## Step 5: Authenticate with Naukri
 
 ### Option A: Via Script
 ```bash
-# Replace <userId> with actual MongoDB user ID
-npm run automation:auth 66e4f1234567890abcdef123
+# Replace <userId> with the user's 24-character MongoDB _id
+npm run automation:auth -- <userId>
 ```
 
-A browser will open. Login to Naukri.com manually. Once logged in, the session is saved encrypted.
+A headed browser opens and waits until you finish logging in, including any OTP or CAPTCHA step. Once Naukri redirects after login, the encrypted session is saved. Press Ctrl+C to cancel.
 
 ### Option B: Via API
 ```bash
@@ -167,7 +167,7 @@ curl http://localhost:8000/api/v1/users/<userId>/stats
 
 ### First Time Setup
 1. Create a user first (use existing user routes or MongoDB directly)
-2. Get the user's MongoDB `_id` 
+2. Get the user's MongoDB `_id` (the 24-character hexadecimal value, not the username or a shortened example)
 3. Use that `_id` for all automation commands
 
 ### Gemini API Limits (FREE TIER)
@@ -192,8 +192,8 @@ curl http://localhost:8000/api/v1/users/<userId>/stats
 - Run `npm run playwright:install` again
 
 ### "Authentication failed"
-- Login manually is too slow (2 min timeout)
-- Try again with faster login
+- Keep the browser open until Naukri redirects after login
+- Press Ctrl+C to cancel, then run the command again if needed
 
 ---
 

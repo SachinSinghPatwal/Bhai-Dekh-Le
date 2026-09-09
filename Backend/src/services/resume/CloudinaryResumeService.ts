@@ -1,8 +1,6 @@
 import { v2 as cloudinary } from 'cloudinary';
-import fs from 'fs';
-import path from 'path';
+import type { UploadApiResponse } from 'cloudinary';
 import logger from '../../utility/logger.js';
-import { ResumeData } from '../../types/automation.types.js';
 
 /**
  * Cloud-based resume storage using Cloudinary
@@ -60,42 +58,40 @@ export class CloudinaryResumeService {
       const folder = isOriginal ? `resumes/${userId}/original` : `resumes/${userId}/tailored`;
 
       // Upload with compression and transformations
-      const result = await cloudinary.uploader.upload_stream(
-        {
-          resource_type: resourceType,
-          folder: folder,
-          public_id: `resume-${Date.now()}`,
-          use_filename: true,
-          unique_filename: true,
-          // Compression settings
-          quality: 'auto',
-          fetch_format: 'auto',
-          // PDF specific compression
-          ...(file.mimetype === 'application/pdf' && {
-            flags: 'progressive',
-            quality: 85, // Compress PDF quality
-          }),
-          // Metadata
-          tags: ['resume', userId, isOriginal ? 'original' : 'tailored'],
-          context: {
-            userId: userId,
-            type: isOriginal ? 'original' : 'tailored',
-            uploadedAt: new Date().toISOString(),
+      const uploadResult = await new Promise<UploadApiResponse>((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          {
+            resource_type: resourceType,
+            folder,
+            public_id: `resume-${Date.now()}`,
+            use_filename: true,
+            unique_filename: true,
+            quality: 'auto',
+            fetch_format: 'auto',
+            ...(file.mimetype === 'application/pdf' && {
+              flags: 'progressive',
+              quality: 85,
+            }),
+            tags: ['resume', userId, isOriginal ? 'original' : 'tailored'],
+            context: {
+              userId,
+              type: isOriginal ? 'original' : 'tailored',
+              uploadedAt: new Date().toISOString(),
+            },
           },
-        },
-        (error, result) => {
-          if (error) throw error;
-        }
-      );
+          (error, result) => {
+            if (error) {
+              reject(error);
+            } else if (result) {
+              resolve(result);
+            } else {
+              reject(new Error('Cloudinary returned no upload result'));
+            }
+          }
+        );
 
-      // Write file to stream
-      result.end(file.buffer);
-
-      // Wait for upload to complete
-      const uploadResult = await new Promise((resolve, reject) => {
-        result.on('finish', () => resolve(result));
-        result.on('error', reject);
-      }) as any;
+        uploadStream.end(file.buffer);
+      });
 
       logger.info('Resume uploaded to Cloudinary', {
         userId,
@@ -282,7 +278,7 @@ export class CloudinaryResumeService {
   /**
    * Determine Cloudinary resource type from MIME type
    */
-  private getResourceType(mimetype: string): string {
+  private getResourceType(mimetype: string): 'auto' | 'raw' {
     if (mimetype.includes('pdf') || mimetype.includes('document')) {
       return 'raw';
     }

@@ -7,7 +7,7 @@
 ## 🚀 One Command to Run Everything
 
 ```bash
-npm run automation:full <userId>
+npm run automation:full -- <24-character-mongodb-user-id>
 ```
 
 **Does: Auth → Scrape → Rate → Tailor → Upload → Apply**
@@ -18,9 +18,9 @@ npm run automation:full <userId>
 
 | Task | Command |
 |------|---------|
-| **Full Pipeline** | `npm run automation:full <userId>` |
-| **Just Auth** | `npm run automation:auth <userId>` |
-| **Just Scrape** | `npm run automation:scrape <userId>` |
+| **Full Pipeline** | `npm run automation:full -- <24-character-mongodb-user-id>` |
+| **Just Auth** | `npm run automation:auth -- <24-character-mongodb-user-id>` |
+| **Just Scrape** | `npm run automation:scrape -- <24-character-mongodb-user-id>` |
 | **Start Server** | `npm run dev` |
 | **Install Browsers** | `npm run playwright:install` |
 
@@ -39,7 +39,7 @@ cp .env.example .env
 
 # 3. Run
 npm run dev
-npm run automation:full <userId>
+npm run automation:full -- <24-character-mongodb-user-id>
 ```
 
 ---
@@ -57,7 +57,7 @@ npm run automation:full <userId>
 
 ### Example
 ```bash
-npm run automation:full 66e4f12345 --max-jobs=30 --threshold=80
+npm run automation:full -- <24-character-mongodb-user-id> --max-jobs=30 --threshold=80
 ```
 
 ---
@@ -114,7 +114,7 @@ curl http://localhost:8000/api/v1/users/<userId>/stats
 |---------|----------|
 | Browser won't open | Check `PLAYWRIGHT_HEADLESS=false` in `.env` |
 | Gemini errors | Verify `GEMINI_API_KEY` is valid |
-| Auth failed | Run `npm run automation:auth` again |
+| Auth failed | Run `npm run automation:auth -- <24-character-mongodb-user-id>` again; it waits for you to complete login |
 | No jobs found | Lower threshold or update preferences |
 | Resume not uploading | Use `.txt` file format |
 

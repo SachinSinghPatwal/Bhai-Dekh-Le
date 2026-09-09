@@ -20,7 +20,8 @@ export class NaukriAuthService {
 
   /**
    * Trigger manual authentication flow
-   * Opens browser, waits for user to login, saves state to DB
+   * Opens a browser and waits until the user completes login, then saves the
+   * session state to the database. The user can cancel with Ctrl+C.
    */
   async authenticate(userId: string): Promise<{ success: boolean; message: string }> {
     let page: Page | null = null;
@@ -42,7 +43,7 @@ export class NaukriAuthService {
       if (!loginSuccess) {
         return {
           success: false,
-          message: 'Login timeout or cancelled by user',
+          message: 'Login was cancelled before it completed.',
         };
       }
 
@@ -82,7 +83,7 @@ export class NaukriAuthService {
   private async waitForLoginSuccess(page: Page | null): Promise<boolean> {
     if (!page) return false;
     try {
-      logger.info('Waiting for user to complete login...');
+      logger.info('Waiting for user to complete login. Press Ctrl+C to cancel.');
 
       // Wait for redirect after successful login
       // Naukri redirects to home or profile page after login
@@ -92,13 +93,13 @@ export class NaukriAuthService {
           // Check if redirected away from login page
           return !currentUrl.includes('/nlogin/login');
         },
-        { timeout: 120000 } // 2 minute timeout
+        { timeout: 0 }
       );
 
       logger.info('Login successful, detected redirect');
       return true;
     } catch (error) {
-      logger.error('Login timeout or cancelled', { error });
+      logger.warn('Login did not complete', { error });
       return false;
     }
   }

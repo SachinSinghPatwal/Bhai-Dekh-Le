@@ -3,7 +3,6 @@ import { NaukriAuthService } from '../services/playwright/naukri/NaukriAuthServi
 import { NaukriScraperService } from '../services/playwright/naukri/NaukriScraperService.js';
 import { NaukriApplierService } from '../services/playwright/naukri/NaukriApplierService.js';
 import { FullAutomationPipeline } from '../services/FullAutomationPipeline.js';
-import { User } from '../models/Mongo/user.models.js';
 import logger from '../utility/logger.js';
 import { ApiError } from '../utility/ApiError.js';
 import { ApiResponse } from '../utility/ApiResponse.js';
@@ -138,7 +137,7 @@ export const applyToJobs = async (req: Request, res: Response) => {
 /**
  * Get automation status
  */
-export const getAutomationStatus = async (req: Request, res: Response) => {
+export const getAutomationStatus = async (_req: Request, res: Response) => {
   try {
     const status = {
       isRunning: automationRunning,
@@ -161,7 +160,7 @@ export const getAutomationStatus = async (req: Request, res: Response) => {
 /**
  * Stop running automation
  */
-export const stopAutomation = async (req: Request, res: Response) => {
+export const stopAutomation = async (_req: Request, res: Response) => {
   try {
     automationRunning = false;
     logger.info('Automation stopped by user');
@@ -229,7 +228,7 @@ export const runFullPipeline = async (req: Request, res: Response) => {
 /**
  * Get pipeline status for running automation
  */
-export const getPipelineStatus = async (req: Request, res: Response) => {
+export const getPipelineStatus = async (_req: Request, res: Response) => {
   // In production, you'd track this in Redis or DB
   // For now, return simple status
   res

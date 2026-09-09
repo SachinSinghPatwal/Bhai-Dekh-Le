@@ -1,7 +1,7 @@
 import '../config/load-env.js';
 import { FullAutomationPipeline } from '../services/FullAutomationPipeline.js';
+import { isMongoObjectId } from '../utility/user-id.js';
 import logger from '../utility/logger.js';
-import "dotenv/config";
 
 /**
  * CLI script to run the complete automation pipeline
@@ -17,7 +17,7 @@ import "dotenv/config";
  *   --no-upload          Skip profile upload
  *
  * Example:
- *   npm run automation:full -- 66e4f1234567890abcdef123 --max-jobs=30 --threshold=80
+ *   npm run automation:full -- <24-character-mongodb-user-id> --max-jobs=30 --threshold=80
  */
 
 async function main() {
@@ -36,7 +36,12 @@ async function main() {
       console.error('  --no-upload          Skip profile upload');
       console.error('');
       console.error('Example:');
-      console.error('  npm run automation:full -- 66e4f12345 --max-jobs=30 --threshold=80');
+      console.error('  npm run automation:full -- <24-character-mongodb-user-id> --max-jobs=30 --threshold=80');
+      process.exit(1);
+    }
+
+    if (!isMongoObjectId(userId)) {
+      console.error('Invalid user ID. Pass the user\'s MongoDB _id (a 24-character hexadecimal value).');
       process.exit(1);
     }
 
