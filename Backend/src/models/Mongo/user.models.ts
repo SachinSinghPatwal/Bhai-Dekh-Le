@@ -11,6 +11,19 @@ interface User extends Document {
   watchHistory: mongoose.Types.ObjectId[];
   password: string;
   refreshToken?: string;
+  naukriStorageState?: string;
+  resume?: {
+    path: string;
+    fileName: string;
+    uploadedAt: Date;
+  };
+  jobPreferences?: {
+    keywords: string[];
+    locations: string[];
+    minSalary: number;
+    jobTypes: ('full-time' | 'part-time' | 'contract' | 'internship')[];
+    employType: ('remote' | 'on-site' | 'hybrid')[];
+  };
   isPasswordCorrect(password: string): Promise<boolean>;
   generateAccessToken(): string;
   generateRefreshToken(): string;
@@ -39,6 +52,47 @@ const userSchema = new Schema<User>(
     },
     refreshToken: {
       type: String,
+    },
+    naukriStorageState: {
+      type: String,
+    },
+    resume: {
+      path: {
+        type: String,
+      },
+      fileName: {
+        type: String,
+      },
+      uploadedAt: {
+        type: Date,
+      },
+    },
+    jobPreferences: {
+      keywords: [
+        {
+          type: String,
+        },
+      ],
+      locations: [
+        {
+          type: String,
+        },
+      ],
+      minSalary: {
+        type: Number,
+      },
+      jobTypes: [
+        {
+          type: String,
+          enum: ['full-time', 'part-time', 'contract', 'internship'],
+        },
+      ],
+      employType: [
+        {
+          type: String,
+          enum: ['remote', 'on-site', 'hybrid'],
+        },
+      ],
     },
   },
   {

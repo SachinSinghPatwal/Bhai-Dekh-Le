@@ -1,19 +1,20 @@
-import { defineConfig, devices } from '@playwright/test';
-import "dotenv/config";
-export default defineConfig({
-  testDir: './tests',
-  fullyParallel: true,
-  forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
-  reporter: 'html',
-  use: {
-    trace: 'on-first-retry',
+{
+  "name": "playwright-config",
+  "testDir": "./tests",
+  "timeout": 60000,
+  "retries": 1,
+  "workers": 1,
+  "use": {
+    "baseURL": "http://localhost:8000",
+    "headless": true,
+    "slowMo": 1000,
+    "screenshot": "only-on-failure",
+    "video": "retain-on-failure",
   },
-  projects: [
-    {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
-    },
-  ],
-});
+  "webServer": {
+    "command": "npm run dev",
+    "port": 8000,
+    "timeout": 120000,
+    "reuseExistingServer": false,
+  },
+}

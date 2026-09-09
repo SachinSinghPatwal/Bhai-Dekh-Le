@@ -1,0 +1,12 @@
+{
+  "jobCard": "[data-job-id]",
+  "jobTitle": "a[title]",
+  "company": ".comp-name",
+  "location": ".locWdth",
+  "salary": ".sal",
+  "description": ".job-desc",
+  "applyButton": "button:has-text('Apply')",
+  "nextButton": ".styles-btn-secondary__2aIP0",
+  "easyApplyForm": ".apply-modal",
+  "submitButton": "button[type='submit']"
+}

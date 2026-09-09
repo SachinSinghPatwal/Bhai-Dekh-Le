@@ -10,6 +10,12 @@ export interface Job extends Document {
   type: "full-time" | "part-time" | "contract" | "internship";
   employType: "remote" | "on-site" | "hybrid";
   salary: number;
+  appliedAt?: Date;
+  applicationStatus?: 'pending' | 'applied' | 'rejected' | 'skipped' | 'failed';
+  geminiScore?: number;
+  geminiReasoning?: string;
+  platform: 'naukri' | 'linkedin' | 'indeed';
+  userId: mongoose.Types.ObjectId;
 }
 
 const jobSchema = new Schema<Job>({
@@ -51,6 +57,29 @@ const jobSchema = new Schema<Job>({
   },
   salary: {
     type: Number,
+    required: true,
+  },
+  appliedAt: {
+    type: Date,
+  },
+  applicationStatus: {
+    type: String,
+    enum: ['pending', 'applied', 'rejected', 'skipped', 'failed'],
+  },
+  geminiScore: {
+    type: Number,
+  },
+  geminiReasoning: {
+    type: String,
+  },
+  platform: {
+    type: String,
+    enum: ['naukri', 'linkedin', 'indeed'],
+    default: 'naukri',
+  },
+  userId: {
+    type: Schema.Types.ObjectId,
+    ref: 'User',
     required: true,
   },
 });
