@@ -1,3 +1,4 @@
+import '../config/load-env.js';
 import { NaukriScraperService } from '../services/playwright/naukri/NaukriScraperService.js';
 import logger from '../utility/logger.js';
 

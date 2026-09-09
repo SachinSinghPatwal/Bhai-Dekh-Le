@@ -52,7 +52,8 @@ Edit `.env` file:
 # Required - Get these first
 GEMINI_API_KEY=AIzaSy...your_key_here
 MONGODB_URI=mongodb://localhost:27017/bhaidekle
-ENCRYPTION_KEY=make_this_32_characters_long!!
+# Generate with: node -e "console.log(require('crypto').randomBytes(16).toString('hex'))"
+ENCRYPTION_KEY=<paste_the_32_character_output_here>
 
 # Server settings (defaults are fine)
 PORT=8000

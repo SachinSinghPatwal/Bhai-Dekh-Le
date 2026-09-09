@@ -1,10 +1,6 @@
-// require('dotenv').config({path: './env'})
-import dotenv from "dotenv";
+import './config/load-env.js';
 import app from "./app.js";
 import connectToMongoDb from "./db/MongoDb.js";
-dotenv.config({
-  path: "./.env",
-});
 
 connectToMongoDb()
   .then(() => {

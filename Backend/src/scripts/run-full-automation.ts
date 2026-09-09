@@ -1,11 +1,13 @@
+import '../config/load-env.js';
 import { FullAutomationPipeline } from '../services/FullAutomationPipeline.js';
 import logger from '../utility/logger.js';
+import "dotenv/config";
 
 /**
  * CLI script to run the complete automation pipeline
  *
  * Usage:
- *   npm run automation:full <userId> [options]
+ *   npm run automation:full -- <userId> [options]
  *
  * Options (via command line):
  *   --skip-auth          Skip authentication (use existing session)
@@ -15,7 +17,7 @@ import logger from '../utility/logger.js';
  *   --no-upload          Skip profile upload
  *
  * Example:
- *   npm run automation:full 66e4f1234567890abcdef123 --max-jobs=30 --threshold=80
+ *   npm run automation:full -- 66e4f1234567890abcdef123 --max-jobs=30 --threshold=80
  */
 
 async function main() {
@@ -24,7 +26,7 @@ async function main() {
     const userId = args[0];
 
     if (!userId) {
-      console.error('❌ Usage: npm run automation:full <userId> [options]');
+      console.error('❌ Usage: npm run automation:full -- <userId> [options]');
       console.error('');
       console.error('Options:');
       console.error('  --skip-auth          Skip authentication');
@@ -34,7 +36,7 @@ async function main() {
       console.error('  --no-upload          Skip profile upload');
       console.error('');
       console.error('Example:');
-      console.error('  npm run automation:full 66e4f12345 --max-jobs=30 --threshold=80');
+      console.error('  npm run automation:full -- 66e4f12345 --max-jobs=30 --threshold=80');
       process.exit(1);
     }
 

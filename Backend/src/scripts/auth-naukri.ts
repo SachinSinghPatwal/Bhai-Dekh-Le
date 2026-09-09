@@ -1,3 +1,4 @@
+import '../config/load-env.js';
 import { BrowserManager } from '../services/playwright/BrowserManager.js';
 import { StorageStateManager } from '../services/playwright/StorageStateManager.js';
 import { NaukriAuthService } from '../services/playwright/naukri/NaukriAuthService.js';
