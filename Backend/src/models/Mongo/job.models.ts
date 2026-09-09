@@ -16,6 +16,7 @@ export interface Job extends Document {
   geminiReasoning?: string;
   platform: 'naukri' | 'linkedin' | 'indeed';
   userId: mongoose.Types.ObjectId;
+  tailoredResumePath?: string;
 }
 
 const jobSchema = new Schema<Job>({
@@ -81,6 +82,9 @@ const jobSchema = new Schema<Job>({
     type: Schema.Types.ObjectId,
     ref: 'User',
     required: true,
+  },
+  tailoredResumePath: {
+    type: String,
   },
 });
 

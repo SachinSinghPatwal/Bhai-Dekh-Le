@@ -10,7 +10,8 @@
     "playwright:install": "playwright install chromium",
     "test:playwright": "playwright test",
     "automation:auth": "tsx src/scripts/auth-naukri.ts",
-    "automation:scrape": "tsx src/scripts/scrape-jobs.ts"
+    "automation:scrape": "tsx src/scripts/scrape-jobs.ts",
+    "automation:full": "tsx src/scripts/run-full-automation.ts"
   },
   "keywords": [],
   "author": "Sachin Singh Patwal",

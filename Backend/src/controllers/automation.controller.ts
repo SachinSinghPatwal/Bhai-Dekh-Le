@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { NaukriAuthService } from '../services/playwright/naukri/NaukriAuthService.js';
 import { NaukriScraperService } from '../services/playwright/naukri/NaukriScraperService.js';
 import { NaukriApplierService } from '../services/playwright/naukri/NaukriApplierService.js';
+import { FullAutomationPipeline } from '../services/FullAutomationPipeline.js';
 import { User } from '../models/Mongo/user.models.js';
 import logger from '../utility/logger.js';
 import { ApiError } from '../utility/ApiError.js';
@@ -174,4 +175,78 @@ export const stopAutomation = async (req: Request, res: Response) => {
     logger.error('Failed to stop automation', { error });
     throw error;
   }
+};
+
+/**
+ * Run complete automation pipeline
+ * Auth → Scrape → Rate → Tailor → Apply → Upload to Profile
+ */
+export const runFullPipeline = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?._id;
+    if (!userId) {
+      throw new ApiError(401, 'User not authenticated');
+    }
+
+    const {
+      skipAuth = false,
+      maxJobs = 50,
+      matchThreshold = 70,
+      tailorResume = true,
+      uploadToProfile = true,
+    } = req.body;
+
+    logger.info('Starting full automation pipeline', {
+      userId,
+      options: { skipAuth, maxJobs, matchThreshold, tailorResume, uploadToProfile },
+    });
+
+    const pipeline = new FullAutomationPipeline();
+
+    const result = await pipeline.runFullPipeline(userId, {
+      skipAuth,
+      maxJobs,
+      matchThreshold,
+      tailorResume,
+      uploadToProfile,
+    });
+
+    res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          result,
+          'Full automation pipeline completed'
+        )
+      );
+  } catch (error) {
+    logger.error('Full pipeline failed', { error });
+    throw error;
+  }
+};
+
+/**
+ * Get pipeline status for running automation
+ */
+export const getPipelineStatus = async (req: Request, res: Response) => {
+  // In production, you'd track this in Redis or DB
+  // For now, return simple status
+  res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        {
+          message: 'Use /api/v1/automation/full to start pipeline',
+          endpoints: {
+            fullPipeline: 'POST /api/v1/automation/full',
+            auth: 'POST /api/v1/automation/auth/naukri',
+            scrape: 'POST /api/v1/automation/scrape',
+            apply: 'POST /api/v1/automation/apply',
+          },
+        },
+        'Pipeline API info'
+      )
+    );
 };
