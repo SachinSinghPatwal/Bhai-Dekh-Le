@@ -287,7 +287,7 @@ npm run test:playwright
 ### storageState Expired
 If authentication fails mid-session, re-run:
 ```bash
-npm run automation:auth
+npm run automation:auth -- <24-character-mongodb-user-id>
 ```
 
 ### Playwright Browser Issues
@@ -358,7 +358,7 @@ Sachin Singh Patwal
 **Next Steps:**
 1. Set up `.env` file with actual credentials
 2. Run `npm run dev` to start server
-3. Test authentication flow: `npm run automation:auth <userId>`
+3. Test authentication flow: `npm run automation:auth -- <24-character-mongodb-user-id>`
 4. Test scraping: `npm run automation:scrape <userId>`
 5. Test full automation via API endpoints
 

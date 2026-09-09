@@ -77,10 +77,10 @@ reducing authentication time by 40% and improving security compliance (Why)
 npm run automation:full <userId>
 
 # Custom settings
-npm run automation:full <userId> --max-jobs=30 --threshold=80
+npm run automation:full -- <24-character-mongodb-user-id> --max-jobs=30 --threshold=80
 
 # Skip specific steps
-npm run automation:full <userId> --no-tailor --skip-auth
+npm run automation:full -- <24-character-mongodb-user-id> --no-tailor --skip-auth
 ```
 
 ### Option 2: API
@@ -275,9 +275,9 @@ Respects your What + How + Why structure exactly
 
 Before going live:
 - [ ] Set up .env with all credentials
-- [ ] Test authentication: `npm run automation:auth <userId>`
+- [ ] Test authentication: `npm run automation:auth -- <24-character-mongodb-user-id>`
 - [ ] Upload resume: `.txt` format, What + How + Why pattern
-- [ ] Run pipeline with 5 jobs: `npm run automation:full <userId> --max-jobs=5`
+- [ ] Run pipeline with 5 jobs: `npm run automation:full -- <24-character-mongodb-user-id> --max-jobs=5`
 - [ ] Check tailored resumes in `uploads/resumes/<userId>/tailored/`
 - [ ] Verify Naukri profile updated
 - [ ] Review applied jobs on Naukri

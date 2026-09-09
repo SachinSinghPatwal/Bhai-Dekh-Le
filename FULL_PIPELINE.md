@@ -256,7 +256,7 @@ The script prints live progress:
 ```
 🚀 Starting Full Automation Pipeline
 ==================================================
-User ID: 66e4f1234567890abcdef123
+User ID: <24-character-mongodb-user-id>
 Options:
   - Max Jobs: 50
   - Match Threshold: 70
@@ -338,7 +338,7 @@ User profile updated with:
 
 ### 1. Start with Test Run
 ```bash
-npm run automation:full <userId> --max-jobs=5 --threshold=80
+npm run automation:full -- <24-character-mongodb-user-id> --max-jobs=5 --threshold=80
 ```
 Run with few jobs and high threshold to verify everything works.
 
@@ -404,11 +404,11 @@ grep GEMINI_API_KEY Backend/.env
 ## Expected Output Example
 
 ```bash
-$ npm run automation:full 66e4f1234567890abcdef123 --max-jobs=20 --threshold=75
+$ npm run automation:full -- <24-character-mongodb-user-id> --max-jobs=20 --threshold=75
 
 🚀 Starting Full Automation Pipeline
 ==================================================
-User ID: 66e4f1234567890abcdef123
+User ID: <24-character-mongodb-user-id>
 Options:
   - Max Jobs: 20
   - Match Threshold: 75

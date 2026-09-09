@@ -154,7 +154,7 @@ npm run dev
 
 ### 3. Authenticate
 ```bash
-npm run automation:auth <userId>
+npm run automation:auth -- <24-character-mongodb-user-id>
 # Browser opens, login manually, session saved
 ```
 

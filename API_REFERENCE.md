@@ -171,7 +171,7 @@ Response:
   "success": true,
   "data": {
     "resume": {
-      "path": "./uploads/resumes/66e4f1234567890abcdef123/resume.txt",
+      "path": "./uploads/resumes/<userId>/resume.txt",
       "fileName": "resume.txt",
       "uploadedAt": "2026-09-09T13:20:00.000Z"
     }

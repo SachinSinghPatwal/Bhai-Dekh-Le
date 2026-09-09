@@ -98,7 +98,7 @@
 
 **CLI Scripts**
 ```bash
-npm run automation:auth <userId>    # Manual authentication
+npm run automation:auth -- <24-character-mongodb-user-id>    # Waits for manual authentication
 npm run automation:scrape <userId>  # Scrape jobs
 npm run playwright:install          # Install browsers
 npm run test:playwright             # Run tests
@@ -224,7 +224,7 @@ npm run dev
 
 **Step 2: Authenticate with Naukri**
 ```bash
-npm run automation:auth <userId>
+npm run automation:auth -- <24-character-mongodb-user-id>
 ```
 - Browser opens in headed mode
 - Login manually to Naukri

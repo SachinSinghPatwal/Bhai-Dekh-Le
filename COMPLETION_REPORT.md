@@ -113,14 +113,14 @@ npm run automation:full <userId>
 
 ### Option 1: Full Automation (Recommended)
 ```bash
-npm run automation:full 66e4f1234567890abcdef123
+npm run automation:full -- <24-character-mongodb-user-id>
 ```
 **Runs entire pipeline automatically!**
 
 ### Option 2: Step-by-Step Control
 ```bash
 # Step 1: Authenticate
-npm run automation:auth <userId>
+npm run automation:auth -- <24-character-mongodb-user-id>
 
 # Step 2: Scrape jobs
 npm run automation:scrape <userId>

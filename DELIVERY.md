@@ -118,7 +118,7 @@ cp .env.example .env
 ### 3. Run (1 minute)
 ```bash
 npm run dev
-npm run automation:auth <userId>  # Browser opens, login manually
+npm run automation:auth -- <24-character-mongodb-user-id>  # Browser waits until you finish logging in
 ```
 
 **That's it!** Your automation is running.

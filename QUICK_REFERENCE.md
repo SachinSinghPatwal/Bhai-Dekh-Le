@@ -184,7 +184,7 @@ npm run dev
 
 # Terminal 2: Run automation
 cd Backend
-npm run automation:full YOUR_USER_ID
+npm run automation:full -- <24-character-mongodb-user-id>
 
 # Watch progress and wait for completion!
 ```
