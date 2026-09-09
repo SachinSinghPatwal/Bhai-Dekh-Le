@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import fs from 'fs';
-import path from 'path';
 import logger from '../../utility/logger.js';
+import { ApiError } from '../../utility/ApiError.js';
+import { extractResumeTextFromFile } from '../../utility/resume-text.js';
 import { GeminiMatchResult } from '../../types/automation.types.js';
 
 /**
@@ -14,7 +14,10 @@ export class GeminiMatchingService {
   constructor() {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      throw new Error('GEMINI_API_KEY not found in environment variables');
+      throw new ApiError(
+        503,
+        'AI matching is not configured. Set GEMINI_API_KEY in Backend/.env — see GEMINI_SETUP.md.'
+      );
     }
     this.genAI = new GoogleGenerativeAI(apiKey);
   }
@@ -81,24 +84,18 @@ Respond ONLY with this JSON format:
   }
 
   /**
-   * Extract text from resume file
-   * Supports TXT files (PDF requires additional library)
+   * Extract text from a resume file on disk.
+   * Supports PDF, DOCX and plain text.
    */
-  async extractResumeText(resumePath: string): Promise<string> {
+  async extractResumeText(resumePath: string, mimeType?: string): Promise<string> {
     try {
-      if (!fs.existsSync(resumePath)) {
-        logger.warn(`Resume file not found: ${resumePath}`);
-        return '';
+      const text = await extractResumeTextFromFile(resumePath, mimeType);
+
+      if (!text) {
+        logger.warn('Resume produced no text', { resumePath });
       }
 
-      const ext = path.extname(resumePath).toLowerCase();
-
-      if (ext === '.txt') {
-        return fs.readFileSync(resumePath, 'utf8');
-      }
-
-      logger.warn(`PDF parsing not implemented. Use .txt files for now.`);
-      return '';
+      return text;
     } catch (error) {
       logger.error('Failed to extract resume text', { error, resumePath });
       return '';

@@ -1,6 +1,10 @@
 import { BrowserManager } from '../BrowserManager.js';
 import { StorageStateManager } from '../StorageStateManager.js';
 import { Page } from 'playwright';
+import {
+  writeTempStorageState,
+  removeTempStorageState,
+} from '../../../utility/temp-storage-state.js';
 import logger from '../../../utility/logger.js';
 import { User } from '../../../models/Mongo/user.models.js';
 import { JobModel } from '../../../models/Mongo/job.models.js';
@@ -24,6 +28,7 @@ export class NaukriScraperService {
    */
   async scrapeJobs(userId: string, maxJobs: number = 50): Promise<JobScrapeResult[]> {
     let page: Page | null = null;
+    let tempStatePath: string | null = null;
     const scrapedJobs: JobScrapeResult[] = [];
 
     try {
@@ -47,9 +52,8 @@ export class NaukriScraperService {
       // Launch browser with saved state
       await this.browserManager.launch({ headless: false });
 
-      // Create temp file for storage state
-      const tempStatePath = `./temp-state-${userId}.json`;
-      require('fs').writeFileSync(tempStatePath, JSON.stringify(storageState));
+      // Write the decrypted session to a short-lived file for Playwright.
+      tempStatePath = writeTempStorageState(userId, storageState);
 
       await this.browserManager.createContext({
         storageStatePath: tempStatePath,
@@ -86,9 +90,6 @@ export class NaukriScraperService {
       // Save jobs to database
       await this.saveJobsToDatabase(scrapedJobs, userId);
 
-      // Cleanup temp file
-      require('fs').unlinkSync(tempStatePath);
-
       logger.info('Job scraping completed', {
         totalJobs: scrapedJobs.length,
       });
@@ -101,6 +102,8 @@ export class NaukriScraperService {
       if (page) {
         await this.browserManager.close();
       }
+      // Always remove the decrypted session file, including on failure.
+      removeTempStorageState(tempStatePath);
     }
   }
 

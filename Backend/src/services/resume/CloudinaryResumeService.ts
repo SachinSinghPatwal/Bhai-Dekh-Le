@@ -1,6 +1,23 @@
 import { v2 as cloudinary } from 'cloudinary';
 import type { UploadApiResponse } from 'cloudinary';
 import logger from '../../utility/logger.js';
+import { ApiError } from '../../utility/ApiError.js';
+import { extractResumeTextFromBuffer } from '../../utility/resume-text.js';
+
+/**
+ * True when all three Cloudinary credentials are present.
+ *
+ * Cloudinary is an optional feature: the rest of the API (auth, scraping,
+ * applying) works fine with local resume storage. Callers use this to return a
+ * clean 503 instead of letting a missing env var surface as a 500.
+ */
+export function isCloudinaryConfigured(): boolean {
+  return Boolean(
+    process.env.CLOUDINARY_CLOUD_NAME &&
+      process.env.CLOUDINARY_API_KEY &&
+      process.env.CLOUDINARY_API_SECRET
+  );
+}
 
 /**
  * Cloud-based resume storage using Cloudinary
@@ -8,14 +25,24 @@ import logger from '../../utility/logger.js';
  * Saves storage by compressing PDFs and documents
  */
 export class CloudinaryResumeService {
-  constructor() {
+  private configured = false;
+
+  /**
+   * Configuration is deferred to the first call rather than done in the
+   * constructor. Constructing the service must never throw, otherwise a
+   * missing CLOUDINARY_* variable stops the entire server from booting.
+   */
+  private ensureConfigured(): void {
+    if (this.configured) return;
+
     const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
     const apiKey = process.env.CLOUDINARY_API_KEY;
     const apiSecret = process.env.CLOUDINARY_API_SECRET;
 
     if (!cloudName || !apiKey || !apiSecret) {
-      throw new Error(
-        'Cloudinary credentials not found in environment variables'
+      throw new ApiError(
+        503,
+        'Cloud storage is not configured. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET in Backend/.env, or use local resume upload instead.'
       );
     }
 
@@ -25,6 +52,7 @@ export class CloudinaryResumeService {
       api_secret: apiSecret,
     });
 
+    this.configured = true;
     logger.info('Cloudinary configured');
   }
 
@@ -41,8 +69,11 @@ export class CloudinaryResumeService {
     cloudinaryId: string;
     fileName: string;
     fileSize: number;
+    mimeType: string;
     uploadedAt: Date;
   }> {
+    this.ensureConfigured();
+
     try {
       // Validate file
       this.validateFile(file);
@@ -106,6 +137,7 @@ export class CloudinaryResumeService {
         cloudinaryId: uploadResult.public_id,
         fileName: file.originalname,
         fileSize: uploadResult.bytes,
+        mimeType: file.mimetype,
         uploadedAt: new Date(),
       };
     } catch (error) {
@@ -118,6 +150,8 @@ export class CloudinaryResumeService {
    * Delete resume from Cloudinary
    */
   async deleteResume(cloudinaryId: string): Promise<void> {
+    this.ensureConfigured();
+
     try {
       logger.info('Deleting resume from Cloudinary', { cloudinaryId });
 
@@ -139,6 +173,8 @@ export class CloudinaryResumeService {
    * Get resume from Cloudinary
    */
   async getResumeUrl(cloudinaryId: string): Promise<string> {
+    this.ensureConfigured();
+
     try {
       const resource = await cloudinary.api.resource(cloudinaryId, {
         resource_type: 'auto',
@@ -160,6 +196,8 @@ export class CloudinaryResumeService {
    * Downloads and returns text for AI processing
    */
   async getResumeText(cloudinaryId: string): Promise<string> {
+    this.ensureConfigured();
+
     try {
       logger.info('Fetching resume text from Cloudinary', { cloudinaryId });
 
@@ -168,19 +206,35 @@ export class CloudinaryResumeService {
         resource_type: 'auto',
       });
 
-      // For text files, directly fetch
-      if (resource.resource_type === 'raw') {
-        const response = await fetch(resource.secure_url);
-        const text = await response.text();
-        logger.info('Resume text retrieved from Cloudinary');
-        return text;
+      const response = await fetch(resource.secure_url);
+      if (!response.ok) {
+        throw new Error(
+          `Failed to download resume from Cloudinary (HTTP ${response.status})`
+        );
       }
 
-      // For PDFs, would need pdf-parse library
-      logger.warn('PDF text extraction requires additional library');
-      return '';
+      const buffer = Buffer.from(await response.arrayBuffer());
+      const contentType =
+        response.headers.get('content-type') || resource.format || undefined;
+
+      // Handles PDF and DOCX, not just plain text.
+      const text = await extractResumeTextFromBuffer(
+        buffer,
+        contentType,
+        resource.secure_url
+      );
+
+      logger.info('Resume text retrieved from Cloudinary', {
+        cloudinaryId,
+        characters: text.length,
+      });
+
+      return text;
     } catch (error) {
-      logger.error('Failed to get resume text from Cloudinary', { error });
+      logger.error('Failed to get resume text from Cloudinary', {
+        error,
+        cloudinaryId,
+      });
       return '';
     }
   }
@@ -189,6 +243,8 @@ export class CloudinaryResumeService {
    * List all user resumes
    */
   async listUserResumes(userId: string): Promise<any[]> {
+    this.ensureConfigured();
+
     try {
       const originalResumes = await cloudinary.search
         .expression(`folder:"resumes/${userId}/original"`)

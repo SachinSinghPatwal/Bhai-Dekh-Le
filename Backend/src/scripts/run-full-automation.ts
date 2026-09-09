@@ -1,5 +1,6 @@
 import '../config/load-env.js';
 import { FullAutomationPipeline } from '../services/FullAutomationPipeline.js';
+import connectToMongoDb, { disconnectFromMongoDb } from '../db/MongoDb.js';
 import { isMongoObjectId } from '../utility/user-id.js';
 import logger from '../utility/logger.js';
 
@@ -68,6 +69,9 @@ async function main() {
 
     const pipeline = new FullAutomationPipeline();
 
+    // Every pipeline step touches MongoDB, so connect before starting.
+    await connectToMongoDb();
+
     // Track progress
     const statusInterval = setInterval(() => {
       const status = pipeline.getStatus();
@@ -84,6 +88,8 @@ async function main() {
     const result = await pipeline.runFullPipeline(userId, options);
 
     clearInterval(statusInterval);
+
+    await disconnectFromMongoDb();
 
     console.log('');
     console.log('═'.repeat(50));
@@ -109,6 +115,7 @@ async function main() {
     console.error('');
     console.error('❌ Pipeline Failed!');
     console.error('Error:', error);
+    await disconnectFromMongoDb().catch(() => undefined);
     process.exit(1);
   }
 }

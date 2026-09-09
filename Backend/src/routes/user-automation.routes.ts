@@ -17,11 +17,13 @@ const upload = multer({
   fileFilter: (_req, file, cb) => {
     if (
       file.mimetype === 'application/pdf' ||
-      file.mimetype === 'text/plain'
+      file.mimetype === 'text/plain' ||
+      file.mimetype ===
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     ) {
       cb(null, true);
     } else {
-      cb(new Error('Only PDF and TXT files allowed'));
+      cb(new Error('Only PDF, DOCX and TXT files allowed'));
     }
   },
 });

@@ -5,14 +5,24 @@ import logger from '../utility/logger.js';
 import { ApiError } from '../utility/ApiError.js';
 import { ApiResponse } from '../utility/ApiResponse.js';
 
-const cloudinaryResumeService = new CloudinaryResumeService();
+/**
+ * Built on first use rather than at import time. Constructing at module load
+ * meant a missing CLOUDINARY_* variable took down the whole server, including
+ * the routes that have nothing to do with cloud storage.
+ */
+let cloudinaryResumeService: CloudinaryResumeService | null = null;
+
+function getCloudinaryService(): CloudinaryResumeService {
+  cloudinaryResumeService ??= new CloudinaryResumeService();
+  return cloudinaryResumeService;
+}
 
 /**
  * Upload resume to Cloudinary (compressed)
  */
 export const uploadResumeToCloud = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?._id;
+    const userId = req.user?._id;
     if (!userId) {
       throw new ApiError(401, 'User not authenticated');
     }
@@ -23,7 +33,7 @@ export const uploadResumeToCloud = async (req: Request, res: Response) => {
 
     logger.info('Uploading resume to Cloudinary', { userId });
 
-    const uploadResult = await cloudinaryResumeService.uploadResume(
+    const uploadResult = await getCloudinaryService().uploadResume(
       userId.toString(),
       req.file,
       true // isOriginal
@@ -36,6 +46,7 @@ export const uploadResumeToCloud = async (req: Request, res: Response) => {
           cloudinaryUrl: uploadResult.publicUrl,
           cloudinaryId: uploadResult.cloudinaryId,
           fileName: uploadResult.fileName,
+          mimeType: uploadResult.mimeType,
           uploadedAt: uploadResult.uploadedAt,
           storage: 'cloudinary', // Track where it's stored
         },
@@ -70,7 +81,7 @@ export const uploadResumeToCloud = async (req: Request, res: Response) => {
  */
 export const getUserResume = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?._id;
+    const userId = req.user?._id;
     if (!userId) {
       throw new ApiError(401, 'User not authenticated');
     }
@@ -87,7 +98,8 @@ export const getUserResume = async (req: Request, res: Response) => {
           200,
           {
             resume: {
-              url: (user.resume as any).cloudinaryUrl,
+              url: user.resume.cloudinaryUrl,
+              storage: user.resume.storage ?? 'local',
               fileName: user.resume.fileName,
               uploadedAt: user.resume.uploadedAt,
             },
@@ -106,12 +118,12 @@ export const getUserResume = async (req: Request, res: Response) => {
  */
 export const getStorageStats = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?._id;
+    const userId = req.user?._id;
     if (!userId) {
       throw new ApiError(401, 'User not authenticated');
     }
 
-    const stats = await cloudinaryResumeService.getStorageStats(userId.toString());
+    const stats = await getCloudinaryService().getStorageStats(userId.toString());
 
     // Convert bytes to MB
     const storageMB = (stats.totalStorage / (1024 * 1024)).toFixed(2);
@@ -143,7 +155,7 @@ export const getStorageStats = async (req: Request, res: Response) => {
  */
 export const deleteResumeFromCloud = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?._id;
+    const userId = req.user?._id;
     if (!userId) {
       throw new ApiError(401, 'User not authenticated');
     }
@@ -153,10 +165,19 @@ export const deleteResumeFromCloud = async (req: Request, res: Response) => {
       throw new ApiError(404, 'Resume not found');
     }
 
-    const cloudinaryId = (user.resume as any).cloudinaryId;
+    const { cloudinaryId } = user.resume;
+
+    // A locally-stored resume has no Cloudinary object to destroy; calling
+    // destroy(undefined) would fail with a confusing error.
+    if (!cloudinaryId) {
+      throw new ApiError(
+        400,
+        'This resume is not stored in Cloudinary, so there is nothing to delete there.'
+      );
+    }
 
     // Delete from Cloudinary
-    await cloudinaryResumeService.deleteResume(cloudinaryId);
+    await getCloudinaryService().deleteResume(cloudinaryId);
 
     // Remove from user record
     await User.findByIdAndUpdate(userId, {

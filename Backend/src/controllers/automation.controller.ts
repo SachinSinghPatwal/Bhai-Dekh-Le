@@ -19,7 +19,7 @@ let jobsApplied = 0;
  */
 export const authenticateUser = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?._id;
+    const userId = req.user?._id;
     if (!userId) {
       throw new ApiError(401, 'User not authenticated');
     }
@@ -53,7 +53,7 @@ export const authenticateUser = async (req: Request, res: Response) => {
  */
 export const scrapeJobs = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?._id;
+    const userId = req.user?._id;
     if (!userId) {
       throw new ApiError(401, 'User not authenticated');
     }
@@ -98,7 +98,7 @@ export const scrapeJobs = async (req: Request, res: Response) => {
  */
 export const applyToJobs = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?._id;
+    const userId = req.user?._id;
     if (!userId) {
       throw new ApiError(401, 'User not authenticated');
     }
@@ -182,7 +182,7 @@ export const stopAutomation = async (_req: Request, res: Response) => {
  */
 export const runFullPipeline = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?._id;
+    const userId = req.user?._id;
     if (!userId) {
       throw new ApiError(401, 'User not authenticated');
     }

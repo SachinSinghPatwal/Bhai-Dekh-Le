@@ -1,5 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
-import { StorageStateManager } from '../src/services/playwright/StorageStateManager';
+// NodeNext module resolution requires the .js extension on relative imports.
+import { StorageStateManager } from '../src/services/playwright/StorageStateManager.js';
 
 test.describe('Naukri Job Applier Flow', () => {
   let page: Page;

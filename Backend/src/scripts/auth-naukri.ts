@@ -1,5 +1,6 @@
 import '../config/load-env.js';
 import { NaukriAuthService } from '../services/playwright/naukri/NaukriAuthService.js';
+import connectToMongoDb, { disconnectFromMongoDb } from '../db/MongoDb.js';
 import { isMongoObjectId } from '../utility/user-id.js';
 import logger from '../utility/logger.js';
 
@@ -22,8 +23,14 @@ async function main() {
 
     logger.info('Starting Naukri authentication CLI', { userId });
 
+    // Services read/write the user document directly, so the connection has to
+    // be open before any of them run.
+    await connectToMongoDb();
+
     const authService = new NaukriAuthService();
     const result = await authService.authenticate(userId);
+
+    await disconnectFromMongoDb();
 
     if (result.success) {
       console.log('✓ Authentication successful!');
@@ -36,6 +43,7 @@ async function main() {
   } catch (error) {
     logger.error('CLI error', { error });
     console.error('Error:', error);
+    await disconnectFromMongoDb().catch(() => undefined);
     process.exit(1);
   }
 }

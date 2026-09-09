@@ -1,7 +1,12 @@
 import { BrowserManager } from '../BrowserManager.js';
 import { StorageStateManager } from '../StorageStateManager.js';
 import { Page } from 'playwright';
+import {
+  writeTempStorageState,
+  removeTempStorageState,
+} from '../../../utility/temp-storage-state.js';
 import logger from '../../../utility/logger.js';
+import { extractUserResumeText } from '../../../utility/resume-text.js';
 import { User } from '../../../models/Mongo/user.models.js';
 import { JobModel } from '../../../models/Mongo/job.models.js';
 import { GeminiMatchingService } from '../../gemini/GeminiMatchingService.js';
@@ -28,6 +33,7 @@ export class NaukriApplierService {
     threshold: number = 70
   ): Promise<{ applied: number; skipped: number; failed: number }> {
     let page: Page | null = null;
+    let tempStatePath: string | null = null;
     const result = { applied: 0, skipped: 0, failed: 0 };
 
     try {
@@ -64,8 +70,8 @@ export class NaukriApplierService {
 
       // Launch browser
       await this.browserManager.launch({ headless: false });
-      const tempStatePath = `./temp-state-${userId}.json`;
-      require('fs').writeFileSync(tempStatePath, JSON.stringify(storageState));
+      // Temp session file lives in the OS temp dir and is removed in `finally`.
+      tempStatePath = writeTempStorageState(userId, storageState);
 
       await this.browserManager.createContext({
         storageStatePath: tempStatePath,
@@ -73,10 +79,8 @@ export class NaukriApplierService {
 
       page = await this.browserManager.newPage();
 
-      // Get resume text for Gemini matching
-      const resumeText = user.resume?.path
-        ? await this.geminiService.extractResumeText(user.resume.path)
-        : '';
+      // Get resume text for Gemini matching (cloud copy preferred, local fallback)
+      const resumeText = await extractUserResumeText(user.resume);
 
       if (!resumeText) {
         logger.warn('No resume found, matching will be less accurate');
@@ -139,9 +143,6 @@ export class NaukriApplierService {
         }
       }
 
-      // Cleanup
-      require('fs').unlinkSync(tempStatePath);
-
       logger.info('Job application process completed', result);
       return result;
     } catch (error) {
@@ -151,6 +152,8 @@ export class NaukriApplierService {
       if (page) {
         await this.browserManager.close();
       }
+      // Always remove the decrypted session file, including on failure.
+      removeTempStorageState(tempStatePath);
     }
   }
 

@@ -8,6 +8,7 @@ import { User } from '../models/Mongo/user.models.js';
 import { JobModel } from '../models/Mongo/job.models.js';
 import logger from '../utility/logger.js';
 import { assertMongoObjectId } from '../utility/user-id.js';
+import { extractUserResumeText } from '../utility/resume-text.js';
 
 /**
  * Parent automation orchestrator
@@ -92,10 +93,7 @@ export class FullAutomationPipeline {
         throw new Error('User not found');
       }
 
-      let resumeText = '';
-      if (user.resume?.path) {
-        resumeText = await this.geminiService.extractResumeText(user.resume.path);
-      }
+      let resumeText = await extractUserResumeText(user.resume);
 
       if (!resumeText) {
         logger.warn('No resume found, job matching will be less accurate');

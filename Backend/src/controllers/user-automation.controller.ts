@@ -13,7 +13,7 @@ const resumeService = new ResumeService();
  */
 export const uploadResume = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?._id;
+    const userId = req.user?._id;
     if (!userId) {
       throw new ApiError(401, 'User not authenticated');
     }
@@ -24,7 +24,7 @@ export const uploadResume = async (req: Request, res: Response) => {
 
     logger.info('Uploading resume', { userId });
 
-    const resumeData = await resumeService.saveResume(userId, req.file);
+    const resumeData = await resumeService.saveResume(userId.toString(), req.file);
 
     // Update user record
     await User.findByIdAndUpdate(userId, {
@@ -32,7 +32,10 @@ export const uploadResume = async (req: Request, res: Response) => {
         resume: {
           path: resumeData.path,
           fileName: resumeData.fileName,
+          // Recorded so the text extractor knows which parser to use later.
+          mimeType: req.file.mimetype,
           uploadedAt: resumeData.uploadedAt,
+          storage: 'local',
         },
       },
     });
@@ -57,7 +60,7 @@ export const uploadResume = async (req: Request, res: Response) => {
  */
 export const updatePreferences = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?._id;
+    const userId = req.user?._id;
     if (!userId) {
       throw new ApiError(401, 'User not authenticated');
     }
@@ -90,7 +93,7 @@ export const updatePreferences = async (req: Request, res: Response) => {
  */
 export const getUserApplications = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?._id;
+    const userId = req.user?._id;
     if (!userId) {
       throw new ApiError(401, 'User not authenticated');
     }
@@ -120,7 +123,7 @@ export const getUserApplications = async (req: Request, res: Response) => {
  */
 export const getStats = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?._id;
+    const userId = req.user?._id;
     if (!userId) {
       throw new ApiError(401, 'User not authenticated');
     }

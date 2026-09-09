@@ -2,6 +2,10 @@ import { BrowserManager } from '../BrowserManager.js';
 import { StorageStateManager } from '../StorageStateManager.js';
 import { Page } from 'playwright';
 import fs from 'fs';
+import {
+  writeTempStorageState,
+  removeTempStorageState,
+} from '../../../utility/temp-storage-state.js';
 import logger from '../../../utility/logger.js';
 import { User } from '../../../models/Mongo/user.models.js';
 
@@ -28,6 +32,7 @@ export class NaukriProfileService {
     resumePath: string
   ): Promise<{ success: boolean; message: string }> {
     let page: Page | null = null;
+    let tempStatePath: string | null = null;
 
     try {
       logger.info('Uploading resume to Naukri profile', { userId, resumePath });
@@ -51,8 +56,9 @@ export class NaukriProfileService {
       // Launch browser
       await this.browserManager.launch({ headless: false });
 
-      const tempStatePath = `./temp-state-${userId}.json`;
-      fs.writeFileSync(tempStatePath, JSON.stringify(storageState));
+      // Decrypted session goes to a short-lived file in the OS temp dir and is
+      // removed in `finally`.
+      tempStatePath = writeTempStorageState(userId, storageState);
 
       await this.browserManager.createContext({
         storageStatePath: tempStatePath,
@@ -97,8 +103,6 @@ export class NaukriProfileService {
       }
 
       // Cleanup
-      fs.unlinkSync(tempStatePath);
-
       logger.info('Resume uploaded to Naukri profile successfully');
 
       return {
@@ -115,6 +119,8 @@ export class NaukriProfileService {
       if (page) {
         await this.browserManager.close();
       }
+      // Always remove the decrypted session file, including on failure.
+      removeTempStorageState(tempStatePath);
     }
   }
 
@@ -127,6 +133,7 @@ export class NaukriProfileService {
     summary: string
   ): Promise<boolean> {
     let page: Page | null = null;
+    let tempStatePath: string | null = null;
 
     try {
       logger.info('Updating Naukri profile summary');
@@ -141,8 +148,10 @@ export class NaukriProfileService {
       );
 
       await this.browserManager.launch({ headless: false });
-      const tempStatePath = `./temp-state-${userId}.json`;
-      fs.writeFileSync(tempStatePath, JSON.stringify(storageState));
+
+      // Decrypted session goes to a short-lived file in the OS temp dir and is
+      // removed in `finally`.
+      tempStatePath = writeTempStorageState(userId, storageState);
 
       await this.browserManager.createContext({
         storageStatePath: tempStatePath,
@@ -176,7 +185,6 @@ export class NaukriProfileService {
         await page.waitForTimeout(2000);
       }
 
-      fs.unlinkSync(tempStatePath);
       logger.info('Profile summary updated');
 
       return true;
@@ -187,6 +195,8 @@ export class NaukriProfileService {
       if (page) {
         await this.browserManager.close();
       }
+      // Always remove the decrypted session file, including on failure.
+      removeTempStorageState(tempStatePath);
     }
   }
 }

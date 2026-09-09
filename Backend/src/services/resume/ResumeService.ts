@@ -67,10 +67,15 @@ export class ResumeService {
    * Validate uploaded file
    */
   private validateFile(file: Express.Multer.File): void {
-    // Check file type
-    const allowedTypes = ['application/pdf', 'text/plain'];
+    // Kept in sync with the multer fileFilter on the upload route and with the
+    // formats the text extractor can actually read.
+    const allowedTypes = [
+      'application/pdf',
+      'text/plain',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ];
     if (!allowedTypes.includes(file.mimetype)) {
-      throw new Error('Invalid file type. Only PDF and TXT files are allowed.');
+      throw new Error('Invalid file type. Only PDF, DOCX and TXT files are allowed.');
     }
 
     // Check file size (5MB max)
