@@ -14,7 +14,7 @@ app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 app.use(cookieParser());
 
 // import jobRoutes from "./routes/job.routes.js";
-import Scraper from "./Learn/phase8/index.js";
+import Scraper from "./services/Scrapper.js";
 
 
 // Liveness probe — deliberately unauthenticated.
