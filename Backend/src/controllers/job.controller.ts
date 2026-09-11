@@ -5,7 +5,6 @@ import { Request,RequestHandler,Response } from "express";
 
 import endpointRequestBodyValidation from "../utility/endpointRequestBodyValidation.js";
 import Scraper from "../services/Scrapper.js";
-import { ApiResponse } from "../utility/ApiResponse.js";
 
 export const createJob = asyncHandler(async (req:Request, res:Response) => {
   const validatedData = endpointRequestBodyValidation(req as Request);
