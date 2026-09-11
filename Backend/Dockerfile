@@ -6,6 +6,9 @@ COPY package*.json ./
 
 RUN npm ci
 
+RUN apt-get update && apt-get install -y xauth \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN npx playwright install --with-deps chromium
 
 COPY . .
