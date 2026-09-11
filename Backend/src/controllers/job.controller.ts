@@ -23,7 +23,7 @@ export const getAllJobs = asyncHandler(async (req: Request, res: Response) => {
   const data = await Scraper();
   res.status(200).json({
     success: true,
-    data,
+    data:data,
   });
 });
 export const getJobById = asyncHandler(async (_req, _res) => {});

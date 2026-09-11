@@ -5,7 +5,7 @@ export default async function Scraper() {
   // here (rather than at module import time) also prevents a browser problem
   // from taking down the API before it can start.
   const browser = await chromium.launch({ headless: false });
-
+  let collectedData:Record<string,number>[]=[] ;
   try {
     const context = await browser.newContext();
     const page = await context.newPage();
@@ -45,13 +45,12 @@ export default async function Scraper() {
           const body = await response.json();
 
           console.log("\nBODY:");
-          const data = body.jobDetails.map((each: Record<string, unknown>) => ({
-            [each.title as string]: each.footerPlaceholderLabel,
+          const data:Record<string,number>[] = body.jobDetails.map((each: Record<string, unknown>) => ({
+            [each.title as string]: Number((each.footerPlaceholderLabel as string).split(" ")[0]),
           }));
-          console.log(data);
-          return data;
+          
+          (collectedData as object[]).push(...data);
         }
-        return;
       } catch (error) {
         console.error("HTTP REQUEST FAILED:");
         console.error(error);
@@ -61,8 +60,10 @@ export default async function Scraper() {
     await page.goto("https://www.naukri.com/react-jobs?k=react");
 
     await page.waitForTimeout(10000);
-  } finally {
+    await browser.close()
+    return collectedData;
+  }catch(error){
     await browser.close();
+    console.log(error)
   }
-
 }
