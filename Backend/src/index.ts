@@ -1,17 +1,17 @@
-import './config/load-env.js';
+import dotenv from "dotenv";
 import app from "./app.js";
-import connectToMongoDb from "./db/MongoDb.js";
+import connectDB from "./db/MongoDb.js";
 
-const port = Number(process.env.PORT) || 8000;
-
-app.listen(port, "0.0.0.0", () => {
-  console.log(`⚙️ Server is running at port : ${port}`);
+dotenv.config({
+  path: "./.env",
 });
 
-connectToMongoDb()
+connectDB()
   .then(() => {
-    console.log("MongoDB initialization completed");
+    app.listen(process.env.PORT || 8000, () => {
+      console.log(`⚙️ Server is running at port : ${process.env.PORT}`);
+    });
   })
-  .catch((err: unknown) => {
-    console.error("MONGO db connection failed !!!", err);
+  .catch((err) => {
+    console.log("MONGO db connection failed !!! ", err);
   });
