@@ -1,5 +1,5 @@
 import { defineConfig } from '@playwright/test';
-
+import process from 'process';
 /**
  * Playwright config.
  *
