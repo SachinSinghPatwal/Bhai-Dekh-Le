@@ -18,7 +18,7 @@ import Scraper from "./services/Scrapper.js";
 
 
 // Liveness probe — deliberately unauthenticated.
-app.get("/api/v1/health", async (_req, res) => {
+app.get("/api/v1/test", async (_req, res) => {
   const data = await Scraper()
   res
     .status(200)
