@@ -26,8 +26,5 @@ app.get("/api/v1/test", async (_req, res) => {
   });
 });
 
-// Must stay last: 404 for unmatched paths, then the terminal error handler.
-// app.use(notFoundHandler);
-// app.use(errorHandler);
 
 export default app;
