@@ -4,7 +4,7 @@ import { createJob, getAllJobs, getJobById, updateJob, deleteJob } from "../cont
 const router = Router();
 
 router.post("/create", createJob);
-router.get("/all", getAllJobs);
+router.get("/getAll", getAllJobs);
 router.get("/:id", getJobById);
 router.put("/:id", updateJob);
 router.delete("/:id", deleteJob);

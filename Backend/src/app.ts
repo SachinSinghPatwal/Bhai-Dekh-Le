@@ -13,21 +13,17 @@ app.use(express.json({ limit: "16kb" }));
 app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 app.use(cookieParser());
 
-// import jobRoutes from "./routes/job.routes.js";
-import Scraper from "./services/Scrapper.js";
+import jobRoutes from "./routes/job.routes.js";
 
+app.use("/api/v1/job", jobRoutes);
 
 // Liveness probe — deliberately unauthenticated.
 app.get("/api/v1/test", async (_req, res) => {
-  const data = await Scraper()
-  res
-    .status(200)
-    .json({
-      success: true,
-      status: "ok",
-      uptime: process.uptime(),
-      data,
-    });
+  res.status(200).json({
+    success: true,
+    status: "ok",
+    uptime: process.uptime(),
+  });
 });
 
 // Must stay last: 404 for unmatched paths, then the terminal error handler.

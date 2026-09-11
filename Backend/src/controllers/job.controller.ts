@@ -1,9 +1,12 @@
 import { asyncHandler } from "../utility/asyncHandler.js";
 import { JobModel } from "../models/Mongo/job.models.js";
 import asyncHandlerTry_CatchWrapper from "../utility/asyncHandlerContentWrapper.js";
-import { Request,Response } from "express";
+import { Request,RequestHandler,Response } from "express";
 
 import endpointRequestBodyValidation from "../utility/endpointRequestBodyValidation.js";
+import Scraper from "../services/Scrapper.js";
+import { ApiResponse } from "../utility/ApiResponse.js";
+
 export const createJob = asyncHandler(async (req:Request, res:Response) => {
   const validatedData = endpointRequestBodyValidation(req as Request);
   const job = await asyncHandlerTry_CatchWrapper(async () => {
@@ -16,7 +19,13 @@ export const createJob = asyncHandler(async (req:Request, res:Response) => {
   });
 });
 
-export const getAllJobs = asyncHandler(async (_req, _res) => {});
+export const getAllJobs = asyncHandler(async (req: Request, res: Response) => {
+  const data = await Scraper();
+  res.status(200).json({
+    success: true,
+    data,
+  });
+});
 export const getJobById = asyncHandler(async (_req, _res) => {});
 export const updateJob = asyncHandler(async (_req, _res) => {});
 export const deleteJob = asyncHandler(async (_req, _res) => {});
