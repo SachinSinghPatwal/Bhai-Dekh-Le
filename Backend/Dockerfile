@@ -15,4 +15,4 @@ COPY . .
 
 RUN npm run build
 
-CMD ["xvfb-run", "-a", "--server-args=-screen 0 1920x1080x24", "npm", "start"]
+CMD ["xvfb-run", "-a", "--server-args=-screen 0 1920x1080x24", "node", "-e", "console.log('NODE STARTED'); setInterval(() => {}, 1000000)"]
