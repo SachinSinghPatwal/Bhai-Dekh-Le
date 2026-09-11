@@ -16,4 +16,4 @@ COPY . .
 
 RUN npm run build
 
-CMD ["sh", "-c", "echo 'CONTAINER STARTED'; xvfb-run -a --server-args='-screen 0 1920x1080x24' node dist/index.js"]
+CMD ["xvfb-run", "-a", "--server-args=-screen 0 1920x1080x24", "node", "dist/index.js"]
