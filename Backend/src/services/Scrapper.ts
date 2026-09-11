@@ -4,7 +4,7 @@ export default async function Scraper() {
   // Render has no display server, so the browser must run headlessly. Launching
   // here (rather than at module import time) also prevents a browser problem
   // from taking down the API before it can start.
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({ headless: false });
 
   try {
     const context = await browser.newContext();
