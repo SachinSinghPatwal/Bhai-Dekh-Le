@@ -5,7 +5,7 @@ export default async function Scraper() {
   // here (rather than at module import time) also prevents a browser problem
   // from taking down the API before it can start.
   const browser = await chromium.launch({ headless: false });
-  let collectedData:Record<string,number>[]=[] ;
+  let collectedData: Record<string, number>[] = [];
   try {
     const context = await browser.newContext();
     const page = await context.newPage();
@@ -25,7 +25,9 @@ export default async function Scraper() {
       // Remove HTTP/2 pseudo-headers:
       // :authority, :method, :path, :scheme
       const headers: Record<string, string> = Object.fromEntries(
-        Object.entries(capturedHeaders).filter(([name]) => !name.startsWith(":")),
+        Object.entries(capturedHeaders).filter(
+          ([name]) => !name.startsWith(":"),
+        ),
       );
 
       console.log("\n========== HTTP REQUEST ==========");
@@ -45,10 +47,28 @@ export default async function Scraper() {
           const body = await response.json();
 
           console.log("\nBODY:");
-          const data:Record<string,number>[] = body.jobDetails.map((each: Record<string, unknown>) => ({
-            [each.title as string]: Number((each.footerPlaceholderLabel as string).split(" ")[0]),
-          }));
-          
+          const data: Record<string, number>[] = body.jobDetails.filter(
+            (each: Record<string, unknown>) => {
+              const currentProp: string = (
+                each.footerPlaceholderLabel as string
+              ).split(" ")[0];
+              const curretnPropIsNan: boolean = isNaN(Number(currentProp));
+              // is currentProp is Not a Number
+              if (curretnPropIsNan) {
+                return {
+                  [each.title as string]: each.footerPlaceholderLabel,
+                };
+              } else if (!curretnPropIsNan && Number(currentProp) < 3) {
+                return {
+                  [each.title as string]: Number(
+                    (each.footerPlaceholderLabel as string).split(" ")[0],
+                  ),
+                };
+              }
+              return
+            },
+          );
+
           (collectedData as object[]).push(...data);
         }
       } catch (error) {
@@ -60,10 +80,10 @@ export default async function Scraper() {
     await page.goto("https://www.naukri.com/react-jobs?k=react");
 
     await page.waitForTimeout(10000);
-    await browser.close()
-    return collectedData;
-  }catch(error){
     await browser.close();
-    console.log(error)
+    return collectedData;
+  } catch (error) {
+    await browser.close();
+    console.log(error);
   }
 }
