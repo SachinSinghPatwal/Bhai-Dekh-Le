@@ -1,89 +1,41 @@
-import { chromium } from "playwright";
+import { chromium, type Request } from "playwright";
+import { sanitizeCaptureHeaderUrl } from "../helpers/Playwright/sanitizeCaptureHeaderUrl.js";
+import makeHttpRequestToGetAllDesiredJobs from "./ComposeHttpRequest.js";
+import { ApiError } from "../utility/ApiError.js";
+import UrlForPageToDirect from "../utility/ComposeUrl.js";
 
-export default async function Scraper() {
-  // Render has no display server, so the browser must run headlessly. Launching
-  // here (rather than at module import time) also prevents a browser problem
-  // from taking down the API before it can start.
+export default async function Scraper(): Promise<
+  Record<string, number>[] | undefined
+> {
+  let collectedData;
   const browser = await chromium.launch({ headless: false });
-  let collectedData: Record<string, number>[] = [];
   try {
     const context = await browser.newContext();
     const page = await context.newPage();
-
-    page.on("request", async (request) => {
+    page.on("request", async (request: Request) => {
       if (!request.url().includes("/jobapi/v3/search")) {
         return;
       }
       const url = new URL(request.url());
-
-      console.log("\n========== CAPTURED REQUEST ==========");
-
       const capturedHeaders = await request.allHeaders();
-
-      console.log("header Pseudo Removale");
-
-      // Remove HTTP/2 pseudo-headers:
-      // :authority, :method, :path, :scheme
-      const headers: Record<string, string> = Object.fromEntries(
-        Object.entries(capturedHeaders).filter(
-          ([name]) => !name.startsWith(":"),
-        ),
-      );
-
-      console.log("\n========== HTTP REQUEST ==========");
-
-      try {
-        for (let i = 1; i < 5; i++) {
-          url.searchParams.set("noOfResults", "20");
-          url.searchParams.set("pageNo", `${i}`);
-          console.log("\nHEADERS Injection count :", i);
-          const response = await fetch(url, {
-            method: request.method(),
-            headers,
-          });
-
-          console.log("STATUS:", response.status);
-
-          const body = await response.json();
-
-          console.log("\nBODY:");
-          const data: Record<string, number>[] = body.jobDetails.filter(
-            (each: Record<string, unknown>) => {
-              const currentProp: string = (
-                each.footerPlaceholderLabel as string
-              ).split(" ")[0];
-              const curretnPropIsNan: boolean = isNaN(Number(currentProp));
-              // is currentProp is Not a Number
-              if (curretnPropIsNan) {
-                return {
-                  [each.title as string]: each.footerPlaceholderLabel,
-                };
-              } else if (!curretnPropIsNan && Number(currentProp) < 3) {
-                return {
-                  [each.title as string]: Number(
-                    (each.footerPlaceholderLabel as string).split(" ")[0],
-                  ),
-                };
-              }
-              return
-            },
-          );
-
-          (collectedData as object[]).push(...data);
-        }
-      } catch (error) {
-        console.error("HTTP REQUEST FAILED:");
-        console.error(error);
-      }
+      const headers = sanitizeCaptureHeaderUrl(capturedHeaders);
+      collectedData = await makeHttpRequestToGetAllDesiredJobs({
+        url,
+        headers,
+        request,
+      });
+      console.log("collected data from Scrapper",collectedData);
+      
     });
-
-    await page.goto("https://www.naukri.com/react-jobs?k=react");
-
+    await page.goto(UrlForPageToDirect());
     await page.waitForTimeout(10000);
     await browser.close();
     return collectedData;
   } catch (error) {
     await browser.close();
-    console.log(error);
+    throw new ApiError(
+      500,
+      "Something Went Wrong while Collecting/Scrapping Job data",
+    );
   }
 }
