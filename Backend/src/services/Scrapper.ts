@@ -29,7 +29,6 @@ export default async function Scraper(): Promise<
     await page.waitForTimeout(10000);
     await browser.close();
     return collectedData;
-    
   } catch (error) {
     await browser.close();
     throw new ApiError(

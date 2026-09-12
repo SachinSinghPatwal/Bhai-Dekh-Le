@@ -9,11 +9,12 @@ export default async function Fetch({
   request,
   headers,
   method = "GET",
-}: FetchParams): Promise<Record<string, number>[]> {
+}: FetchParams): Promise<object> {
   const response = await fetch(url!, {
     method: request?.method() ?? method,
     headers,
   });
   const body = await response.json();
-  return body.jobDetails ?? [];
+  const { jobDetails, noOfJobs } = body;
+  return { jobDetails, noOfJobs };
 }
