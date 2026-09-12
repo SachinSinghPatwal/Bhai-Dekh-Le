@@ -1,7 +1,5 @@
 import { type Request } from "playwright";
-import { setIterativePaginationParams } from "../helpers/Playwright/setIterativePagiantionParams.js";
 import GetAllJobs from "../utility/Fetch.js";
-import ValidateJobIsPostedWithinThreeDays from "../utility/ValidatingProp.js";
 
 export interface RequestParams {
   url: URL;
@@ -15,7 +13,6 @@ export default async function composeHttpRequest({
   headers,
 }: RequestParams) {
   let data: Record<string, number>[] = [];
-
   try {
     data = await GetAllJobs({
       url,

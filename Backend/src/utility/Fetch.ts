@@ -15,13 +15,15 @@ export default async function Fetch({
 
   let data: Record<string, number>[] = [];
 
-  for (let i = 1; i < totalJobs; i++) {
+  for (let i = 1; i <= totalJobs; i++) {
     setIterativePaginationParams(url, i);
 
-    const filteredRecentJob = unSortedJobs.filter(
+    const filteredRecentJob = unSortedJobs.map(
       (each: Record<string, unknown>) =>
         ValidateJobIsPostedWithinThreeDays(each),
     );
+
+    // console.log("Filtered Recent jobs ",filteredRecentJob)
 
     data.push(...filteredRecentJob);
   }

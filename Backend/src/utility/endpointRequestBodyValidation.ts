@@ -9,8 +9,6 @@ export default function endpointRequestBodyValidation(
 
     const properties: unknown[] = Object.values(params);
 
-    console.log("properties", properties);
-
     const hasEmptyField = properties.some(
       (field) => typeof field !== "string" || field.trim() === "",
     );

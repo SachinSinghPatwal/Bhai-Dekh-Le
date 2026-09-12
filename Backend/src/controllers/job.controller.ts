@@ -20,7 +20,6 @@ export const createJob = asyncHandler(async (req: Request, res: Response) => {
 
 export const getAllJobs = asyncHandler(async (req: Request, res: Response) => {
   const data = await Scraper();
-  console.log("data from endpoint :", data);
   res.status(200).json({
     success: true,
     data: data,
