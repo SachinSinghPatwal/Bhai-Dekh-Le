@@ -1,6 +1,6 @@
 import { chromium, type Request } from "playwright";
 import { sanitizeCaptureHeaderUrl } from "../helpers/Playwright/sanitizeCaptureHeaderUrl.js";
-import makeHttpRequestToGetAllDesiredJobs from "./ComposeHttpRequest.js";
+import makeHttpRequestToGetAllDesiredJobs from "./GetDesiredJobs.js";
 import { ApiError } from "../utility/ApiError.js";
 import UrlForPageToDirect from "../utility/ComposeUrl.js";
 
@@ -23,12 +23,13 @@ export default async function Scraper(): Promise<
         url,
         headers,
         request,
-      });      
+      });
     });
     await page.goto(UrlForPageToDirect());
     await page.waitForTimeout(10000);
     await browser.close();
     return collectedData;
+    
   } catch (error) {
     await browser.close();
     throw new ApiError(

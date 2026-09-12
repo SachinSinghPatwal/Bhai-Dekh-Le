@@ -1,31 +1,19 @@
-import { setIterativePaginationParams } from "../helpers/Playwright/setIterativePagiantionParams.js";
-import { RequestParams } from "../services/ComposeHttpRequest.js";
-import ValidateJobIsPostedWithinThreeDays from "./ValidatingProp.js";
+import { RequestParams } from "../services/GetDesiredJobs.js";
+
+interface FetchParams extends Partial<RequestParams> {
+  method?: "GET";
+}
+
 export default async function Fetch({
   url,
   request,
   headers,
-}: RequestParams): Promise<Record<string, number>[]> {
-  const response = await fetch(url, {
-    method: request.method(),
+  method = "GET",
+}: FetchParams): Promise<Record<string, number>[]> {
+  const response = await fetch(url!, {
+    method: request?.method() ?? method,
     headers,
   });
   const body = await response.json();
-  const { jobDetails: unSortedJobs, noOfJobs: totalJobs } = body;
-
-  let data: Record<string, number>[] = [];
-
-  for (let i = 1; i <= totalJobs; i++) {
-    setIterativePaginationParams(url, i);
-
-    const filteredRecentJob = unSortedJobs.map(
-      (each: Record<string, unknown>) =>
-        ValidateJobIsPostedWithinThreeDays(each),
-    );
-
-    // console.log("Filtered Recent jobs ",filteredRecentJob)
-
-    data.push(...filteredRecentJob);
-  }
-  return data;
+  return body.jobDetails ?? [];
 }
