@@ -17,16 +17,11 @@ export default async function composeHttpRequest({
   let data: Record<string, number>[] = [];
 
   try {
-    for (let i = 1; i < 2; i++) {
-      setIterativePaginationParams(url, i);
-      const allJobs = await GetAllJobs({ url, headers, request });
-      const filteredRecentJob = allJobs.filter(
-        (each: Record<string, unknown>) =>
-          ValidateJobIsPostedWithinThreeDays(each),
-      );
-      data.push(...filteredRecentJob);
-    }
-    console.log("data from ComposeHTTPRequest:", data);
+    data = await GetAllJobs({
+      url,
+      headers,
+      request,
+    });
     return data;
   } catch (error: unknown) {
     if (error instanceof Error) {

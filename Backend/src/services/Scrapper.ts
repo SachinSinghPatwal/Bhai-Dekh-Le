@@ -23,9 +23,7 @@ export default async function Scraper(): Promise<
         url,
         headers,
         request,
-      });
-      console.log("collected data from Scrapper",collectedData);
-      
+      });      
     });
     await page.goto(UrlForPageToDirect());
     await page.waitForTimeout(10000);
