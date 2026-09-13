@@ -25,6 +25,6 @@ export const getAllJobs = AsyncHandler(async (req: Request, res: Response) => {
     data: data,
   });
 });
-export const getJobById = AsyncHandler(async (_req, _res) => {});
-export const updateJob = AsyncHandler(async (_req, _res) => {});
-export const deleteJob = AsyncHandler(async (_req, _res) => {});
+export const getJobById = AsyncHandler(async (req: Request, res: Response) => {});
+export const updateJob = AsyncHandler(async (req: Request, res: Response) => {});
+export const deleteJob = AsyncHandler(async (req: Request, res: Response) => {});
