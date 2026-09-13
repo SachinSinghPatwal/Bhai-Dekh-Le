@@ -1,10 +1,6 @@
-# BhaiDekhLe - Naukri Job Applier
+# BhaiDekhLe — Naukri Job Scraper
 
-An intelligent job application automation system that scrapes Naukri.com jobs, uses Gemini AI to rate resume-job compatibility, and auto-applies to high-scoring positions.
-
-## 🎯 Project Vision
-
-Build a reusable Playwright automation framework with Naukri.com as the first implementation. The system saves time by intelligently filtering and applying to relevant job opportunities based on AI-powered resume matching.
+A backend service that scrapes [Naukri.com](https://www.naukri.com) job listings using Playwright for session discovery, then paginates through results via direct HTTP requests. Jobs are filtered by title keywords and recency before being returned through a REST API.
 
 ---
 
@@ -13,308 +9,265 @@ Build a reusable Playwright automation framework with Naukri.com as the first im
 ```
 Backend/
 ├── src/
-│   ├── services/
-│   │   ├── playwright/
-│   │   │   ├── BrowserManager.ts           # Browser lifecycle management
-│   │   │   ├── StorageStateManager.ts      # Encrypted session storage
-│   │   │   └── naukri/
-│   │   │       ├── NaukriAuthService.ts    # Authentication flow
-│   │   │       ├── NaukriScraperService.ts # Job scraping
-│   │   │       └── NaukriApplierService.ts # Auto-apply logic
-│   │   ├── gemini/
-│   │   │   └── GeminiMatchingService.ts    # AI-powered job matching
-│   │   └── resume/
-│   │       └── ResumeService.ts            # Resume management
+│   ├── index.ts                              # Server entry point (Express + MongoDB)
+│   ├── app.ts                                # Express app setup (CORS, routes, error handlers)
+│   ├── constants.ts                          # Naukri search URL composition & DB name
+│   │
+│   ├── config/
+│   │   ├── load-env.ts                       # dotenv loader (path-independent)
+│   │   ├── naukri-answers.json               # Naukri form auto-fill answers
+│   │   └── naukri-selectors.json             # Naukri page CSS selectors
+│   │
+│   ├── controllers/
+│   │   └── job.controller.ts                 # Route handlers (createJob, getAllJobs, etc.)
+│   │
+│   ├── db/
+│   │   └── MongoDb.ts                        # Mongoose connection
+│   │
+│   ├── helpers/
+│   │   └── Playwright/
+│   │       ├── sanitizeCaptureHeaderUrl.ts    # Strips HTTP/2 pseudo-headers
+│   │       └── setIterativePagiantionParams.ts # Sets pageNo & noOfResults on URL
+│   │
+│   ├── middlewares/
+│   │   └── error.middleware.ts               # JSON error handler + 404 catch-all
+│   │
 │   ├── models/
 │   │   └── Mongo/
-│   │       ├── user.models.ts              # User + auth state + preferences
-│   │       └── job.models.ts               # Job + application tracking
+│   │       ├── job.models.ts                 # Job schema (title, skills, salary, etc.)
+│   │       └── user.models.ts                # User schema (auth, resume, preferences)
+│   │
 │   ├── routes/
-│   │   ├── automation.routes.ts            # Automation endpoints
-│   │   └── user.routes.ts                  # User/resume endpoints
-│   └── controllers/
-│       ├── automation.controller.ts
-│       └── user.controller.ts
+│   │   └── job.routes.ts                     # /api/v1/job/* route definitions
+│   │
+│   ├── services/
+│   │   ├── Scrapper.ts                       # Playwright browser → captures first API request → hands off to HTTP pagination
+│   │   └── GetDesiredJobs.ts                 # Paginates up to 40 pages, filters by title & recency
+│   │
+│   ├── utility/
+│   │   ├── ApiError.ts                       # Custom error class with status code
+│   │   ├── ApiResponse.ts                    # Standard success response wrapper
+│   │   ├── AsyncHandler.ts                   # Express async error-catching wrapper
+│   │   ├── AsyncHandlerContentWrapper.ts     # Generic try/catch wrapper for async ops
+│   │   ├── EndpointRequestBodyValidation.ts  # Request body empty-field validator
+│   │   ├── Fetch.ts                          # HTTP fetch wrapper for Naukri's job API
+│   │   ├── Logger.ts                         # Winston logger (file + console transports)
+│   │   ├── ValidatingProp.ts                 # Filters jobs posted within 3 days
+│   │   └── playwright/
+│   │       └── ComposeUrl.ts                 # Builds the initial Naukri search URL
+│   │
+│   └── Learn/                                # Playwright learning exercises (Phase1–Phase8)
+│
+├── logs/                                     # Winston log output (error, combined, playwright)
+├── Dockerfile
+├── playwright.config.ts
+├── tsconfig.json
+└── package.json
 ```
 
 ---
 
-## 📊 Implementation Progress
+## ⚙️ How It Works
 
-### ✅ Completed Phases
+1. **Session Discovery** — `Scrapper.ts` launches a Playwright Chromium instance, navigates to Naukri, and intercepts the first `/jobapi/v3/search` network request to capture the URL and auth headers.
 
-**Phase 0: Planning**
-- [x] Architecture design
-- [x] Technology stack selection
-- [x] Database schema design
-- [x] API endpoint planning
+2. **Paginated Fetching** — `GetDesiredJobs.ts` replays that request via `fetch()` across up to 40 pages (20 results per page), collecting all job listings.
 
-### ✅ Phase 1: Foundation (Complete)
+3. **Filtering** — Jobs are filtered by:
+   - **Title keywords**: must contain "react" or "javascript"
+   - **Recency**: must have been posted within the last 3 days (`ValidatingProp.ts`)
 
-**Database Models**
-- [x] Update User model with Naukri fields
-- [x] Update Job model with application tracking
-- [x] Add encryption utilities for storageState
-
-**Infrastructure Services**
-- [x] StorageStateManager (AES-256-CBC encryption)
-- [x] BrowserManager (Playwright lifecycle)
-- [x] Winston logger setup
-- [x] TypeScript type definitions
-
-### ✅ Phase 2: Resume & Gemini Integration (Complete)
-- [x] ResumeService (upload, parse, store)
-- [x] GeminiMatchingService (AI scoring)
-- [x] Resume upload API endpoint
-
-### ✅ Phase 3: Naukri Automation (Complete)
-- [x] NaukriAuthService (manual login flow)
-- [x] NaukriScraperService (job scraping)
-- [x] NaukriApplierService (auto-apply)
-- [x] Configuration files (selectors, form answers)
-
-### ✅ Phase 4: API Layer (Complete)
-- [x] Automation routes and controller
-- [x] User preferences endpoints
-- [x] Status monitoring endpoints
-
-### ✅ Phase 5: Testing & Scripts (Complete)
-- [x] CLI scripts (auth, scrape)
-- [x] Example Playwright test
-- [x] Package.json scripts
-
-**Phase 6: Documentation**
-- [x] Environment setup guide
-- [x] API documentation
-- [x] Troubleshooting guide
+4. **Response** — Filtered jobs are returned as JSON through the Express API.
 
 ---
 
 ## 🛠️ Technology Stack
 
-**Backend**
-- Node.js + Express 5
-- TypeScript 7
-- MongoDB + Mongoose
-
-**Automation**
-- Playwright 1.62
-- Headless/Headed modes
-
-**AI Integration**
-- Google Gemini AI (resume-job matching)
-
-**Security**
-- bcrypt (password hashing)
-- crypto (AES-256-CBC for session encryption)
-- JWT (authentication tokens)
+| Layer         | Technology                         |
+|---------------|------------------------------------|
+| Runtime       | Node.js + TypeScript 7             |
+| Framework     | Express 5                          |
+| Database      | MongoDB + Mongoose 9               |
+| Automation    | Playwright 1.62 (Chromium)         |
+| Auth          | JWT + bcrypt                       |
+| Logging       | Winston (file + console transports)|
+| Build         | tsx (dev) / tsc (production)       |
 
 ---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-```bash
-Node.js >= 18
-MongoDB running locally or cloud instance
-```
+
+- Node.js ≥ 18
+- MongoDB instance (local or cloud)
 
 ### Installation
+
 ```bash
-# Install dependencies
 cd Backend
 npm install
 
-# Install Playwright browsers
+# Install Playwright's Chromium browser
 npm run playwright:install
 
-# Set up environment variables
+# Set up environment
 cp .env.example .env
-# Edit .env with your credentials
+# Edit .env with your actual values
 ```
 
 ### Environment Variables
+
 ```env
 # Server
 PORT=8000
-MONGODB_URI=your_mongodb_connection_string
+NODE_ENV=development
 
-# Authentication
-ACCESS_TOKEN_SECRET=your_access_token_secret
+# Database
+MONGODB_URI=mongodb://localhost:27017/
+
+# Frontend (CORS origin)
+FRONTEND_URL=http://localhost:3000
+
+# JWT
+ACCESS_TOKEN_SECRET=your_secret
 ACCESS_TOKEN_EXPIRY=1d
-REFRESH_TOKEN_SECRET=your_refresh_token_secret
-REFRESH_TOKEN_EXPIRY=10d
+REFRESH_TOKEN_SECRET=your_secret
+REFRESH_TOKEN_EXPIRY=7d
 
-# Gemini AI
-GEMINI_API_KEY=your_gemini_api_key
-
-# Playwright
-PLAYWRIGHT_HEADLESS=false
-RESUME_UPLOAD_PATH=./uploads/resumes
-JOB_MATCH_THRESHOLD=70
-
-# Encryption
-ENCRYPTION_KEY=your_32_character_encryption_key
+# Logging
+LOG_LEVEL=info
 ```
 
-### Run Development Server
+### Run
+
 ```bash
 npm run dev
 ```
+
+Server starts on `http://localhost:8000`.
 
 ---
 
 ## 📡 API Endpoints
 
-### Automation
-```
-POST   /api/v1/automation/auth/naukri       # Authenticate with Naukri
-POST   /api/v1/automation/scrape            # Scrape jobs
-POST   /api/v1/automation/apply             # Match & apply to jobs
-GET    /api/v1/automation/status            # Get bot status
-POST   /api/v1/automation/stop              # Stop automation
-```
-
-### User Management
-```
-POST   /api/v1/users/:userId/resume         # Upload resume
-GET    /api/v1/users/:userId/applications   # Get applications
-PUT    /api/v1/users/:userId/preferences    # Update job preferences
-```
-
 ### Jobs
-```
-POST   /api/v1/jobs                         # Create job
-GET    /api/v1/jobs                         # Get all jobs
-GET    /api/v1/jobs/:id                     # Get job by ID
-PUT    /api/v1/jobs/:id                     # Update job
-DELETE /api/v1/jobs/:id                     # Delete job
+
+| Method   | Path                    | Description                      |
+|----------|-------------------------|----------------------------------|
+| `GET`    | `/api/v1/job/getAll`    | Scrape & return filtered jobs    |
+| `POST`   | `/api/v1/job/create`    | Create a job record              |
+| `GET`    | `/api/v1/job/:id`       | Get job by ID                    |
+| `PUT`    | `/api/v1/job/:id`       | Update job                       |
+| `DELETE` | `/api/v1/job/:id`       | Delete job                       |
+
+### Health
+
+| Method   | Path                    | Description                      |
+|----------|-------------------------|----------------------------------|
+| `GET`    | `/api/v1/test`          | Liveness probe (uptime + status) |
+
+### Example
+
+```bash
+# Check server is alive
+curl http://localhost:8000/api/v1/test
+
+# Scrape and fetch filtered Naukri jobs
+curl http://localhost:8000/api/v1/job/getAll
 ```
 
 ---
 
-## 🔧 Usage
+## 📊 Database Schemas
 
-### 1. Authenticate with Naukri
-```bash
-npm run automation:auth -- <24-character-mongodb-user-id>
+### Job Model
+
+```typescript
+{
+  title: string              // Job title
+  jobId: string              // Naukri job ID
+  footerPlaceholderLabel: string  // e.g. "1 Day Ago"
+  companyName: string
+  tagsAndSkills: string[]    // e.g. ["React.js", "TypeScript"]
+  placeholders: object[]     // Experience, salary, location
+  jdURL: string              // Naukri job detail URL
+  JD: string                 // Full job description
+  createdDate: number        // Unix timestamp
+  salaryDetails: object
+  minExp: string
+  maxExp: string
+  applyByTime: string
+  walkIn: boolean
+}
 ```
-Opens a headed browser and waits until you finish the manual login. Session is then saved encrypted in MongoDB; press Ctrl+C to cancel.
-
-### 2. Scrape Jobs
-```bash
-npm run automation:scrape -- <24-character-mongodb-user-id>
-```
-Scrapes jobs based on your preferences and saves to database.
-
-### 3. Auto-Apply
-```bash
-curl -X POST http://localhost:8000/api/v1/automation/apply
-```
-Gemini AI rates each job against your resume. Auto-applies to jobs scoring above threshold.
-
----
-
-## 🔐 Security Features
-
-- **Session Encryption**: Naukri storageState encrypted with AES-256-CBC
-- **Password Security**: bcrypt hashing with salt rounds
-- **Resume Storage**: Local filesystem with user-specific folders
-- **Input Validation**: Request body validation middleware
-- **Error Handling**: Comprehensive error logging without exposing secrets
-
----
-
-## 📝 Database Schema
 
 ### User Model
+
 ```typescript
 {
   username: string
   email: string
-  password: string (bcrypt hashed)
+  fullname: string
+  password: string           // bcrypt hashed
   refreshToken?: string
-  naukriStorageState?: string (encrypted)
+  naukriStorageState?: string
   resume?: {
-    path: string
-    fileName: string
-    uploadedAt: Date
+    path?: string
+    cloudinaryUrl?: string
+    cloudinaryId?: string
+    fileName?: string
+    mimeType?: string
+    uploadedAt?: Date
+    storage?: "local" | "cloudinary"
   }
   jobPreferences?: {
     keywords: string[]
     locations: string[]
     minSalary: number
-    jobTypes: JobType[]
-    employType: EmployType[]
+    jobTypes: ("full-time" | "part-time" | "contract" | "internship")[]
+    employType: ("remote" | "on-site" | "hybrid")[]
   }
 }
 ```
 
-### Job Model
-```typescript
-{
-  title: string
-  description: string
-  company: string
-  location: string
-  type: 'full-time' | 'part-time' | 'contract' | 'internship'
-  employType: 'remote' | 'on-site' | 'hybrid'
-  salary: number
-  staticLink: string
-  externalLink?: string
-  platform: 'naukri' | 'linkedin' | 'indeed'
-  userId: ObjectId
-  appliedAt?: Date
-  applicationStatus?: 'pending' | 'applied' | 'rejected' | 'skipped' | 'failed'
-  geminiScore?: number
-  geminiReasoning?: string
-}
-```
+---
+
+## 📁 NPM Scripts
+
+| Script                  | Description                              |
+|-------------------------|------------------------------------------|
+| `npm run dev`           | Start dev server with tsx + nodemon      |
+| `npm run build`         | Compile TypeScript to `dist/`            |
+| `npm start`             | Run compiled production build            |
+| `npm run playwright:install` | Install Chromium for Playwright     |
+| `npm run test:playwright`    | Run Playwright tests                |
 
 ---
 
-## 🧪 Testing
+## 📝 Logging
 
-```bash
-# Run Playwright tests
-npm run test:playwright
-```
+Winston writes to three log files in `Backend/logs/`:
 
----
+| File              | Content                    |
+|-------------------|----------------------------|
+| `error.log`       | Error-level entries only   |
+| `combined.log`    | All log levels             |
+| `playwright.log`  | Debug-level automation logs|
 
-## 🐛 Troubleshooting
-
-### storageState Expired
-If authentication fails mid-session, re-run:
-```bash
-npm run automation:auth -- <24-character-mongodb-user-id>
-```
-
-### Playwright Browser Issues
-```bash
-# Reinstall browsers
-npm run playwright:install
-```
-
-### Gemini API Errors
-Verify `GEMINI_API_KEY` in `.env` and check API quota.
+Console output is enabled in development (`NODE_ENV !== 'production'`).
 
 ---
 
 ## 📚 Learning Resources
 
-- Playwright learning examples in `Backend/src/Learn/Phase*`
-- Persistent context example: `Backend/src/Learn/Phase2/PersistentContext.ts`
+Playwright learning exercises are in `Backend/src/Learn/Phase1` through `Phase8`.
 
 ---
 
-## 🤝 Contributing
+## 👤 Author
 
-1. Follow existing code patterns and utilities
-2. Use TypeScript strict mode
-3. Add error handling with `asyncHandler`
-4. Log important events with Winston
-5. Test manually before committing
+**Sachin Singh Patwal**
 
 ---
 
@@ -324,45 +277,4 @@ ISC
 
 ---
 
-## 👤 Author
-
-Sachin Singh Patwal
-
----
-
-## 🎯 Success Criteria
-
-- [x] User can authenticate via headed browser, state saved encrypted in DB
-- [x] Jobs scraped from Naukri and stored in MongoDB
-- [x] Gemini rates jobs with score and reasoning
-- [x] Auto-apply works for jobs above threshold
-- [x] All API endpoints functional
-- [x] Resume upload works
-- [x] Logs capture all automation events
-- [x] README documents full system
-- [ ] One example test passes (needs manual verification)
-
----
-
-## ⏱️ Timeline Status
-
-**All Phases Complete!** Ready for end-to-end testing.
-
-- ✅ Phase 1 (Foundation): Complete
-- ✅ Phase 2 (Resume & Gemini): Complete
-- ✅ Phase 3 (Naukri Automation): Complete
-- ✅ Phase 4 (API Layer): Complete
-- ✅ Phase 5 (Testing): Complete
-- ✅ Phase 6 (Documentation): Complete
-
-**Next Steps:**
-1. Set up `.env` file with actual credentials
-2. Run `npm run dev` to start server
-3. Test authentication flow: `npm run automation:auth -- <24-character-mongodb-user-id>`
-4. Test scraping: `npm run automation:scrape <userId>`
-5. Test full automation via API endpoints
-
----
-
-**Last Updated**: 2026-09-09
-**Current Status**: ✅ Phase 1-5 Complete - Ready for Testing
+**Last Updated**: 2026-09-13

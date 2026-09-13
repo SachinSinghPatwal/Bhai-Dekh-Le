@@ -56,6 +56,7 @@ export default async function Scraper(): Promise<JOB_DETAILS[] | undefined> {
 
     return collectedData;
   } catch (error) {
+    console.error("Scraper error:", error);
     await browser.close();
 
     throw new ApiError(
