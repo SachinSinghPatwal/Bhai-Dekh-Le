@@ -1,4 +1,4 @@
-export default async function asyncHandlerContentWrapper(fn: Function, req:object):Promise<Response> {
+export default async function AsyncHandlerContentWrapper(fn: Function, req:object):Promise<Response> {
   try {
     const response = await fn(req);
     return response;

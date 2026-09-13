@@ -4,7 +4,7 @@ export interface RequestHandler {
   (req: Request, res: Response, next: NextFunction): void | Promise<void>;
 }
 
-export const asyncHandler = (requestHandler: RequestHandler) => {
+export const AsyncHandler = (requestHandler: RequestHandler) => {
   return (req: Request, res: Response, next: NextFunction) => {
     Promise.resolve(requestHandler(req, res, next)).catch((err) => next(err));
   };

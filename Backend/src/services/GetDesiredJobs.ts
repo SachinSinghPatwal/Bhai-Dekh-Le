@@ -2,6 +2,7 @@ import { type Request } from "playwright";
 import GetAllJobs from "../utility/Fetch.js";
 import { setIterativePaginationParams } from "../helpers/Playwright/setIterativePagiantionParams.js";
 import ValidateJobIsPostedWithinThreeDays from "../utility/ValidatingProp.js";
+import { JOB_DETAILS } from "../types.js";
 
 export interface RequestParams {
   url: URL;
@@ -14,54 +15,86 @@ export default async function getDesiredJobs({
   request,
   headers,
 }: RequestParams) {
-  let unSortedJobs: Record<string, number>[] = [];
-  let SortedJobs: Record<string, unknown>[] = [];
-  let pageNumber = 1;
-  const jobsPerPage = 20;
+  const unSortedJobs: JOB_DETAILS[] = [];
+
+  const MAX_PAGES = 40;
+
   try {
-    const { jobDetails, noOfJobs }: any = await GetAllJobs({
+    // First captured request
+    const firstPage = await GetAllJobs({
       url,
       headers,
       request,
     });
-    unSortedJobs = jobDetails;
-    while (pageNumber <= 40) {
-      setIterativePaginationParams(url, pageNumber);
-      const { jobDetails,_}: any = await GetAllJobs({
-        url,
+
+    const { jobDetails, noOfJobs } = firstPage as {
+      jobDetails: JOB_DETAILS[];
+      noOfJobs: number;
+    };
+
+    unSortedJobs.push(...jobDetails);
+
+    // Remaining pages
+    for (let pageNumber = 2; pageNumber <= MAX_PAGES; pageNumber++) {
+      const pageUrl = new URL(url.toString());
+
+      setIterativePaginationParams(pageUrl, pageNumber);
+
+      const { jobDetails: pageJobs } = (await GetAllJobs({
+        url: pageUrl,
         headers,
         request,
-      });
-      unSortedJobs.push(jobDetails);
-      pageNumber++;
-    }
-    const filteredRecentJob = unSortedJobs.map(
-      (each: Record<string, unknown>) => {
-        if (
-          (each.title as string).toLocaleLowerCase().includes("react") ||
-          ((each.title as string).toLocaleLowerCase().includes("javascript") &&
-            Number(
-              (each.footerPlaceholderLabel as string)
-                .split(" ")[0]
-                .replace("+", ""),
-            ) <= 3)
-        ) {
-          return ValidateJobIsPostedWithinThreeDays(each);
-        } else {
-          return;
-        }
-      },
-    );
-    if (filteredRecentJob) {
-      console.log("desiredjob :", filteredRecentJob.length);
-      // SortedJobs.push(...(filteredRecentJob as Record<string, unknown>[]));
-    }
-    console.log("total page number : ", pageNumber, "total jobs", noOfJobs);
+      })) as {
+        jobDetails: JOB_DETAILS[];
+      };
 
-    return SortedJobs;
+      unSortedJobs.push(...pageJobs);
+
+      console.log(
+        `Fetched page ${pageNumber}, total jobs: ${unSortedJobs.length}`,
+      );
+    }
+
+    const filteredRecentJob = unSortedJobs
+      .filter((job) => {
+        const title = String(job.title ?? "").toLowerCase();
+
+        return title.includes("react") || title.includes("javascript");
+      })
+      .map((job) => ValidateJobIsPostedWithinThreeDays(job))
+      .filter(Boolean);
+
+    console.log("Desired jobs:", filteredRecentJob.length);
+    console.log(
+      "Desired jobs:",
+      filteredRecentJob.map((each) => {
+        return {
+          [each?.title as string]: new Date(each?.createdDate as number).toLocaleString(
+            "en-IN",
+            {
+              timeZone: "Asia/Kolkata",
+            },
+          ),
+        };
+      }),
+    );
+
+    console.log(
+      "Total pages:",
+      MAX_PAGES,
+      "Total jobs reported:",
+      noOfJobs,
+      "Total jobs fetched:",
+      unSortedJobs.length,
+    );
+
+    return filteredRecentJob as JOB_DETAILS[];
   } catch (error: unknown) {
     if (error instanceof Error) {
-      return error;
+      console.error("Job scraping failed:", error);
+      throw error;
     }
+
+    throw new Error("Unknown error while fetching jobs");
   }
 }
