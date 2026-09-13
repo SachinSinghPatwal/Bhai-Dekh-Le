@@ -1,4 +1,5 @@
-import { JOB_DETAILS } from "../types.js";
+import { JOB_DETAILS } from "../models/Mongo/job.models.js";
+
 
 
 export default function ValidateJobIsPostedWithinThreeDays(

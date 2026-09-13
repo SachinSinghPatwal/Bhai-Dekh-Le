@@ -1,91 +1,93 @@
 import mongoose, { Document, Schema } from "mongoose";
 
-export interface Job extends Document {
+export interface JOB_DETAILS extends Document {
   title: string;
-  description: string;
-  staticLink: string;
-  externalLink?: string;
-  company: string;
-  location: string;
-  type: "full-time" | "part-time" | "contract" | "internship";
-  employType: "remote" | "on-site" | "hybrid";
-  salary: number;
-  appliedAt?: Date;
-  applicationStatus?: 'pending' | 'applied' | 'rejected' | 'skipped' | 'failed';
-  geminiScore?: number;
-  geminiReasoning?: string;
-  platform: 'naukri' | 'linkedin' | 'indeed';
-  userId: mongoose.Types.ObjectId;
-  tailoredResumePath?: string;
+  jobId: string;
+  footerPlaceholderLabel: string;
+  companyName: string;
+  tagsAndSkills: string[];
+  placeholders: Record<string, string>[];
+  jdURL: string;
+  JD: string;
+  createdDate: number;
+  salaryDetails: Record<string, unknown>;
+  minExp: string;
+  maxExp: string;
+  applyByTime: string;
+  walkIn: boolean;
 }
 
-const jobSchema = new Schema<Job>({
-  title: {
-    type: String,
-    required: true,
-    index: true,
+const jobSchema = new Schema<Required<JOB_DETAILS>>(
+  {
+    title: {
+      type: String,
+      required: true,
+      index: true,
+    },
+    jobId: {
+      type: String,
+      required: true,
+      index: true,
+    },
+    footerPlaceholderLabel: {
+      type: String,
+      required: true,
+    },
+    companyName: {
+      type: String,
+      required: true,
+    },
+    tagsAndSkills: [
+      {
+        type: String,
+        required: true,
+        index: true,
+      },
+    ],
+    placeholders: [
+      {
+        type: Object,
+        required: true,
+      },
+    ],
+    jdURL: {
+      type: String,
+      required: true,
+    },
+    JD: {
+      type: String,
+      required: true,
+    },
+    createdDate: {
+      type: Number,
+      required: true,
+      index:true
+    },
+    salaryDetails: {
+      type: Object,
+      required: true,
+    },
+    minExp: {
+      type: String,
+      required: true,
+      index:true,
+    },
+    maxExp: {
+      type: String,
+      required: true,
+    },
+    applyByTime: {
+      type: String,
+      required: true,
+    },
+    walkIn: {
+      type: Boolean,
+      required: true,
+    },
   },
-  description: {
-    type: String,
-    required: true,
+  {
+    timestamps: true,
   },
-  company: {
-    type: String,
-    required: true,
-  },
-  location: {
-    type: String,
-    required: true,
-    index: true,
-  },
-  type: {
-    type: String,
-    required: true,
-    enum: ["full-time", "part-time", "contract", "internship"],
-  },
-  employType: {
-    type: String,
-    required: true,
-    enum: ["remote", "on-site", "hybrid"],
-  },
-  staticLink: {
-    type: String,
-    required: true,
-  },
-  externalLink: {
-    type: String,
-    default: null,
-  },
-  salary: {
-    type: Number,
-    required: true,
-  },
-  appliedAt: {
-    type: Date,
-  },
-  applicationStatus: {
-    type: String,
-    enum: ['pending', 'applied', 'rejected', 'skipped', 'failed'],
-  },
-  geminiScore: {
-    type: Number,
-  },
-  geminiReasoning: {
-    type: String,
-  },
-  platform: {
-    type: String,
-    enum: ['naukri', 'linkedin', 'indeed'],
-    default: 'naukri',
-  },
-  userId: {
-    type: Schema.Types.ObjectId,
-    ref: 'User',
-    required: true,
-  },
-  tailoredResumePath: {
-    type: String,
-  },
-});
+);
 
 export const JobModel = mongoose.model("Job", jobSchema);

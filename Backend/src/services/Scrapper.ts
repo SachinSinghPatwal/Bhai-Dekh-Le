@@ -3,7 +3,7 @@ import { sanitizeCaptureHeaderUrl } from "../helpers/Playwright/sanitizeCaptureH
 import makeHttpRequestToGetAllDesiredJobs from "./GetDesiredJobs.js";
 import { ApiError } from "../utility/ApiError.js";
 import UrlForPageToDirect from "../utility/playwright/ComposeUrl.js";
-import { JOB_DETAILS } from "../types.js";
+import { JOB_DETAILS } from "../models/Mongo/job.models.js";
 
 export default async function Scraper(): Promise<JOB_DETAILS[] | undefined> {
   const browser = await chromium.launch({

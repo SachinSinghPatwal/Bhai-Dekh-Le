@@ -1,7 +1,7 @@
 import { AsyncHandler } from "../utility/AsyncHandler.js";
 import { JobModel } from "../models/Mongo/job.models.js";
 import AsyncHandlerTry_CatchWrapper from "../utility/AsyncHandlerContentWrapper.js";
-import { Request, RequestHandler, Response } from "express";
+import type { Request, Response } from "express";
 
 import endpointRequestBodyValidation from "../utility/EndpointRequestBodyValidation.js";
 import Scraper from "../services/Scrapper.js";

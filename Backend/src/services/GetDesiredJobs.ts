@@ -2,7 +2,8 @@ import { type Request } from "playwright";
 import GetAllJobs from "../utility/Fetch.js";
 import { setIterativePaginationParams } from "../helpers/Playwright/setIterativePagiantionParams.js";
 import ValidateJobIsPostedWithinThreeDays from "../utility/ValidatingProp.js";
-import { JOB_DETAILS } from "../types.js";
+import { JOB_DETAILS } from "../models/Mongo/job.models.js";
+
 
 export interface RequestParams {
   url: URL;
