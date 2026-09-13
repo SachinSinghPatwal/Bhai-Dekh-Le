@@ -55,13 +55,15 @@ export default async function Scraper(): Promise<JOB_DETAILS[] | undefined> {
     await browser.close();
 
     return collectedData;
-  } catch (error) {
+  } catch (error:unknown) {
     console.error("Scraper error:", error);
-    await browser.close();
-
-    throw new ApiError(
-      500,
-      "Something Went Wrong while Collecting/Scrapping Job data",
-    );
+    await browser.close()
+    if(error instanceof Error){
+      throw new ApiError(
+        500,
+        "Something Went Wrong while Collecting/Scrapping Job data",
+        error.message,
+      );
+    }
   }
 }
