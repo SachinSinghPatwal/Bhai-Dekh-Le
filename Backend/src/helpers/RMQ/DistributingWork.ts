@@ -1,12 +1,18 @@
 export default function DistributingLoadWithWorkers(noOfJobs:number,workerId:string) {
-  const numberOfJobPerPage = 20;
-  const workers = 4;
-  let maxPages = Math.ceil(noOfJobs / numberOfJobPerPage);
-  const totalPages = maxPages - 1; // page 1 already fetched
+  const totalPages = noOfJobs - 1; // page 1 already fetched
+  const totalWorkers = 4;
+
   const workerNumber = Number(workerId.split("-")[1]);
-  const pagesPerWorker = Math.ceil(totalPages / workers);
-  const startPage = 2 + (workerNumber - 1) * pagesPerWorker;
-  const endPage = Math.min(startPage + pagesPerWorker - 1, maxPages);
+
+  const basePages = Math.floor(totalPages / totalWorkers);
+  const remainder = totalPages % totalWorkers;
+
+  const pagesForThisWorker = basePages + (workerNumber <= remainder ? 1 : 0);
+
+  const startPage =
+    2 + (workerNumber - 1) * basePages + Math.min(workerNumber - 1, remainder);
+
+  const endPage = startPage + pagesForThisWorker - 1;
 
   return { startPage, endPage };
 }
