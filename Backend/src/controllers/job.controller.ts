@@ -20,10 +20,6 @@ export const createJob = AsyncHandler(async (req: Request, res: Response) => {
 });
 
 export const getAllJobs = AsyncHandler(async (req: Request, res: Response) => {
-  console.log("========== ENDPOINT HIT ==========");
-  console.log("PID:", process.pid);
-  console.log("CWD:", process.cwd());
-  console.log("A - controller entered");
   const data = await Scraper();
   res.status(200).json({
     success: true,

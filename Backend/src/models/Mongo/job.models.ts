@@ -28,6 +28,7 @@ const jobSchema = new Schema<Required<JOB_DETAILS>>(
       type: String,
       required: true,
       index: true,
+      unique: [true, "only Unique jobs should be saved"],
     },
     footerPlaceholderLabel: {
       type: String,
@@ -61,7 +62,7 @@ const jobSchema = new Schema<Required<JOB_DETAILS>>(
     createdDate: {
       type: Number,
       required: true,
-      index:true
+      index: true,
     },
     salaryDetails: {
       type: Object,
@@ -70,7 +71,7 @@ const jobSchema = new Schema<Required<JOB_DETAILS>>(
     minExp: {
       type: String,
       required: true,
-      index:true,
+      index: true,
     },
     maxExp: {
       type: String,
@@ -89,5 +90,21 @@ const jobSchema = new Schema<Required<JOB_DETAILS>>(
     timestamps: true,
   },
 );
+
+jobSchema.post("save", function (error: any, _: any, next: any) {
+  if (error.name === "ValidationError") {
+    const errors = Object.values(error.errors).map((err: any) => ({
+      field: err.path,
+      message: `${err.path} is invalid`,
+    }));
+
+    return next({
+      statusCode: 400,
+      errors,
+    });
+  }
+
+  next(error);
+});
 
 export const JobModel = mongoose.model("Job", jobSchema);
