@@ -1,31 +1,66 @@
 import { ChildProcess, fork } from "node:child_process";
+import path from "node:path";
 
 export function startScrapConsumer() {
-  const workers:ChildProcess[] = [];
-  const NUMBER_OF_WORKERS: string = process.env.WORKER_COUNT!;
+  const workerPath = path.resolve(
+    process.cwd(),
+    "src",
+    "services",
+    "Infrastructure",
+    "RMQ",
+    "consumer",
+    "ScheduleScrapWorker.ts",
+  );
 
-  for (let i = 1; i <= Number(NUMBER_OF_WORKERS); i++) {
-    const worker = fork("./consumer/ScheduleScrapWorker.js", {
+  const workers: ChildProcess[] = [];
+
+  const workerCount = Number(process.env.WORKER_COUNT ?? 4);
+
+  console.log(`Starting ${workerCount} workers...`);
+
+  for (let i = 1; i <= workerCount; i++) {
+    const workerId = `worker-${i}`;
+
+    const worker = fork(workerPath, {
+      execArgv: ["--import", "tsx"],
+
       env: {
         ...process.env,
-        WORKER_ID: `worker-${i}`,
+        WORKER_ID: workerId,
       },
     });
+
     workers.push(worker);
-    console.log("child process Listeners :", i);
+
+    console.log(`${workerId} started`);
+
+    worker.on("exit", (code, signal) => {
+      console.log(`${workerId} exited. code=${code}, signal=${signal}`);
+    });
+
+    worker.on("error", (error) => {
+      console.error(`${workerId} error:`, error);
+    });
   }
+
+  let shuttingDown = false;
 
   function shutdown() {
-    console.log("Shutting down workers...");
-  
-    for (const worker of workers) {
-      worker.kill("SIGTERM");
+    if (shuttingDown) {
+      return;
     }
-  
-    process.exit(0);
-  }
-  
-  process.on("SIGINT", shutdown);
-  process.on("SIGTERM", shutdown);
-}
 
+    shuttingDown = true;
+
+    console.log("Shutting down workers...");
+
+    for (const worker of workers) {
+      if (!worker.killed) {
+        worker.kill("SIGTERM");
+      }
+    }
+  }
+
+  process.once("SIGINT", shutdown);
+  process.once("SIGTERM", shutdown);
+}

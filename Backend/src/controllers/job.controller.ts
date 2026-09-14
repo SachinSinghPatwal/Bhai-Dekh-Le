@@ -5,6 +5,7 @@ import type { Request, Response } from "express";
 
 import endpointRequestBodyValidation from "../utility/EndpointRequestBodyValidation.js";
 import ScheduleScrapping from "../services/Infrastructure/RMQ/Producer/ScheduleScrape.js";
+import { startScrapConsumer } from "../services/Infrastructure/WorkerManager.js";
 
 export const createJob = AsyncHandler(async (req: Request, res: Response) => {
   const validatedData = endpointRequestBodyValidation(req as Request);
@@ -20,6 +21,8 @@ export const createJob = AsyncHandler(async (req: Request, res: Response) => {
 });
 
 export const getAllJobs = AsyncHandler(async (req: Request, res: Response) => {
+  startScrapConsumer();
+  console.log("worker started listening");
   const data = await ScheduleScrapping();
   console.log(data);
   res.status(200).json({

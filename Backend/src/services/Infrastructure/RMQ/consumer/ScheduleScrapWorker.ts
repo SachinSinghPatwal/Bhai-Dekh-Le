@@ -1,42 +1,67 @@
-import amqp, { Message } from "amqplib";
+import amqp, { type Message } from "amqplib";
 import { ScheduleScrape } from "../../../../constants.js";
 import Scraper from "../../../Scrapper.js";
 
-export async function ScrapingWorker (id: number) {
-  console.log("CONNECTING WITH ADMIN USER");
-  const connection = await amqp.connect(
-    "https://rabbitmq-4-management-x53s.onrender.com/",
+let connection: any = null;
+let channel: any = null;
+
+export async function ScrapingWorker(id: number) {
+  const workerId = process.env.WORKER_ID ?? `worker-${id}`;
+
+  console.log(`[${workerId}] Connecting to RabbitMQ...`);
+
+  connection = await amqp.connect(
+    process.env.RABBITMQ_URL ?? "amqp://admin:admin123@localhost:5672",
   );
 
-  const channel = await connection.createChannel();
+  channel = await connection.createChannel();
 
-  await channel.assertExchange(ScheduleScrape, "direct", { durable: true });
+  await channel.assertExchange(ScheduleScrape, "direct", {
+    durable: true,
+    autoDelete: false,
+  });
 
-  // declare three queue
-  await channel.assertQueue("info_logs");
+  await channel.assertQueue(ScheduleScrape, {
+    durable: true,
+  });
 
-  // Bind each queue with matching routing keys
-  await channel.bindQueue("info_logs", ScheduleScrape, "info");
+  await channel.bindQueue(ScheduleScrape, ScheduleScrape, "Scrapper");
 
-  console.log("waiting for direct log messages ...");
+  console.log(`[${workerId}] Waiting for messages...`);
 
-  const workerId = process.env.WORKER_ID!;
+  await channel.consume(ScheduleScrape, async (message: Message | null) => {
+    if (!message) return;
 
-  // consumer for each queue
-  await channel.consume(ScheduleScrape, async (Theme) => {
-    console.log(`[INFO] ${Theme?.toString()}`);
+    console.log(`[${workerId}] Received: ${message.content.toString()}`);
 
     const scraper = await Scraper.getInstance(workerId);
 
     try {
       const jobs = await scraper.scrape();
 
-      console.log(`Worker ${id} jobs:`, jobs);
+      console.log(`[${workerId}] Jobs: ${jobs?.length ?? 0}`);
+
+      channel.ack(message);
     } catch (error) {
-      console.error(error);
-    } finally {
-      await scraper.close();
+      console.error(`[${workerId}] Scraping failed:`, error);
+
+      channel.nack(message, false, true);
     }
-    channel.ack(Theme as Message);
   });
-};
+
+  console.log(`[${workerId}] Consumer is listening`);
+}
+
+export async function shutdownWorker() {
+  console.log(`[${process.env.WORKER_ID}] Closing RabbitMQ...`);
+
+  try {
+    await channel?.close();
+    await connection?.close();
+  } catch (error) {
+    console.error("RabbitMQ shutdown error:", error);
+  }
+
+  channel = null;
+  connection = null;
+}

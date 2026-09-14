@@ -3,24 +3,29 @@ import { ScheduleScrape } from "../../../../constants.js";
 
 export default async function ScheduleScrapping(): Promise<void> {
   const connection = await amqp.connect(
-    "amqp://rabbitmq-4-management-x53s:5672/",
+    process.env.RABBITMQ_URL ?? "amqp://admin:admin123@localhost:5672",
   );
 
-  console.log("===CONNECTED WITH ADMIN USER===");
+  try {
+    console.log("=== CONNECTED WITH RABBITMQ ===");
 
-  const channel = await connection.createChannel();
+    const channel = await connection.createChannel();
 
-  await channel.assertExchange(ScheduleScrape, "direct", {
-    durable: true,
-    autoDelete: true,
-  });
+    await channel.assertExchange(ScheduleScrape, "direct", {
+      durable: true,
+      autoDelete: false,
+    });
 
-  console.log("\n DIRECT Exchange Demo started - sending every 10 seconds");
+    const message = "scrapping";
 
-  const work = {
-    key: "Scrapper",
-    Theme: "scrapping",
-  };
-  channel.publish(ScheduleScrape, work.key, Buffer.from(work.Theme));
-  console.log("\n Messages sent. closing connection");
+    channel.publish(ScheduleScrape, "Scrapper", Buffer.from(message), {
+      persistent: true,
+    });
+
+    console.log(`Message published: ${message}`);
+  } finally {
+    await connection.close();
+
+    console.log("Producer connection closed");
+  }
 }
