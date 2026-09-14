@@ -15,3 +15,5 @@ export const JOb_SEARCH_URL_WITH_QUERY = {
     // salary: "ctcFilter=0to3",
   },
 };
+
+export const ScheduleScrape = "TimedScrapping";

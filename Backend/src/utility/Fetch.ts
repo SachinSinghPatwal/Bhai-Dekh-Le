@@ -1,3 +1,4 @@
+import { JOB_DETAILS } from "../models/Mongo/job.models.js";
 import { RequestParams } from "../types.js";
 
 interface FetchParams extends Partial<RequestParams> {
@@ -9,7 +10,7 @@ export default async function Fetch({
   request,
   headers,
   method = "GET",
-}: FetchParams): Promise<object> {
+}: FetchParams): Promise<JOB_DETAILS> {
   const response = await fetch(url!, {
     method: request?.method() ?? method,
     headers,
@@ -19,6 +20,6 @@ export default async function Fetch({
     console.log("BODY START:", text.slice(0, 500));
   }
   const body = await response.json();
-  const { jobDetails, noOfJobs } = body;
-  return { jobDetails, noOfJobs };
+  const { jobDetails } = body;
+  return jobDetails;
 }

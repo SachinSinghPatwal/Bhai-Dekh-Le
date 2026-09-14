@@ -7,32 +7,34 @@ export default async function getDesiredJobs({
   url,
   request,
   headers,
+  noOfJobs,
+  jobDetails,
 }: RequestParams) {
   const unSortedJobs: JOB_DETAILS[] = [];
+  const numberOfJobPerPage = 20;
+  let maxPages = Math.ceil((noOfJobs as number)/ numberOfJobPerPage);
 
-  let maxPages =112;
-  let initialScrap = true;
+  /*
+    Intial request interception provide body and no of total jobs exist
+  */ 
+  if(Array.isArray(jobDetails) && jobDetails.length > 0){
+    unSortedJobs.push(...jobDetails);
+  }
 
-  const pageUrl:URL = new URL(url.toString());
+  const pageUrl: URL = new URL(url.toString());
 
-  // Remaining pages
-  for (let pageNumber = 1; pageNumber <= maxPages; pageNumber++) {
+  // Start from 2nd page since first page is pushed above
+  for (let pageNumber = 2; pageNumber <= maxPages; pageNumber++) {
     try {
-      const pages: number | undefined = await ScrappingPaginatedJob({
+      await ScrappingPaginatedJob({
         url: pageUrl,
         headers,
         request,
         unSortedJobs,
-        initialScrap,
-        maxPages,
         pageNumber,
       });
-      if (pages && initialScrap) {
-        maxPages = pages as number;
-      }
-      initialScrap = false;
     } catch (error) {
-      if(error instanceof Error){
+      if (error instanceof Error) {
         console.error(`Scraping stopped at page ${pageNumber}:`, error);
         throw error;
       }
