@@ -1,4 +1,4 @@
-import { RequestParams } from "../services/GetDesiredJobs.js";
+import { RequestParams } from "../types.js";
 
 interface FetchParams extends Partial<RequestParams> {
   method?: "GET";
@@ -14,6 +14,10 @@ export default async function Fetch({
     method: request?.method() ?? method,
     headers,
   });
+  if (response.headers.get("content-type")?.includes("text/html")) {
+    const text = await response.text();
+    console.log("BODY START:", text.slice(0, 500));
+  }
   const body = await response.json();
   const { jobDetails, noOfJobs } = body;
   return { jobDetails, noOfJobs };
