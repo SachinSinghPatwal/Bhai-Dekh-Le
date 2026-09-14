@@ -1,7 +1,7 @@
 import amqp from "amqplib";
 import { ScheduleScrape } from "../../../../constants.js";
 
-export default async function (): Promise<void> {
+export default async function Scrapper(): Promise<void> {
   const connection = await amqp.connect(
     "amqp://rabbitmq-4-management-x53s:5672/",
   );
@@ -17,11 +17,10 @@ export default async function (): Promise<void> {
 
   console.log("\n DIRECT Exchange Demo started - sending every 10 seconds");
 
-  for (const { key, msg } of messages) {
-    channel.publish(ScheduleScrape, key, Buffer.from(msg));
-  }
-  console.log("\n All messages sent. closing connection");
-  setTimeout(() => {
-    connection.close();
-  }, 500);
+  const work = {
+    key: "Scrapper",
+    Theme: "scrapping",
+  };
+  channel.publish(ScheduleScrape, work.key, Buffer.from(work.Theme));
+  console.log("\n Messages sent. closing connection");
 }

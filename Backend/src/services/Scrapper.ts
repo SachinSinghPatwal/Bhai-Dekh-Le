@@ -14,25 +14,37 @@ import UrlForPageToDirect from "../utility/playwright/ComposeUrl.js";
 import { JOB_DETAILS } from "../models/Mongo/job.models.js";
 
 class Scraper {
+  // One shared browser for all workers
+  private static browser: Browser | null = null;
+
   // One Scraper instance per worker
   private static instances = new Map<string, Scraper>();
 
-  private browser: Browser | null = null;
+  // One context + one page per worker
   private context: BrowserContext | null = null;
+  private page: Page | null = null;
 
   private constructor(private readonly workerId: string) {}
 
   public static async getInstance(workerId: string): Promise<Scraper> {
+    // Create the browser only once
+    if (!Scraper.browser) {
+      Scraper.browser = await chromium.launch({
+        headless: false,
+      });
+    }
+
+    // Return existing worker instance
     let scraper = Scraper.instances.get(workerId);
 
     if (!scraper) {
       scraper = new Scraper(workerId);
 
-      scraper.browser = await chromium.launch({
-        headless: false,
-      });
+      // Every worker gets its own isolated context
+      scraper.context = await Scraper.browser.newContext();
 
-      scraper.context = await scraper.browser.newContext();
+      // Exactly one page for this worker
+      scraper.page = await scraper.context.newPage();
 
       Scraper.instances.set(workerId, scraper);
     }
@@ -40,27 +52,19 @@ class Scraper {
     return scraper;
   }
 
-  private getContext(): BrowserContext {
-    if (!this.context) {
-      throw new Error(
-        `Worker ${this.workerId}: Browser context is not initialized`,
-      );
+  private getPage(): Page {
+    if (!this.page) {
+      throw new Error(`Worker ${this.workerId}: Page is not initialized`);
     }
 
-    return this.context;
-  }
-
-  public async createPage(): Promise<Page> {
-    return this.getContext().newPage();
+    return this.page;
   }
 
   public async scrape(): Promise<JOB_DETAILS[] | undefined> {
-    let page: Page | undefined;
+    const page = this.getPage();
 
     try {
       console.log(`Worker ${this.workerId}: starting scraper`);
-
-      page = await this.createPage();
 
       const capturedRequest = this.captureRequest(page);
       const capturedResponse = this.captureResponse(page);
@@ -80,15 +84,13 @@ class Scraper {
 
       const { jobDetails, noOfJobs } = await response.json();
 
-      const workerId = this.workerId
-
       return await makeHttpRequestToGetAllDesiredJobs({
         url,
         headers,
         request,
         noOfJobs,
         jobDetails,
-        workerId,
+        workerId: this.workerId,
       });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
@@ -100,8 +102,6 @@ class Scraper {
         `Worker ${this.workerId}: Something went wrong while scraping jobs`,
         message,
       );
-    } finally {
-      await page?.close();
     }
   }
 
@@ -136,15 +136,13 @@ class Scraper {
   }
 
   public async close(): Promise<void> {
-    console.log(`Worker ${this.workerId}: closing scraper`);
+    console.log(`Worker ${this.workerId}: closing`);
 
-    // Closing browser also closes its context and pages.
-    await this.browser?.close();
+    // Closing the shared browser closes all contexts/pages.
+    await Scraper.browser?.close();
 
-    this.browser = null;
-    this.context = null;
-
-    Scraper.instances.delete(this.workerId);
+    Scraper.browser = null;
+    Scraper.instances.clear();
   }
 }
 
