@@ -80,12 +80,15 @@ class Scraper {
 
       const { jobDetails, noOfJobs } = await response.json();
 
+      const workerId = this.workerId
+
       return await makeHttpRequestToGetAllDesiredJobs({
         url,
         headers,
         request,
         noOfJobs,
         jobDetails,
+        workerId,
       });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);

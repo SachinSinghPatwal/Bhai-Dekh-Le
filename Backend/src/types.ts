@@ -6,5 +6,6 @@ export interface RequestParams {
   request: Request;
   headers: Record<string, string>;
   readonly noOfJobs?: number;
-  jobDetails:JOB_DETAILS[];
+  jobDetails: JOB_DETAILS[];
+  workerId: string;
 }

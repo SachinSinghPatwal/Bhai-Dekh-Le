@@ -2,6 +2,7 @@ import { JOB_DETAILS } from "../models/Mongo/job.models.js";
 import { RequestParams } from "../types.js";
 import ScrappingPaginatedJob from "../helpers/ScrappingPaginatedJob.js";
 import { sortingUnsortedJobBasedOnTimeCreated } from "../utility/sortingJobBasedOnCreated.js";
+import DistributingLoadWithWorkers from "../helpers/RMQ/DistributingWork.js";
 
 export default async function getDesiredJobs({
   url,
@@ -9,22 +10,26 @@ export default async function getDesiredJobs({
   headers,
   noOfJobs,
   jobDetails,
+  workerId,
 }: RequestParams) {
   const unSortedJobs: JOB_DETAILS[] = [];
-  const numberOfJobPerPage = 20;
-  let maxPages = Math.ceil((noOfJobs as number)/ numberOfJobPerPage);
+
+  const { startPage, endPage } = DistributingLoadWithWorkers(
+    noOfJobs as number,
+    workerId,
+  );
 
   /*
     Intial request interception provide body and no of total jobs exist
-  */ 
-  if(Array.isArray(jobDetails) && jobDetails.length > 0){
+  */
+  if (Array.isArray(jobDetails) && jobDetails.length > 0) {
     unSortedJobs.push(...jobDetails);
   }
 
   const pageUrl: URL = new URL(url.toString());
 
   // Start from 2nd page since first page is pushed above
-  for (let pageNumber = 2; pageNumber <= maxPages; pageNumber++) {
+  for (let pageNumber = startPage; pageNumber <= endPage; pageNumber++) {
     try {
       await ScrappingPaginatedJob({
         url: pageUrl,
