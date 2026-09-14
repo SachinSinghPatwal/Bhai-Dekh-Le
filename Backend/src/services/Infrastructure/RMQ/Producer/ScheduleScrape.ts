@@ -1,7 +1,7 @@
 import amqp from "amqplib";
 import { ScheduleScrape } from "../../../../constants.js";
 
-export default async function Scrapper(): Promise<void> {
+export default async function ScheduleScrapping(): Promise<void> {
   const connection = await amqp.connect(
     "amqp://rabbitmq-4-management-x53s:5672/",
   );
