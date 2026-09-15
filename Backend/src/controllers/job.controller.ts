@@ -21,10 +21,9 @@ export const createJob = AsyncHandler(async (req: Request, res: Response) => {
 });
 
 export const getAllJobs = AsyncHandler(async (req: Request, res: Response) => {
-  startScrapConsumer();
+  await startScrapConsumer();
   console.log("worker started listening");
-  const data = await ScheduleScrapping();
-  console.log(data);
+  await ScheduleScrapping();
   res.status(200).json({
     success: true,
   });

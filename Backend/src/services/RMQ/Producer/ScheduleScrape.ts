@@ -1,5 +1,5 @@
 import amqp from "amqplib";
-import { ScheduleScrape } from "../../../../constants.js";
+import { ScheduleScrape } from "../../../constants.js";
 
 export default async function ScheduleScrapping(): Promise<void> {
   const connection = await amqp.connect(
