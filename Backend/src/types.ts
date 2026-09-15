@@ -8,4 +8,5 @@ export interface RequestParams {
   readonly noOfJobs?: number;
   jobDetails: JOB_DETAILS[];
   workerId: string;
+  retryStartingPage:number;
 }

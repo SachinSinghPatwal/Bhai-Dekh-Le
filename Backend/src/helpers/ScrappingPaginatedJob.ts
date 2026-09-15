@@ -1,13 +1,13 @@
 import { JOB_DETAILS } from "../models/Mongo/job.models.js";
 import { RequestParams } from "../types.js";
 import GetAllJobs from "../utility/Fetch.js";
+import { RateLimitError } from "../utility/RateLimitingError.js";
 import ValidateJobIsPostedWithinThreeDays from "../utility/ValidatingProp.js";
 import { setIterativePaginationParams } from "./Playwright/setIterativePagiantionParams.js";
 
 interface SCRAPPING_PAGINATED_JOBS extends Partial<RequestParams> {
   unSortedJobs: JOB_DETAILS[];
   pageNumber?: number;
-  jobsPerPage?: number;
 }
 
 export default async function ScrappingPaginatedJob({
@@ -16,8 +16,7 @@ export default async function ScrappingPaginatedJob({
   request,
   unSortedJobs,
   pageNumber,
-}: SCRAPPING_PAGINATED_JOBS): Promise<void> {
-
+}: SCRAPPING_PAGINATED_JOBS): Promise<any> {
   const jobDetails = await GetAllJobs({
     url,
     headers,
@@ -41,8 +40,12 @@ export default async function ScrappingPaginatedJob({
           title: each?.title,
           createdAt: each?.footerPlaceholderLabel,
         })),
+      "--page number",
+      pageNumber,
+      "desired job",
+      unSortedJobs.length
     );
   } else {
-    throw new Error("jobDetails are not iterable");
+    throw new RateLimitError("Rate limited by Application", pageNumber as number);
   }
 }

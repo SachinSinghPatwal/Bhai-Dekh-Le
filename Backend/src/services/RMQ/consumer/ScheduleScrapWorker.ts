@@ -2,7 +2,7 @@ import { chromium } from "playwright";
 import "../../../config/load-env.js";
 import amqp, { type Message } from "amqplib";
 import { ScheduleScrape } from "../../../constants.js";
-import Scraper from "../../Scrapper.js";
+import Scrapper from "../../Scrapper.js";
 
 const workerId = process.env.WORKER_ID ?? `worker-unknown`;
 
@@ -50,25 +50,7 @@ async function start() {
 
       try {
         console.log("Launching Chromium...");
-
-        const browser = await chromium.launch({
-          headless: false,
-        });
-
-        console.log("CHROMIUM LAUNCHED");
-
-        const context = await browser.newContext();
-        const page = await context.newPage();
-
-        console.log("PAGE CREATED");
-
-        await page.goto("https://www.youtube.com", {
-          waitUntil: "domcontentloaded",
-        });
-
-        console.log("YOUTUBE OPENED");
-
-        await new Promise(() => {});
+        await Scrapper(workerId);
       } catch (error) {
         console.error("PLAYWRIGHT FAILURE:");
         console.error(error);

@@ -11,13 +11,16 @@ export default async function getDesiredJobs({
   noOfJobs,
   jobDetails,
   workerId,
-}: RequestParams) {
+  retryStartingPage,
+}: RequestParams): Promise<JOB_DETAILS[]> {
   const unSortedJobs: JOB_DETAILS[] = [];
 
-  const { startPage, endPage } = DistributingLoadWithWorkers(
+  let { startPage, endPage } = DistributingLoadWithWorkers(
     noOfJobs as number,
     workerId,
   );
+
+  startPage = retryStartingPage // retrying on previous closed browser
 
   /*
     Intial request interception provide body and no of total jobs exist
@@ -27,7 +30,7 @@ export default async function getDesiredJobs({
   }
 
   const pageURL = new URL(url.toString());
-  
+
   try {
     for (let pageNumber = startPage; pageNumber <= endPage; pageNumber++) {
       await ScrappingPaginatedJob({

@@ -1,4 +1,4 @@
-# BhaiDekhLe — Naukri Job Scraper
+# BhaiDekhLe — Naukri Job Scrapper
 
 A backend service that scrapes [Naukri.com](https://www.naukri.com) job listings using Playwright for session discovery, then paginates through results via direct HTTP requests. Jobs are filtered by title keywords and recency before being returned through a REST API.
 
@@ -83,15 +83,15 @@ Backend/
 
 ## 🛠️ Technology Stack
 
-| Layer         | Technology                         |
-|---------------|------------------------------------|
-| Runtime       | Node.js + TypeScript 7             |
-| Framework     | Express 5                          |
-| Database      | MongoDB + Mongoose 9               |
-| Automation    | Playwright 1.62 (Chromium)         |
-| Auth          | JWT + bcrypt                       |
-| Logging       | Winston (file + console transports)|
-| Build         | tsx (dev) / tsc (production)       |
+| Layer      | Technology                          |
+| ---------- | ----------------------------------- |
+| Runtime    | Node.js + TypeScript 7              |
+| Framework  | Express 5                           |
+| Database   | MongoDB + Mongoose 9                |
+| Automation | Playwright 1.62 (Chromium)          |
+| Auth       | JWT + bcrypt                        |
+| Logging    | Winston (file + console transports) |
+| Build      | tsx (dev) / tsc (production)        |
 
 ---
 
@@ -153,19 +153,19 @@ Server starts on `http://localhost:8000`.
 
 ### Jobs
 
-| Method   | Path                    | Description                      |
-|----------|-------------------------|----------------------------------|
-| `GET`    | `/api/v1/job/getAll`    | Scrape & return filtered jobs    |
-| `POST`   | `/api/v1/job/create`    | Create a job record              |
-| `GET`    | `/api/v1/job/:id`       | Get job by ID                    |
-| `PUT`    | `/api/v1/job/:id`       | Update job                       |
-| `DELETE` | `/api/v1/job/:id`       | Delete job                       |
+| Method   | Path                 | Description                   |
+| -------- | -------------------- | ----------------------------- |
+| `GET`    | `/api/v1/job/getAll` | Scrape & return filtered jobs |
+| `POST`   | `/api/v1/job/create` | Create a job record           |
+| `GET`    | `/api/v1/job/:id`    | Get job by ID                 |
+| `PUT`    | `/api/v1/job/:id`    | Update job                    |
+| `DELETE` | `/api/v1/job/:id`    | Delete job                    |
 
 ### Health
 
-| Method   | Path                    | Description                      |
-|----------|-------------------------|----------------------------------|
-| `GET`    | `/api/v1/test`          | Liveness probe (uptime + status) |
+| Method | Path           | Description                      |
+| ------ | -------------- | -------------------------------- |
+| `GET`  | `/api/v1/test` | Liveness probe (uptime + status) |
 
 ### Example
 
@@ -235,11 +235,11 @@ curl http://localhost:8000/api/v1/job/getAll
 
 ## 📁 NPM Scripts
 
-| Script                  | Description                              |
-|-------------------------|------------------------------------------|
-| `npm run dev`           | Start dev server with tsx + nodemon      |
-| `npm run build`         | Compile TypeScript to `dist/`            |
-| `npm start`             | Run compiled production build            |
+| Script                       | Description                         |
+| ---------------------------- | ----------------------------------- |
+| `npm run dev`                | Start dev server with tsx + nodemon |
+| `npm run build`              | Compile TypeScript to `dist/`       |
+| `npm start`                  | Run compiled production build       |
 | `npm run playwright:install` | Install Chromium for Playwright     |
 | `npm run test:playwright`    | Run Playwright tests                |
 
@@ -249,11 +249,11 @@ curl http://localhost:8000/api/v1/job/getAll
 
 Winston writes to three log files in `Backend/logs/`:
 
-| File              | Content                    |
-|-------------------|----------------------------|
-| `error.log`       | Error-level entries only   |
-| `combined.log`    | All log levels             |
-| `playwright.log`  | Debug-level automation logs|
+| File             | Content                     |
+| ---------------- | --------------------------- |
+| `error.log`      | Error-level entries only    |
+| `combined.log`   | All log levels              |
+| `playwright.log` | Debug-level automation logs |
 
 Console output is enabled in development (`NODE_ENV !== 'production'`).
 
