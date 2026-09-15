@@ -7,7 +7,7 @@ export default async function ScheduleScrapping(): Promise<void> {
   );
 
   try {
-    console.log("=== CONNECTED WITH RABBITMQ ===");
+    console.log("=== Producer CONNECTED ===");
 
     const channel = await connection.createChannel();
 

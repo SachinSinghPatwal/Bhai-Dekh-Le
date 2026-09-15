@@ -26,11 +26,13 @@ export default async function getDesiredJobs({
     unSortedJobs.push(...jobDetails);
   }
 
+  const pageURL = new URL(url.toString())
+
   // Start from 2nd page since first page is pushed above
   for (let pageNumber = startPage; pageNumber <= endPage; pageNumber++) {
     try {
       await ScrappingPaginatedJob({
-        url: new URL(url.toString()), //each gets its own url to mutate
+        url: pageURL, //each iteration gets one url thats already mutated
         headers,
         request,
         unSortedJobs,

@@ -6,7 +6,9 @@ import Scraper from "../../Scrapper.js";
 const workerId = process.env.WORKER_ID ?? `worker-unknown`;
 
 let connection: Awaited<ReturnType<typeof amqp.connect>> | null = null;
-let channel: Awaited<ReturnType<Awaited<ReturnType<typeof amqp.connect>>["createChannel"]>> | null = null;
+let channel: Awaited<
+  ReturnType<Awaited<ReturnType<typeof amqp.connect>>["createChannel"]>
+> | null = null;
 
 async function start() {
   console.log(`[${workerId}] Connecting to RabbitMQ...`);
@@ -39,7 +41,7 @@ async function start() {
     console.log(`[${workerId}] Received: ${message.content.toString()}`);
 
     try {
-      const scraper = await Scraper.getInstance(workerId);
+      const scraper = Scraper.getInstance(workerId);
 
       const jobs = await scraper.scrape();
 

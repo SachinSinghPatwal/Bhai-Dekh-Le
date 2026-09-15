@@ -28,20 +28,20 @@ export default async function ScrappingPaginatedJob({
 
   if (Array.isArray(jobDetails) && jobDetails.length > 0) {
     unSortedJobs.push(...jobDetails);
-    // console.log(
-    //   "desired jobs",
-    //   unSortedJobs
-    //     .filter((job) => {
-    //       const title = String(job.title ?? "").toLowerCase();
-    //       return title.includes("react") || title.includes("javascript");
-    //     })
-    //     .map((job) => ValidateJobIsPostedWithinThreeDays(job))
-    //     .filter(Boolean)
-    //     .map((each) => ({
-    //       title: each?.title,
-    //       createdAt: each?.footerPlaceholderLabel,
-    //     })),
-    // );
+    console.log(
+      "desired jobs",
+      unSortedJobs
+        .filter((job) => {
+          const title = String(job.title ?? "").toLowerCase();
+          return title.includes("react") || title.includes("javascript");
+        })
+        .map((job) => ValidateJobIsPostedWithinThreeDays(job))
+        .filter(Boolean)
+        .map((each) => ({
+          title: each?.title,
+          createdAt: each?.footerPlaceholderLabel,
+        })),
+    );
   } else {
     throw new Error("jobDetails are not iterable");
   }

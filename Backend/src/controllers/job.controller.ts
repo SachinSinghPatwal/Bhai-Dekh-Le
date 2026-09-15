@@ -28,6 +28,7 @@ export const getAllJobs = AsyncHandler(async (req: Request, res: Response) => {
     success: true,
   });
 });
+
 export const getJobById = AsyncHandler(
   async (req: Request, res: Response) => {},
 );
