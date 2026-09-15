@@ -4,8 +4,8 @@ import AsyncHandlerTry_CatchWrapper from "../utility/AsyncHandlerContentWrapper.
 import type { Request, Response } from "express";
 
 import endpointRequestBodyValidation from "../utility/EndpointRequestBodyValidation.js";
-import ScheduleScrapping from "../services/Infrastructure/RMQ/Producer/ScheduleScrape.js";
-import { startScrapConsumer } from "../services/Infrastructure/WorkerManager.js";
+import ScheduleScrapping from "../services/RMQ/Producer/ScheduleScrape.js";
+import { startScrapConsumer } from "../services/RMQ/WorkerManager.js";
 
 export const createJob = AsyncHandler(async (req: Request, res: Response) => {
   const validatedData = endpointRequestBodyValidation(req as Request);
