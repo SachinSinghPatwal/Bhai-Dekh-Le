@@ -39,6 +39,8 @@ export default async function getDesiredJobs({
         request,
         unSortedJobs,
         pageNumber,
+        workerId,
+        endPage,
       });
     }
   } catch (error) {

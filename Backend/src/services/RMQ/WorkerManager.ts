@@ -58,7 +58,7 @@ export async function startScrapConsumer() {
 
   shuttingDown = false;
 
-  const workerCount = Number(process.env.WORKER_COUNT ?? 4);
+  const workerCount = Number(process.env.WORKER_COUNT ?? 5);
 
   console.log(`Starting ${workerCount} workers...`);
 
