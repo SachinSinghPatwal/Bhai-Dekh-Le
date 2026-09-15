@@ -10,11 +10,15 @@ export default async function Scraper(
   workerId: string,
 ): Promise<JOB_DETAILS[] | undefined> {
   let attempt = 0;
+  let browserInstace ;
   while (attempt < MAX_RETRIES) {
-    await retryDelay(attempt)
+    // await retryDelay(attempt)
     try {
-      const { url, request, noOfJobs, headers, jobDetails } =
+      const { url, request, noOfJobs, headers, jobDetails,browser } =
         (await CreatingEnviromentToScrap()) as SETUP_RETURNED_VALUES;
+
+      browserInstace = browser
+
       const filteredRecentJob = await makeHttpRequestToGetAllDesiredJobs({
         url,
         headers,
@@ -26,6 +30,7 @@ export default async function Scraper(
 
       return filteredRecentJob;
     } catch (error: unknown) {
+      browserInstace?.close();
       attempt++;
       console.error(`Worker ${workerId}: Scraper error:`, error);
       if (attempt === MAX_RETRIES) {

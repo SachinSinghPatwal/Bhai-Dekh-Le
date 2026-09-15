@@ -10,6 +10,7 @@ export interface SETUP_RETURNED_VALUES {
   noOfJobs: number;
   headers: Record<string, string>;
   jobDetails: JOB_DETAILS[];
+  browser:Browser;
 }
 export async function CreatingEnviromentToScrap(): Promise<
   SETUP_RETURNED_VALUES | undefined
@@ -53,7 +54,7 @@ export async function CreatingEnviromentToScrap(): Promise<
 
     const { jobDetails, noOfJobs } = await response.json();
 
-    return { url, request, noOfJobs, headers, jobDetails };
+    return { url, request, noOfJobs, headers, jobDetails,browser };
   } catch (error: unknown) {
     browser?.close();
     if (error instanceof Error) {
