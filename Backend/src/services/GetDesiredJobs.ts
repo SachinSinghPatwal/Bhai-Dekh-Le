@@ -14,13 +14,10 @@ export default async function getDesiredJobs({
 }: RequestParams) {
   const unSortedJobs: JOB_DETAILS[] = [];
 
-  
   const { startPage, endPage } = DistributingLoadWithWorkers(
     noOfJobs as number,
     workerId,
   );
-  
-  let currentPageNumber = startPage;
 
   /*
     Intial request interception provide body and no of total jobs exist
@@ -29,28 +26,21 @@ export default async function getDesiredJobs({
     unSortedJobs.push(...jobDetails);
   }
 
-  const pageURL = new URL(url.toString())
-
-  // Start from 2nd page since first page is pushed above
-  do {
+  const pageURL = new URL(url.toString());
+  
+  try {
     for (let pageNumber = startPage; pageNumber <= endPage; pageNumber++) {
-      try {
-        await ScrappingPaginatedJob({
-          url: pageURL, //each iteration gets one url thats already mutated
-          headers,
-          request,
-          unSortedJobs,
-          pageNumber,
-        });
-      } catch (error) {
-        if (error instanceof Error) {
-          console.error(`Scraping stopped at page ${pageNumber}:`, error);
-          throw error;
-        }
-      }
-      currentPageNumber++;
+      await ScrappingPaginatedJob({
+        url: pageURL,
+        headers,
+        request,
+        unSortedJobs,
+        pageNumber,
+      });
     }
-  } while (currentPageNumber <= endPage);
+  } catch (error) {
+    throw error;
+  }
 
   const filteredRecentJob = sortingUnsortedJobBasedOnTimeCreated(unSortedJobs);
 

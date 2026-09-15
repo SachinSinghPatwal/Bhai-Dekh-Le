@@ -1,83 +1,40 @@
-import {
-  chromium,
-  type Browser,
-  type BrowserContext,
-  type Request,
-  type Response,
-} from "playwright";
-
-import { sanitizeCaptureHeaderUrl } from "../helpers/Playwright/sanitizeCaptureHeaderUrl.js";
 import makeHttpRequestToGetAllDesiredJobs from "./GetDesiredJobs.js";
-import { ApiError } from "../utility/ApiError.js";
-import UrlForPageToDirect from "../utility/playwright/ComposeUrl.js";
 import { JOB_DETAILS } from "../models/Mongo/job.models.js";
-import { interceptingBrowsersHttpCommunication } from "../helpers/Playwright/interceptingBrowsersHttpCommunication.js";
+import {
+  CreatingEnviromentToScrap,
+  SETUP_RETURNED_VALUES,
+} from "./Playwright/CreatingEnviromentToScrap.js";
+import { MAX_RETRIES } from "../constants.js";
 
 export default async function Scraper(
   workerId: string,
 ): Promise<JOB_DETAILS[] | undefined> {
-  let browser: Browser | null = null;
-  let context: BrowserContext | null = null;
+  let attempt = 0;
+  while (attempt < MAX_RETRIES) {
+    await retryDelay(attempt)
+    try {
+      const { url, request, noOfJobs, headers, jobDetails } =
+        (await CreatingEnviromentToScrap()) as SETUP_RETURNED_VALUES;
+      const filteredRecentJob = await makeHttpRequestToGetAllDesiredJobs({
+        url,
+        headers,
+        request,
+        noOfJobs,
+        workerId,
+        jobDetails,
+      });
 
-  try {
-    browser = await chromium.launch({
-      headless: false,
-    });
-
-    context = await browser.newContext();
-
-    const page = await context.newPage();
-
-    const capturedRequest = new Promise<Request>((resolve) => {
-      page.on(
-        "request",
-        interceptingBrowsersHttpCommunication(page, resolve, "request"),
-      );
-    });
-
-    const capturedResponse = new Promise<Response>((resolve) => {
-      page.on(
-        "response",
-        interceptingBrowsersHttpCommunication(page, resolve, "response"),
-      );
-    });
-
-    await page.goto(UrlForPageToDirect(), {
-      waitUntil: "domcontentloaded",
-    });
-
-    const request = await capturedRequest;
-    const response = await capturedResponse;
-
-    const url = new URL(request.url());
-
-    const capturedHeaders = await request.allHeaders();
-
-    const headers = sanitizeCaptureHeaderUrl(capturedHeaders);
-
-    const { jobDetails, noOfJobs } = await response.json();
-
-    const filteredRecentJob = await makeHttpRequestToGetAllDesiredJobs({
-      url,
-      headers,
-      request,
-      noOfJobs,
-      workerId,
-      jobDetails,
-    });
-
-    return filteredRecentJob;
-  } catch (error: unknown) {
-    console.error(`Worker ${workerId}: Scraper error:`, error);
-    if (error instanceof Error) {
-      throw new ApiError(
-        500,
-        "Something Went Wrong while Collecting/Scrapping Job data",
-        error.message,
-      );
+      return filteredRecentJob;
+    } catch (error: unknown) {
+      attempt++;
+      console.error(`Worker ${workerId}: Scraper error:`, error);
+      if (attempt === MAX_RETRIES) {
+        throw error;
+      }
     }
-    throw error;
-  } finally {
-    await browser?.close();
   }
+}
+
+async function retryDelay(retry: number):Promise<void> {
+  return new Promise((_, resolve) => setTimeout(() => resolve(), 10000 * retry));
 }

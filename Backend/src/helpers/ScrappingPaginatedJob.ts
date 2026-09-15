@@ -15,7 +15,7 @@ export default async function ScrappingPaginatedJob({
   headers,
   request,
   unSortedJobs,
-  pageNumber = 1,
+  pageNumber,
 }: SCRAPPING_PAGINATED_JOBS): Promise<void> {
 
   const jobDetails = await GetAllJobs({

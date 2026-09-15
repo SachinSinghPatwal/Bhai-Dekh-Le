@@ -27,7 +27,7 @@ export const getAllJobs = AsyncHandler(async (req: Request, res: Response) => {
   
   // console.log("endpoint data:", jobs);
   // await ScheduleScrapping();
-  const job = Scraper("worker-1");
+  const job = await Scraper("worker-1");
   console.log(job)
   res.status(200).json({
     success: true,

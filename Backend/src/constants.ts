@@ -20,3 +20,5 @@ export const JOb_SEARCH_URL_WITH_QUERY = {
 export const ScheduleScrape = "TimedScrapping";
 
 export const MatchedURLOfSearch = "/jobapi/v3/search";
+
+export const MAX_RETRIES = 5;
