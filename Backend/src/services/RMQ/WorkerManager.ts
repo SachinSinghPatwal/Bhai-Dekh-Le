@@ -107,8 +107,9 @@ export async function startScrapConsumer() {
     worker.on("exit", (code, signal) => {
       console.log(`${workerId} exited. code=${code}, signal=${signal}`);
 
-      // Auto-restart crashed workers (non-zero exit) unless we're shutting down
-      if (!shuttingDown && code !== 0) {
+      // Auto-restart only on actual crashes (positive exit code).
+      // Signal kills (SIGTERM) set code=null — those are intentional, not crashes.
+      if (!shuttingDown && code !== null && code !== 0) {
         console.log(`${workerId} crashed — restarting in 3s...`);
 
         setTimeout(() => {

@@ -18,16 +18,19 @@ export default async function ScheduleScrapping(): Promise<void> {
       autoDelete: false,
     });
 
-    const message = "scrapping";
+    const workerCount = Number(process.env.WORKER_COUNT ?? 4);
 
-    channel.publish(ScheduleScrape, "Scrapper", Buffer.from(message), {
-      persistent: true,
-    });
+    for (let i = 0; i < workerCount; i++) {
+      const message = `scrapping task ${i + 1}`;
+      channel.publish(ScheduleScrape, "Scrapper", Buffer.from(message), {
+        persistent: true,
+      });
+    }
 
-    // Wait for broker to confirm it received and persisted the message
+    // Wait for broker to confirm it received and persisted the messages
     await channel.waitForConfirms();
 
-    console.log(`Message published and confirmed: ${message}`);
+    console.log(`${workerCount} messages published and confirmed`);
 
     await channel.close();
   } finally {
