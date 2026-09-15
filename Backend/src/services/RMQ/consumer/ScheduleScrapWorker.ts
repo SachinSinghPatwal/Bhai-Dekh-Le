@@ -1,3 +1,4 @@
+import { chromium } from "playwright";
 import "../../../config/load-env.js";
 import amqp, { type Message } from "amqplib";
 import { ScheduleScrape } from "../../../constants.js";
@@ -41,11 +42,37 @@ async function start() {
     console.log(`[${workerId}] Received: ${message.content.toString()}`);
 
     try {
-      const scraper = Scraper.getInstance(workerId);
+      // worker.ts
 
-      const jobs = await scraper.scrape();
+      console.log("WORKER STARTED");
+      console.log("PID:", process.pid);
+      console.log("PPID:", process.ppid);
 
-      console.log(`[${workerId}] Jobs: ${jobs?.length ?? 0}`);
+      try {
+        console.log("Launching Chromium...");
+
+        const browser = await chromium.launch({
+          headless: false,
+        });
+
+        console.log("CHROMIUM LAUNCHED");
+
+        const context = await browser.newContext();
+        const page = await context.newPage();
+
+        console.log("PAGE CREATED");
+
+        await page.goto("https://www.youtube.com", {
+          waitUntil: "domcontentloaded",
+        });
+
+        console.log("YOUTUBE OPENED");
+
+        await new Promise(() => {});
+      } catch (error) {
+        console.error("PLAYWRIGHT FAILURE:");
+        console.error(error);
+      }
 
       channel!.ack(message);
     } catch (error) {

@@ -14,36 +14,69 @@ import UrlForPageToDirect from "../utility/playwright/ComposeUrl.js";
 import { JOB_DETAILS } from "../models/Mongo/job.models.js";
 
 class Scraper {
-  // One shared browser for all workers
+  /**
+   * One Browser per Node.js worker process.
+   *
+   * fork() creates separate Node.js processes,
+   * therefore each process has its own static browser.
+   */
   private static browser: Browser | null = null;
 
-  // One Scraper instance per worker
+  /**
+   * Scraper instances live only inside this worker process.
+   */
   private static instances = new Map<string, Scraper>();
 
-  // One context + one page per worker
+  /**
+   * One isolated browser environment for this scraper.
+   */
   private context: BrowserContext | null = null;
+
+  /**
+   * One page belonging to this context.
+   */
   private page: Page | null = null;
 
   private constructor(private readonly workerId: string) {}
 
   public static async getInstance(workerId: string): Promise<Scraper> {
-    // Create the browser only once
+    /*
+     * Browser belongs to THIS Node.js process.
+     *
+     * Worker 1:
+     *   Scraper.browser → Chromium 1
+     *
+     * Worker 2:
+     *   Scraper.browser → Chromium 2
+     */
     if (!Scraper.browser) {
-      Scraper.browser = await chromium.launch({
-        headless: false,
-      });
+      console.log(`Worker ${workerId}: CHROMIUM LAUNCH STARTED`);
+
+      try {
+        Scraper.browser = await chromium.launch({
+          headless: false,
+        });
+        console.log(`Worker ${workerId}: CHROMIUM LAUNCH SUCCEEDED`);
+      } catch (err) {
+        console.error(`Worker ${workerId}: CHROMIUM LAUNCH FAILED:`, err);
+        throw err;
+      }
     }
 
-    // Return existing worker instance
     let scraper = Scraper.instances.get(workerId);
 
     if (!scraper) {
       scraper = new Scraper(workerId);
 
-      // Every worker gets its own isolated context
+      /*
+       * Context is isolated from other contexts
+       * inside this browser.
+       */
       scraper.context = await Scraper.browser.newContext();
 
-      // Exactly one page for this worker
+      /*
+       * Page belongs to the context.
+       */
       scraper.page = await scraper.context.newPage();
 
       Scraper.instances.set(workerId, scraper);
@@ -113,6 +146,7 @@ class Scraper {
         }
 
         page.off("request", handleRequest);
+
         resolve(request);
       };
 
@@ -128,6 +162,7 @@ class Scraper {
         }
 
         page.off("response", handleResponse);
+
         resolve(response);
       };
 
@@ -138,7 +173,26 @@ class Scraper {
   public async close(): Promise<void> {
     console.log(`Worker ${this.workerId}: closing`);
 
-    // Closing the shared browser closes all contexts/pages.
+    /*
+     * Close this scraper's context first.
+     *
+     * This closes its pages.
+     */
+    await this.context?.close();
+
+    this.context = null;
+    this.page = null;
+
+    Scraper.instances.delete(this.workerId);
+  }
+
+  /**
+   * Call this when the ENTIRE worker process
+   * is shutting down.
+   */
+  public static async closeBrowser(): Promise<void> {
+    console.log("Closing worker browser");
+
     await Scraper.browser?.close();
 
     Scraper.browser = null;

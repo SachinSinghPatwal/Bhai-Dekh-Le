@@ -9,7 +9,9 @@ export default async function ScheduleScrapping(): Promise<void> {
   try {
     console.log("=== Producer CONNECTED ===");
 
-    const channel = await connection.createChannel();
+    // Confirm channel guarantees the broker has received the message
+    // before we close the connection.
+    const channel = await connection.createConfirmChannel();
 
     await channel.assertExchange(ScheduleScrape, "direct", {
       durable: true,
@@ -22,7 +24,12 @@ export default async function ScheduleScrapping(): Promise<void> {
       persistent: true,
     });
 
-    console.log(`Message published: ${message}`);
+    // Wait for broker to confirm it received and persisted the message
+    await channel.waitForConfirms();
+
+    console.log(`Message published and confirmed: ${message}`);
+
+    await channel.close();
   } finally {
     await connection.close();
 
