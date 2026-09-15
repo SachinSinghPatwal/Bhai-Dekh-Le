@@ -1,4 +1,5 @@
 export const MONGO_DB_NAME = "BhaiDekhLe";
+
 export const JOb_SEARCH_URL_WITH_QUERY = {
   protocol: "https://",
   domain: "www.naukri.com/",
@@ -17,3 +18,5 @@ export const JOb_SEARCH_URL_WITH_QUERY = {
 };
 
 export const ScheduleScrape = "TimedScrapping";
+
+export const MatchedURLOfSearch = "/jobapi/v3/search";

@@ -22,12 +22,13 @@ export const createJob = AsyncHandler(async (req: Request, res: Response) => {
 });
 
 export const getAllJobs = AsyncHandler(async (req: Request, res: Response) => {
-  await startScrapConsumer();
-  console.log("worker started listening");
-  // const scraper = await Scraper.getInstance("worker-1");
-  // const jobs = await scraper.scrape();
+  // await startScrapConsumer();
+  // console.log("worker started listening");
+  
   // console.log("endpoint data:", jobs);
-  await ScheduleScrapping();
+  // await ScheduleScrapping();
+  const job = Scraper("worker-1");
+  console.log(job)
   res.status(200).json({
     success: true,
   });
