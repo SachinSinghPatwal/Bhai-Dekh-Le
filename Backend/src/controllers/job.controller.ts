@@ -5,7 +5,6 @@ import type { Request, Response } from "express";
 
 import endpointRequestBodyValidation from "../utility/EndpointRequestBodyValidation.js";
 import ScheduleScrapping from "../services/RMQ/Producer/ScheduleScrape.js";
-import { startScrapConsumer } from "../services/RMQ/WorkerManager.js";
 import Scrapper from "../services/Scrapper.js";
 
 export const createJob = AsyncHandler(async (req: Request, res: Response) => {
@@ -22,10 +21,9 @@ export const createJob = AsyncHandler(async (req: Request, res: Response) => {
 });
 
 export const getAllJobs = AsyncHandler(async (req: Request, res: Response) => {
-  // console.log("endpoint data:", jobs);
-  await ScheduleScrapping();
-  // const job = await Scrapper("worker-1");
-  // console.log(job)
+  // await ScheduleScrapping();
+  const job = await Scrapper("worker-1");
+  console.log(job)
   res.status(200).json({
     success: true,
   });
