@@ -59,7 +59,7 @@ export default async function Scrapper(
         error,
       );
 
-      if (attempt === customMaxRetries) {
+      if (attempt === customMaxRetries.times) {
         console.log("ordered job", orderedJobs);
         throw error;
       }
