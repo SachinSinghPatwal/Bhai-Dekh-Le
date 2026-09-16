@@ -4,7 +4,6 @@ import {
   CreatingEnviromentToScrap,
   SETUP_RETURNED_VALUES,
 } from "./Playwright/CreatingEnviromentToScrap.js";
-import { DEFAULT_MAX_RETRIES } from "../constants.js";
 import { RateLimitError } from "../utility/RateLimitingError.js";
 
 export default async function Scrapper(
@@ -13,17 +12,21 @@ export default async function Scrapper(
   let attempt = 0;
   let browserInstace;
   let lastPageCrashed = 0;
-  let customMaxRetries = Number(process.env.WORKER_COUNT ?? 4);
+  let customMaxRetries = { times: 10, changed: false };
   let orderedJobs;
 
-  while (attempt < customMaxRetries) {
+  while (attempt < customMaxRetries.times) {
     try {
       const { url, request, totalJobsAvaibles, headers, jobDetails, browser } =
         (await CreatingEnviromentToScrap()) as SETUP_RETURNED_VALUES;
 
-      if (!customMaxRetries)
-        customMaxRetries =
+      if (!customMaxRetries.changed) {
+
+        customMaxRetries.changed = true; //flag for updated end page
+        
+        customMaxRetries.times =
           totalJobsAvaibles / Number(process.env.WORKER_COUNT ?? 4);
+      }
 
       browserInstace = browser;
 
@@ -57,7 +60,7 @@ export default async function Scrapper(
       );
 
       if (attempt === customMaxRetries) {
-        console.log("ordered job",orderedJobs);
+        console.log("ordered job", orderedJobs);
         throw error;
       }
 
