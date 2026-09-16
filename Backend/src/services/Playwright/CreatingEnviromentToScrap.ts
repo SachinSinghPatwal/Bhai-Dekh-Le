@@ -7,10 +7,10 @@ import { JOB_DETAILS } from "../../models/Mongo/job.models.js";
 export interface SETUP_RETURNED_VALUES {
   url: URL;
   request: Request;
-  noOfJobs: number;
+  totalJobsAvaibles: number;
   headers: Record<string, string>;
   jobDetails: JOB_DETAILS[];
-  browser:Browser;
+  browser: Browser;
 }
 export async function CreatingEnviromentToScrap(): Promise<
   SETUP_RETURNED_VALUES | undefined
@@ -52,9 +52,9 @@ export async function CreatingEnviromentToScrap(): Promise<
 
     const headers = sanitizeCaptureHeaderUrl(capturedHeaders);
 
-    const { jobDetails, noOfJobs } = await response.json();
+    const { jobDetails, totalJobsAvaibles } = await response.json();
 
-    return { url, request, noOfJobs, headers, jobDetails,browser };
+    return { url, request, totalJobsAvaibles, headers, jobDetails, browser };
   } catch (error: unknown) {
     browser?.close();
     if (error instanceof Error) {

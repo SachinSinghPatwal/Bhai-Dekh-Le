@@ -1,5 +1,8 @@
-export default function DistributingLoadWithWorkers(noOfJobs:number,workerId:string) {
-  const totalPages = noOfJobs - 1; // page 1 already fetched
+export default function DistributingLoadWithWorkers(
+  totalJobsAvaibles: number,
+  workerId: string,
+) {
+  const totalPages = totalJobsAvaibles - 1; // page 1 already fetched
   const totalWorkers = 4;
 
   const workerNumber = Number(workerId.split("-")[1]);

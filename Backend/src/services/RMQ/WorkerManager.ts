@@ -60,8 +60,6 @@ export async function startScrapConsumer() {
 
   const workerCount = Number(process.env.WORKER_COUNT ?? 5);
 
-  console.log(`Starting ${workerCount} workers...`);
-
   const readyPromises: Promise<void>[] = [];
 
   for (let i = 1; i <= workerCount; i++) {
@@ -77,8 +75,6 @@ export async function startScrapConsumer() {
     });
 
     workers.push(worker);
-
-    console.log(`${workerId} started`);
 
     // Wait for this worker to signal it's ready (queue bound + consuming)
     const ready = new Promise<void>((resolve, reject) => {
@@ -141,7 +137,7 @@ export async function startScrapConsumer() {
   // Wait for ALL workers to be ready before returning
   await Promise.all(readyPromises);
 
-  console.log("All workers ready — safe to publish messages");
+  console.log("All workers listening Queue messages");
 }
 
 function shutdown() {

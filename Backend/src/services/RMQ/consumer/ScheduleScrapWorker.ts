@@ -1,4 +1,3 @@
-import { chromium } from "playwright";
 import "../../../config/load-env.js";
 import amqp, { type Message } from "amqplib";
 import { ScheduleScrape } from "../../../constants.js";
@@ -12,8 +11,6 @@ let channel: Awaited<
 > | null = null;
 
 async function start() {
-  console.log(`[${workerId}] Connecting to RabbitMQ...`);
-
   connection = await amqp.connect(
     process.env.RABBITMQ_URL ?? "amqp://admin:admin123@localhost:5672",
   );
@@ -34,8 +31,6 @@ async function start() {
 
   await channel.bindQueue(ScheduleScrape, ScheduleScrape, "Scrapper");
 
-  console.log(`[${workerId}] Waiting for messages...`);
-
   await channel.consume(ScheduleScrape, async (message: Message | null) => {
     if (!message) return;
 
@@ -43,28 +38,14 @@ async function start() {
 
     try {
       // worker.ts
-
-      console.log("WORKER STARTED");
-      console.log("PID:", process.pid);
-      console.log("PPID:", process.ppid);
-
-      try {
-        console.log("Launching Chromium...");
-        await Scrapper(workerId);
-      } catch (error) {
-        console.error("PLAYWRIGHT FAILURE:");
-        console.error(error);
-      }
-
+      console.log("PID:", process.pid, "PPID:", process.ppid);
+      await Scrapper(workerId);
       channel!.ack(message);
     } catch (error) {
       console.error(`[${workerId}] Scraping failed:`, error);
-
       channel!.nack(message, false, true);
     }
   });
-
-  console.log(`[${workerId}] Consumer is listening`);
 
   // Tell the parent (WorkerManager) we're ready to receive messages
   if (process.send) {

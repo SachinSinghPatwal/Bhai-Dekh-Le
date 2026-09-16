@@ -8,7 +8,7 @@ export default async function getDesiredJobs({
   url,
   request,
   headers,
-  noOfJobs,
+  totalJobsAvaibles,
   jobDetails,
   workerId,
   retryStartingPage,
@@ -16,11 +16,11 @@ export default async function getDesiredJobs({
   const unSortedJobs: JOB_DETAILS[] = [];
 
   let { startPage, endPage } = DistributingLoadWithWorkers(
-    noOfJobs as number,
+    totalJobsAvaibles as number,
     workerId,
   );
 
-  startPage = retryStartingPage // retrying on previous closed browser
+  startPage = retryStartingPage; // retrying on previous closed browser
 
   /*
     Intial request interception provide body and no of total jobs exist
