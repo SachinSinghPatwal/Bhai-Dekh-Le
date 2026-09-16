@@ -55,7 +55,7 @@ export default async function Scrapper(
       browserInstace?.close();
 
       console.error(
-        `\n Worker ${workerId}: Scrapper error. Attempt ${attempt}/${customMaxRetries}. Last Pages Crashed ${lastPageCrashed}`,
+        `\n Worker ${workerId}: Scrapper error. Attempt ${attempt}/${customMaxRetries.times}. Last Pages Crashed ${lastPageCrashed}`,
         error,
       );
 
