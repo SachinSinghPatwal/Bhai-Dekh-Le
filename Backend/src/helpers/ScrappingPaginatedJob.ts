@@ -4,14 +4,13 @@ import { RequestParams } from "../types.js";
 import GetAllJobs from "../utility/Fetch.js";
 import { RateLimitError } from "../utility/RateLimitingError.js";
 import { sortingUnsortedJobBasedOnTimeCreated } from "../utility/sortingJobBasedOnCreated.js";
-import ValidateJobIsPostedWithinThreeDays from "../utility/ValidatingProp.js";
 import { setIterativePaginationParams } from "./Playwright/setIterativePagiantionParams.js";
 
 interface SCRAPPING_PAGINATED_JOBS extends Partial<RequestParams> {
   unSortedJobs: JOB_DETAILS[];
   pageNumber?: number;
   workerId: string;
-  endPage:number;
+  endPage: number;
 }
 
 export default async function ScrappingPaginatedJob({
@@ -23,13 +22,14 @@ export default async function ScrappingPaginatedJob({
   workerId,
   endPage, //logging
 }: SCRAPPING_PAGINATED_JOBS): Promise<any> {
+  
+  setIterativePaginationParams(url as URL, pageNumber);
+
   const jobDetails = await GetAllJobs({
     url,
     headers,
     request,
   });
-
-  setIterativePaginationParams(url as URL, pageNumber);
 
   if (Array.isArray(jobDetails) && jobDetails.length > 0) {
     unSortedJobs.push(...jobDetails);
@@ -45,6 +45,8 @@ export default async function ScrappingPaginatedJob({
       sortingUnsortedJobBasedOnTimeCreated(unSortedJobs).length, //logging
       "--worker_Id--",
       workerId,
+      "--url--",
+      url,
     );
   } else {
     throw new RateLimitError(

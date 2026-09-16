@@ -33,12 +33,10 @@ export default async function getDesiredJobs({
     unSortedJobs.push(...jobDetails);
   }
 
-  const pageURL = new URL(url.toString());
-
   try {
     for (let pageNumber = startPage; pageNumber <= endPage; pageNumber++) {
       await ScrappingPaginatedJob({
-        url: pageURL,
+        url: new URL(url.toString()),
         headers,
         request,
         unSortedJobs,

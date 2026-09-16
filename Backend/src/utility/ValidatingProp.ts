@@ -9,7 +9,7 @@ export default function ValidateJobIsPostedWithinThreeDays(
     String(each.footerPlaceholderLabel).split(" ")[0].replace("+", ""),
   );
 
-  if (jobAge <= 1) {
+  if (jobAge <= 3) {
     return each;
   }
 
