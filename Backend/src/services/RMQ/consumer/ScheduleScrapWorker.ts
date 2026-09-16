@@ -12,7 +12,7 @@ let channel: Awaited<
 
 async function start() {
   connection = await amqp.connect(
-    process.env.RABBITMQ_URL ?? "amqp://admin:admin123@localhost:5672",
+    process.env.RABBITMQ_URL_WITH_CREDENTIALS!,
   );
 
   channel = await connection.createChannel();
@@ -72,6 +72,7 @@ async function shutdown() {
 // Graceful shutdown on signals from parent (WorkerManager)
 process.once("SIGTERM", shutdown);
 process.once("SIGINT", shutdown);
+process.once("SIGUSR2", shutdown); // Nodemon restart signal
 
 // Also handle parent disconnect (nodemon kill / parent crash)
 process.on("disconnect", shutdown);

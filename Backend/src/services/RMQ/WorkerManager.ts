@@ -155,6 +155,7 @@ function shutdown() {
 
 process.once("SIGINT", shutdown);
 process.once("SIGTERM", shutdown);
+process.once("SIGUSR2", shutdown);
 
 // On Windows, nodemon sends 'exit' on the process rather than SIGTERM.
 // 'beforeExit' won't fire while the event loop is busy, but 'exit' always does.

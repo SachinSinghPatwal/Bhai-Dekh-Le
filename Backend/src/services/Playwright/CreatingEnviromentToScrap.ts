@@ -43,16 +43,22 @@ export async function CreatingEnviromentToScrap(): Promise<
       waitUntil: "domcontentloaded",
     });
 
-    const request = await capturedRequest;
-    const response = await capturedResponse;
+    const timeoutPromise = new Promise<never>((_, reject) => 
+      setTimeout(() => reject(new Error("Timeout intercepting network requests")), 30000)
+    );
+
+    const request = (await Promise.race([capturedRequest, timeoutPromise])) as Request;
+    const response = (await Promise.race([capturedResponse, timeoutPromise])) as Response;
 
     const url = new URL(request.url());
 
     const capturedHeaders = await request.allHeaders();
-
     const headers = sanitizeCaptureHeaderUrl(capturedHeaders);
 
-    const { jobDetails, totalJobsAvaibles } = await response.json();
+    const jsonData = await response.json();
+    
+    const jobDetails = jsonData.jobDetails;
+    const totalJobsAvaibles = jsonData.noOfJobs ?? jsonData.totalJobs ?? 100; // default to 100 for safety if missing
 
     return { url, request, totalJobsAvaibles, headers, jobDetails, browser };
   } catch (error: unknown) {

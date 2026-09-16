@@ -11,7 +11,7 @@ app.listen(port, "0.0.0.0", () => {
 
 connectToMongoDb()
   .then(() => {
-    startScrapConsumer();
+    // startScrapConsumer();
     console.log("MongoDB connected");
   })
   .catch((err: unknown) => {

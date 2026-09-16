@@ -37,6 +37,7 @@ export default async function Scrapper(
         jobDetails,
       });
 
+      browserInstace?.close();
       return orderedJobs as JOB_DETAILS[];
     } catch (error: unknown) {
       if (error instanceof RateLimitError) {
@@ -56,7 +57,7 @@ export default async function Scrapper(
       );
 
       if (attempt === customMaxRetries) {
-        console.log(orderedJobs);
+        console.log("ordered job",orderedJobs);
         throw error;
       }
 

@@ -20,7 +20,11 @@ export default async function getDesiredJobs({
     workerId,
   );
 
-  startPage = retryStartingPage; // retrying on previous closed browser
+  if (retryStartingPage > 0) {
+    startPage = retryStartingPage; // retrying on previous closed browser
+  }
+
+  console.log(`[${workerId}] Starting scraping work size: ${endPage - startPage + 1} pages (from ${startPage} to ${endPage})`);
 
   /*
     Intial request interception provide body and no of total jobs exist

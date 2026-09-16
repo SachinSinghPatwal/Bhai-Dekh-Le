@@ -3,7 +3,7 @@ import { ScheduleScrape } from "../../../constants.js";
 
 export default async function ScheduleScrapping(): Promise<void> {
   const connection = await amqp.connect(
-    process.env.RABBITMQ_URL ?? "amqp://admin:admin123@localhost:5672",
+    process.env.RABBITMQ_URL_WITH_CREDENTIALS!,
   );
 
   try {
