@@ -40,15 +40,17 @@ export default async function Scrapper(
         jobDetails,
       });
 
-      browserInstace?.close();
+      await browserInstace?.close();
       return orderedJobs as JOB_DETAILS[];
     } catch (error: unknown) {
+      
       if (error instanceof RateLimitError) {
         lastPageCrashed = error.lastPage;
         console.error(error.message);
-        browserInstace?.close();
       }
-      console.log("=======x====== Closing Browser ========x=========");
+      console.log(
+        "=======x=============x=============x====== Closing Browser =======x=============x=============x======",
+      );
 
       attempt++;
 
