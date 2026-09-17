@@ -1,5 +1,7 @@
 import { ChildProcess, fork } from "node:child_process";
 import path from "node:path";
+import { killAllWorkers } from "../../utility/workers/killAllWorker.js";
+import { shutdown } from "../../utility/workers/shutdown.js";
 
 const workerPath = path.resolve(
   process.cwd(),
@@ -14,38 +16,6 @@ let workers: ChildProcess[] = [];
 let shuttingDown = false;
 
 /**
- * Kill all existing workers and wait for them to exit.
- * Called before spawning a new batch or on process shutdown.
- */
-function killAllWorkers(): Promise<void> {
-  if (workers.length === 0) return Promise.resolve();
-
-  console.log("Killing existing workers...");
-
-  return new Promise((resolve) => {
-    let remaining = workers.length;
-
-    function onDone() {
-      remaining--;
-      if (remaining <= 0) {
-        workers = [];
-        resolve();
-      }
-    }
-
-    for (const worker of workers) {
-      if (worker.exitCode !== null || worker.killed) {
-        // Already dead
-        onDone();
-      } else {
-        worker.once("exit", onDone);
-        worker.kill("SIGTERM");
-      }
-    }
-  });
-}
-
-/**
  * Spawn consumer workers. Kills any previously spawned workers first
  * so they don't pile up across nodemon restarts or repeated calls.
  *
@@ -54,7 +24,7 @@ function killAllWorkers(): Promise<void> {
  */
 export async function startScrapConsumer() {
   // Tear down previous workers first
-  await killAllWorkers();
+  await killAllWorkers(workers);
 
   shuttingDown = false;
 
@@ -140,24 +110,11 @@ export async function startScrapConsumer() {
   console.log("All workers listening Queue messages");
 }
 
-function shutdown() {
-  if (shuttingDown) return;
-  shuttingDown = true;
-
-  console.log("Shutting down workers...");
-
-  for (const worker of workers) {
-    if (!worker.killed) {
-      worker.kill("SIGTERM");
-    }
-  }
-}
-
+// On Windows, nodemon sends 'exit' on the process rather than SIGTERM.
 process.once("SIGINT", shutdown);
 process.once("SIGTERM", shutdown);
 process.once("SIGUSR2", shutdown);
 
-// On Windows, nodemon sends 'exit' on the process rather than SIGTERM.
 // 'beforeExit' won't fire while the event loop is busy, but 'exit' always does.
 process.once("exit", () => {
   for (const worker of workers) {
