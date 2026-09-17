@@ -20,6 +20,14 @@ export async function CreatingEnviromentToScrap(): Promise<
   try {
     browser = await chromium.launch({
       headless: false,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--disable-gpu',
+        '--single-process'
+      ]
     });
 
     context = await browser.newContext();
@@ -60,9 +68,14 @@ export async function CreatingEnviromentToScrap(): Promise<
     const jobDetails = jsonData.jobDetails;
     const totalJobsAvaibles = jsonData.noOfJobs ?? jsonData.totalJobs ?? 100; // default to 100 for safety if missing
 
-    return { url, request, totalJobsAvaibles, headers, jobDetails, browser };
+    const method = request.method();
+    const mockRequest = { method: () => method } as any;
+
+    await browser.close();
+
+    return { url, request: mockRequest, totalJobsAvaibles, headers, jobDetails, browser: null as any };
   } catch (error: unknown) {
-    browser?.close();
+    if (browser) await browser.close();
     if (error instanceof Error) {
       throw new Error(
         "Seomthing Went Wrong While Creating the Enviroment to Scrap",

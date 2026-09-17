@@ -34,16 +34,26 @@ export default async function getDesiredJobs({
   }
 
   try {
-    for (let pageNumber = startPage; pageNumber <= endPage; pageNumber++) {
-      await ScrappingPaginatedJob({
-        url: new URL(url.toString()),
-        headers,
-        request,
-        unSortedJobs,
-        pageNumber,
-        workerId,
-        endPage,
-      });
+    const CONCURRENCY = 5;
+    for (let i = startPage; i <= endPage; i += CONCURRENCY) {
+      const batch = [];
+      for (let j = 0; j < CONCURRENCY && i + j <= endPage; j++) {
+        const pageNumber = i + j;
+        batch.push(
+          ScrappingPaginatedJob({
+            url: new URL(url.toString()),
+            headers,
+            request,
+            unSortedJobs, // note: pushing to this array concurrently is safe in JS
+            pageNumber,
+            workerId,
+            endPage,
+          })
+        );
+      }
+      await Promise.all(batch);
+      // Add a small delay between batches to respect rate limits
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     }
   } catch (error) {
     throw error;
