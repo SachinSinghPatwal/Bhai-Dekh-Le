@@ -56,16 +56,10 @@ export default async function Scrapper(
 
       browserInstace?.close();
 
-      console.error(
-        `\n Worker ${workerId}: Scrapper error. Attempt ${attempt}/${customMaxRetries.times}. Last Pages Crashed ${lastPageCrashed}`,
-        error,
-      );
-
       if (attempt === customMaxRetries.times) {
         console.log("ordered job", orderedJobs);
         throw error;
       }
-
       await retryDelay(attempt);
     }
   }

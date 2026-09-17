@@ -4,10 +4,10 @@ export const JOb_SEARCH_URL_WITH_QUERY = {
   protocol: "https://",
   domain: "www.naukri.com/",
   generic_Job_Description:
-    "react-dot-js-react-js-developer-react-developer-javascript-jobs?",
+    "react-jobs?",
   query: {
     keyword:
-      "k=react.js%2C%20react%20js%20developer%2C%20react%20developer%2C%20javascript&",
+      "k=react&",
     // location: "l=Bhopal&",
     // experince: "experience=1&",
     job_Search_By: "nignbevent_src=jobsearchDeskGNB&",

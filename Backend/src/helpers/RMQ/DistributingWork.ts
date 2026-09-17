@@ -2,7 +2,8 @@ export default function DistributingLoadWithWorkers(
   totalJobsAvaibles: number,
   workerId: string,
 ) {
-  const totalPages = totalJobsAvaibles - 1; // page 1 already fetched
+  const jobsPerPage = 20;
+  const totalPages = Math.ceil(totalJobsAvaibles / jobsPerPage) - 1; // page 1 already fetched
   const totalWorkers = 4;
 
   const workerNumber = Number(workerId.split("-")[1]);
