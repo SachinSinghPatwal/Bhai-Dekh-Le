@@ -21,13 +21,14 @@ export async function CreatingEnviromentToScrap(): Promise<
     browser = await chromium.launch({
       headless: false,
       args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--disable-gpu',
-        '--single-process'
-      ]
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-accelerated-2d-canvas",
+        "--disable-gpu",
+        "--single-process",
+        "--start-minimized",
+      ],
     });
 
     context = await browser.newContext();
@@ -51,12 +52,21 @@ export async function CreatingEnviromentToScrap(): Promise<
       waitUntil: "domcontentloaded",
     });
 
-    const timeoutPromise = new Promise<never>((_, reject) => 
-      setTimeout(() => reject(new Error("Timeout intercepting network requests")), 30000)
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error("Timeout intercepting network requests")),
+        30000,
+      ),
     );
 
-    const request = (await Promise.race([capturedRequest, timeoutPromise])) as Request;
-    const response = (await Promise.race([capturedResponse, timeoutPromise])) as Response;
+    const request = (await Promise.race([
+      capturedRequest,
+      timeoutPromise,
+    ])) as Request;
+    const response = (await Promise.race([
+      capturedResponse,
+      timeoutPromise,
+    ])) as Response;
 
     const url = new URL(request.url());
 
@@ -64,7 +74,7 @@ export async function CreatingEnviromentToScrap(): Promise<
     const headers = sanitizeCaptureHeaderUrl(capturedHeaders);
 
     const jsonData = await response.json();
-    
+
     const jobDetails = jsonData.jobDetails;
     const totalJobsAvaibles = jsonData.noOfJobs ?? jsonData.totalJobs ?? 100; // default to 100 for safety if missing
 
@@ -73,7 +83,14 @@ export async function CreatingEnviromentToScrap(): Promise<
 
     await browser.close();
 
-    return { url, request: mockRequest, totalJobsAvaibles, headers, jobDetails, browser: null as any };
+    return {
+      url,
+      request: mockRequest,
+      totalJobsAvaibles,
+      headers,
+      jobDetails,
+      browser: null as any,
+    };
   } catch (error: unknown) {
     if (browser) await browser.close();
     if (error instanceof Error) {

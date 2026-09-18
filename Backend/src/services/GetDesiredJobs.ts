@@ -15,6 +15,8 @@ export default async function getDesiredJobs({
 }: RequestParams): Promise<JOB_DETAILS[]> {
   const unSortedJobs: JOB_DETAILS[] = [];
 
+  console.log("total Number Of Pages :", Number(totalJobsAvaibles) / 20 - 1);
+
   let { startPage, endPage } = DistributingLoadWithWorkers(
     totalJobsAvaibles as number,
     workerId,
@@ -24,7 +26,9 @@ export default async function getDesiredJobs({
     startPage = retryStartingPage; // retrying on previous closed browser
   }
 
-  console.log(`[${workerId}] Starting scraping work size: ${endPage - startPage + 1} pages (from ${startPage} to ${endPage})`);
+  console.log(
+    `[${workerId}] Starting scraping work size: ${endPage - startPage + 1} pages (from ${startPage} to ${endPage})`,
+  );
 
   /*
     Intial request interception provide body and no of total jobs exist
@@ -34,7 +38,7 @@ export default async function getDesiredJobs({
   }
 
   try {
-    const CONCURRENCY = 5;
+    const CONCURRENCY = 10;
     for (let i = startPage; i <= endPage; i += CONCURRENCY) {
       const batch = [];
       for (let j = 0; j < CONCURRENCY && i + j <= endPage; j++) {
@@ -44,11 +48,11 @@ export default async function getDesiredJobs({
             url: new URL(url.toString()),
             headers,
             request,
-            unSortedJobs, // note: pushing to this array concurrently is safe in JS
+            unSortedJobs, // pushing to this array concurrently is safe in JS
             pageNumber,
             workerId,
             endPage,
-          })
+          }),
         );
       }
       await Promise.all(batch);

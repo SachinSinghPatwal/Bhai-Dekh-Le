@@ -1,9 +1,9 @@
-
 import { JOB_DETAILS } from "../models/Mongo/job.models.js";
 import { RequestParams } from "../types.js";
 import GetAllJobs from "../utility/Fetch.js";
 import { RateLimitError } from "../utility/RateLimitingError.js";
-import { setIterativePaginationParams } from "./Playwright/setIterativePagiantionParams.js";
+import { sortingUnsortedJobBasedOnTimeCreated } from "../utility/sortingJobBasedOnCreated.js";
+import { setIterativePaginationParams } from "./Playwright/setIterativePaginationParams.js";
 
 interface SCRAPPING_PAGINATED_JOBS extends Partial<RequestParams> {
   unSortedJobs: JOB_DETAILS[];
@@ -20,10 +20,7 @@ export default async function ScrappingPaginatedJob({
   pageNumber,
   workerId,
 }: SCRAPPING_PAGINATED_JOBS): Promise<any> {
-
   setIterativePaginationParams(url as URL, pageNumber);
-
-  console.log("URL: ", url , "for Worker :",workerId);
 
   const jobDetails = await GetAllJobs({
     url,
@@ -33,9 +30,17 @@ export default async function ScrappingPaginatedJob({
 
   if (Array.isArray(jobDetails) && jobDetails.length > 0) {
     unSortedJobs.push(...jobDetails);
+    console.log(
+      "Worker :",
+      workerId,
+      "Page :",
+      pageNumber,
+      "content : ",
+      sortingUnsortedJobBasedOnTimeCreated(unSortedJobs).length,
+    );
   } else {
     throw new RateLimitError(
-      "Rate limited by Application",
+      `xxxxxxxxx Rate limited by Application ${workerId} last page was ${pageNumber} xxxxxxxxx `,
       pageNumber as number,
     );
   }
