@@ -5,7 +5,6 @@ import { interceptingBrowsersHttpCommunication } from "../../helpers/Playwright/
 import UrlForPageToDirect from "../../utility/playwright/ComposeUrl.js";
 import { sanitizeCaptureHeaderUrl } from "../../helpers/Playwright/sanitizeCaptureHeaderUrl.js";
 import { JOB_DETAILS } from "../../models/Mongo/job.models.js";
-import RecaptchaPlugin from "puppeteer-extra-plugin-recaptcha"
 
 chromium.use(stealth());
 

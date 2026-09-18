@@ -35,12 +35,10 @@ export default async function ScrappingPaginatedJob({
       workerId,
       "Page :",
       pageNumber,
-      "content : ",
-      sortingUnsortedJobBasedOnTimeCreated(unSortedJobs).length,
     );
   } else {
     throw new RateLimitError(
-      `xxxxxxxxx Rate limited by Application ${workerId} last page was ${pageNumber} xxxxxxxxx `,
+      `xxxxxxxxx Rate limited by Application ${workerId} last page was ${pageNumber} totla pages complted ${sortingUnsortedJobBasedOnTimeCreated(unSortedJobs).length} xxxxxxxxx `,
       pageNumber as number,
     );
   }
