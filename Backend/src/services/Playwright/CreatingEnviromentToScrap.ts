@@ -1,8 +1,13 @@
-import { Browser, BrowserContext, chromium, Request } from "playwright";
+import { Browser, BrowserContext, Request } from "playwright";
+import { chromium } from "playwright-extra";
+import stealth from "puppeteer-extra-plugin-stealth";
 import { interceptingBrowsersHttpCommunication } from "../../helpers/Playwright/interceptingBrowsersHttpCommunication.js";
 import UrlForPageToDirect from "../../utility/playwright/ComposeUrl.js";
 import { sanitizeCaptureHeaderUrl } from "../../helpers/Playwright/sanitizeCaptureHeaderUrl.js";
 import { JOB_DETAILS } from "../../models/Mongo/job.models.js";
+import RecaptchaPlugin from "puppeteer-extra-plugin-recaptcha"
+
+chromium.use(stealth());
 
 export interface SETUP_RETURNED_VALUES {
   url: URL;
@@ -19,7 +24,7 @@ export async function CreatingEnviromentToScrap(): Promise<
   let context: BrowserContext | null = null;
   try {
     browser = await chromium.launch({
-      headless: false,
+      headless: true,
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",

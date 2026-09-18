@@ -23,6 +23,9 @@
     "mongoose-aggregate-paginate-v2": "^1.1.5",
     "pdf-parse": "^1.1.1",
     "playwright": "^1.62.1",
+    "playwright-extra": "^4.3.6",
+    "puppeteer-extra-plugin-recaptcha": "^3.6.8",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
     "winston": "^3.19.0"
   },
   "devDependencies": {
