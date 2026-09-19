@@ -14,18 +14,23 @@ export default async function Scrapper(
   let lastPageCrashed = 0;
   let customMaxRetries = { times: 10, changed: false };
   let orderedJobs;
+  let initialTotalJobs = 0;
 
   while (attempt < customMaxRetries.times) {
     try {
       const { url, request, totalJobsAvaibles, headers, jobDetails, browser } =
         (await CreatingEnviromentToScrap()) as SETUP_RETURNED_VALUES;
+        
+      if (initialTotalJobs === 0) {
+        initialTotalJobs = totalJobsAvaibles;
+      }
 
       if (!customMaxRetries.changed) {
 
         customMaxRetries.changed = true; //flag for updated end page
         
         customMaxRetries.times =
-          totalJobsAvaibles / Number(process.env.WORKER_COUNT ?? 4);
+          initialTotalJobs / Number(process.env.WORKER_COUNT ?? 4);
       }
 
       browserInstace = browser;
@@ -34,10 +39,11 @@ export default async function Scrapper(
         url,
         headers,
         request,
-        totalJobsAvaibles,
+        totalJobsAvaibles: initialTotalJobs,
         retryStartingPage: lastPageCrashed,
         workerId,
         jobDetails,
+        attempt,
       });
 
       await browserInstace?.close();
@@ -48,9 +54,6 @@ export default async function Scrapper(
         lastPageCrashed = error.lastPage;
         console.error(error.message);
       }
-      console.log(
-        "=======x=============x=============x====== Closing Browser =======x=============x=============x======",
-      );
 
       attempt++;
 

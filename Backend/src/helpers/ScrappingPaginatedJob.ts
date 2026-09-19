@@ -7,9 +7,10 @@ import { setIterativePaginationParams } from "./Playwright/setIterativePaginatio
 
 interface SCRAPPING_PAGINATED_JOBS extends Partial<RequestParams> {
   unSortedJobs: JOB_DETAILS[];
-  pageNumber?: number;
+  pageNumber: number;
   workerId: string;
   endPage: number;
+  startPage:number;
 }
 
 export default async function ScrappingPaginatedJob({
@@ -19,27 +20,26 @@ export default async function ScrappingPaginatedJob({
   unSortedJobs,
   pageNumber,
   workerId,
+  startPage,
 }: SCRAPPING_PAGINATED_JOBS): Promise<any> {
   setIterativePaginationParams(url as URL, pageNumber);
 
-  const jobDetails = await GetAllJobs({
-    url,
-    headers,
-    request,
-  });
+  try {
+    const jobDetails = await GetAllJobs({
+      url,
+      headers,
+      request,
+    });
 
-  if (Array.isArray(jobDetails) && jobDetails.length > 0) {
-    unSortedJobs.push(...jobDetails);
-    console.log(
-      "Worker :",
-      workerId,
-      "Page :",
-      pageNumber,
-    );
-  } else {
+    if (Array.isArray(jobDetails) && jobDetails.length > 0) {
+      unSortedJobs.push(...jobDetails);
+    } else {
+      throw new Error("Empty jobDetails returned (caught by else block)");
+    }
+  } catch (error: any) {
     throw new RateLimitError(
-      `xxxxxxxxx Rate limited by Application ${workerId} last page was ${pageNumber} totla pages complted ${sortingUnsortedJobBasedOnTimeCreated(unSortedJobs).length} xxxxxxxxx `,
-      pageNumber as number,
+      `Rate limited by Application ${workerId} last page was ${pageNumber} total pages complted ${pageNumber - startPage} | Reason: ${error.message}`,
+      pageNumber,
     );
   }
 }

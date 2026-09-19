@@ -12,6 +12,7 @@ export default async function getDesiredJobs({
   jobDetails,
   workerId,
   retryStartingPage,
+  attempt,
 }: RequestParams): Promise<JOB_DETAILS[]> {
   const unSortedJobs: JOB_DETAILS[] = [];
 
@@ -38,26 +39,20 @@ export default async function getDesiredJobs({
   }
 
   try {
-    const CONCURRENCY = 10;
-    for (let i = startPage; i <= endPage; i += CONCURRENCY) {
-      const batch = [];
-      for (let j = 0; j < CONCURRENCY && i + j <= endPage; j++) {
-        const pageNumber = i + j;
-        batch.push(
-          ScrappingPaginatedJob({
-            url: new URL(url.toString()),
-            headers,
-            request,
-            unSortedJobs, // pushing to this array concurrently is safe in JS
-            pageNumber,
-            workerId,
-            endPage,
-          }),
-        );
-      }
-      await Promise.all(batch);
-      // Add a small delay between batches to respect rate limits
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+    for (let i = startPage; i <= endPage; i++) {
+      await ScrappingPaginatedJob({
+        url: new URL(url.toString()),
+        headers,
+        request,
+        unSortedJobs, // pushing to this array sequentially is safe
+        pageNumber: i,
+        workerId,
+        endPage,
+        startPage,
+      });
+      // Add a randomized delay to simulate human behaviour and stagger workers (1.5 to 3.5 seconds)
+      const delay = Math.floor(Math.random() * 2000) + 1500;
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
   } catch (error) {
     throw error;
