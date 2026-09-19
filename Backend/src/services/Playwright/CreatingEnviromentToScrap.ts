@@ -16,9 +16,9 @@ export interface SETUP_RETURNED_VALUES {
   jobDetails: JOB_DETAILS[];
   browser: Browser;
 }
-export async function CreatingEnviromentToScrap(): Promise<
-  SETUP_RETURNED_VALUES | undefined
-> {
+export async function CreatingEnviromentToScrap(
+  workerId: string,
+): Promise<SETUP_RETURNED_VALUES | undefined> {
   let browser: Browser | null = null;
   let context: BrowserContext | null = null;
   try {
@@ -26,11 +26,6 @@ export async function CreatingEnviromentToScrap(): Promise<
       headless: true,
       args: [
         "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-accelerated-2d-canvas",
-        "--disable-gpu",
-        "--single-process",
         "--start-minimized",
       ],
     });
