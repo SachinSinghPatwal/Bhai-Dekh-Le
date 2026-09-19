@@ -56,7 +56,7 @@ export default async function Scrapper(
 
       attempt++;
 
-      browserInstace?.close();
+      await browserInstace?.close();
     }
   }
 }
