@@ -12,7 +12,7 @@ export default async function getDesiredJobs({
   jobDetails,
   workerId,
   retryStartingPage,
-  attempt,
+
 }: RequestParams): Promise<JOB_DETAILS[]> {
   const unSortedJobs: JOB_DETAILS[] = [];
 
@@ -50,9 +50,6 @@ export default async function getDesiredJobs({
         endPage,
         startPage,
       });
-      // Add a randomized delay to simulate human behaviour and stagger workers (1.5 to 3.5 seconds)
-      const delay = Math.floor(Math.random() * 2000) + 1500;
-      await new Promise((resolve) => setTimeout(resolve, delay));
     }
   } catch (error) {
     throw error;

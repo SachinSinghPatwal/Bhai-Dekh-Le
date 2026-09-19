@@ -9,5 +9,4 @@ export interface RequestParams {
   jobDetails: JOB_DETAILS[];
   workerId: string;
   retryStartingPage: number;
-  attempt: number;
 }

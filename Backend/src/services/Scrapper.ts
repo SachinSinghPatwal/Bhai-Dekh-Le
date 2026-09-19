@@ -43,7 +43,6 @@ export default async function Scrapper(
         retryStartingPage: lastPageCrashed,
         workerId,
         jobDetails,
-        attempt,
       });
 
       await browserInstace?.close();
@@ -63,11 +62,12 @@ export default async function Scrapper(
         console.log("ordered job", orderedJobs);
         throw error;
       }
-      await retryDelay(attempt);
+      // await retryDelay();
     }
   }
 }
 
-async function retryDelay(retry: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(() => resolve(), 10000 * retry));
+async function retryDelay(): Promise<void> {
+  // Fixed minimal pause (1s) instead of escalating 10s * attempt
+  return new Promise((resolve) => setTimeout(resolve, 1000));
 }
