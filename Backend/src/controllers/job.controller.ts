@@ -5,36 +5,28 @@ import type { Request, Response } from "express";
 
 import endpointRequestBodyValidation from "../utility/EndpointRequestBodyValidation.js";
 import ScheduleScrapping from "../services/RMQ/Producer/ScheduleScrape.js";
+import { ApiResponse } from "../utility/ApiResponse.js";
 
-export const createJob = AsyncHandler(async (req: Request, res: Response) => {
-  const validatedData = endpointRequestBodyValidation(req as Request);
+// export const createJob = AsyncHandler(async (req: Request, res: Response) => {
+//   const validatedData = endpointRequestBodyValidation(req as Request);
 
-  const job = await AsyncHandlerTry_CatchWrapper(async () => {
-    return JobModel.create();
-  }, validatedData);
+//   const job = await AsyncHandlerTry_CatchWrapper(async () => {
+//     return JobModel.create();
+//   }, validatedData);
 
-  res.status(201).json({
-    success: true,
-    job,
-  });
-});
+//   res.status(201).json({
+//     success: true,
+//     job,
+//   });
+// });
 
-export const getAllJobs = AsyncHandler(async (req: Request, res: Response) => {
-  // await startScrapConsumer()
+export const getAllJobs = AsyncHandler(async (_: Request, res: Response) => {
   await ScheduleScrapping();
-  // const job = await Scrapper("worker-1");
-  // console.log(job)
-  res.status(200).json({
-    success: true,
-  });
-});
 
-export const getJobById = AsyncHandler(
-  async (req: Request, res: Response) => {},
-);
-export const updateJob = AsyncHandler(
-  async (req: Request, res: Response) => {},
-);
-export const deleteJob = AsyncHandler(
-  async (req: Request, res: Response) => {},
-);
+  return res.status(202).json(
+    new ApiResponse({
+      statusCode: 202,
+      message: "Job scraping scheduled successfully",
+    }),
+  );
+});
