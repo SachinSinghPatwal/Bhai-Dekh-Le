@@ -2,6 +2,7 @@ import "../../../config/load-env.js";
 import amqp, { type Message } from "amqplib";
 import { ScheduleScrape } from "../../../constants.js";
 import Scrapper from "../../Scrapper.js";
+import { JobModel } from "../../../models/Mongo/job.models.js";
 
 const workerId = process.env.WORKER_ID ?? `worker-unknown`;
 
@@ -11,9 +12,7 @@ let channel: Awaited<
 > | null = null;
 
 async function start() {
-  connection = await amqp.connect(
-    process.env.RABBITMQ_URL_WITH_CREDENTIALS!,
-  );
+  connection = await amqp.connect(process.env.RABBITMQ_URL_WITH_CREDENTIALS!);
 
   channel = await connection.createChannel();
 
@@ -39,7 +38,20 @@ async function start() {
     try {
       // worker.ts
       console.log("PID:", process.pid, "PPID:", process.ppid);
-      await Scrapper(workerId);
+      const response = await Scrapper(workerId);
+      let dbResponse ;
+      if (Array.isArray(response) && response.length > 0) {
+        await JobModel.bulkWrite(
+          dbResponse = response.map((each) => ({
+            updateOne: {
+              filter: { jobId: each.jobId },
+              update: { $set: each },
+              upsert: true,
+            },
+          })),
+        );
+        if(!dbResponse){throw Error("Something went WRONG while inserting data into the DB")}
+      }
       channel!.ack(message);
     } catch (error) {
       console.error(`[${workerId}] Scraping failed:`, error);

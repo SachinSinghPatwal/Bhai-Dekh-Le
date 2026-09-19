@@ -57,17 +57,7 @@ export default async function Scrapper(
       attempt++;
 
       browserInstace?.close();
-
-      if (attempt === customMaxRetries.times) {
-        console.log("ordered job", orderedJobs);
-        throw error;
-      }
-      // await retryDelay();
     }
   }
 }
 
-async function retryDelay(): Promise<void> {
-  // Fixed minimal pause (1s) instead of escalating 10s * attempt
-  return new Promise((resolve) => setTimeout(resolve, 1000));
-}

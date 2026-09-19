@@ -55,9 +55,7 @@ export default async function getDesiredJobs({
     throw error;
   }
 
-  const filteredRecentJob = sortingUnsortedJobBasedOnTimeCreated(unSortedJobs);
-
-  console.log(filteredRecentJob.length);
+  const filteredRecentJob = sortingUnsortedJobBasedOnTimeCreated(unSortedJobs)
 
   return filteredRecentJob as JOB_DETAILS[];
 }

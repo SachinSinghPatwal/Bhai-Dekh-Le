@@ -1,7 +1,5 @@
 import { JOB_DETAILS } from "../models/Mongo/job.models.js";
 
-
-
 export default function ValidateJobIsPostedWithinThreeDays(
   each: JOB_DETAILS,
 ): JOB_DETAILS | undefined {
@@ -10,8 +8,38 @@ export default function ValidateJobIsPostedWithinThreeDays(
   );
 
   if (jobAge <= 3) {
-    return each;
+    const {
+      title,
+      jobId,
+      footerPlaceholderLabel,
+      companyName,
+      tagsAndSkills,
+      placeholders,
+      jdURL,
+      JD,
+      createdDate,
+      salaryDetails,
+      minExp,
+      maxExp,
+      applyByTime,
+      walkIn,
+    } = each;
+    return {
+      title,
+      jobId,
+      footerPlaceholderLabel,
+      companyName,
+      tagsAndSkills,
+      placeholders,
+      jdURL,
+      JD,
+      createdDate,
+      salaryDetails,
+      minExp,
+      maxExp,
+      applyByTime,
+      walkIn,
+    } as JOB_DETAILS;
   }
-
   return undefined;
 }
