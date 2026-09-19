@@ -3,6 +3,7 @@ import amqp, { type Message } from "amqplib";
 import { ScheduleScrape } from "../../../constants.js";
 import Scrapper from "../../Scrapper.js";
 import { JobModel } from "../../../models/Mongo/job.models.js";
+import { BulkWriteResult } from "mongodb";
 
 const workerId = process.env.WORKER_ID ?? `worker-unknown`;
 
@@ -39,18 +40,20 @@ async function start() {
       // worker.ts
       console.log("PID:", process.pid, "PPID:", process.ppid);
       const response = await Scrapper(workerId);
-      let dbResponse ;
+      let dbResponse: any;
       if (Array.isArray(response) && response.length > 0) {
-        await JobModel.bulkWrite(
-          dbResponse = response.map((each) => ({
+        dbResponse = (await JobModel.bulkWrite(
+          response.map((each) => ({
             updateOne: {
               filter: { jobId: each.jobId },
               update: { $set: each },
               upsert: true,
             },
           })),
-        );
-        if(!dbResponse){throw Error("Something went WRONG while inserting data into the DB")}
+        )) as BulkWriteResult;
+        if (!dbResponse.acknowledged || !dbResponse) {
+          throw Error("Something went WRONG while inserting data into the DB");
+        }
       }
       channel!.ack(message);
     } catch (error) {
