@@ -13,7 +13,6 @@ export default async function getDesiredJobs({
   jobDetails,
   workerId,
   retryStartingPage,
-
 }: RequestParams): Promise<JOB_DETAILS[]> {
   const unSortedJobs: JOB_DETAILS[] = [];
 
@@ -53,10 +52,14 @@ export default async function getDesiredJobs({
       });
     }
   } catch (error) {
+    log.error(
+      `Error while collecting fetched Data from [${workerId}] :`,
+      error,
+    );
     throw error;
   }
 
-  const filteredRecentJob = sortingUnsortedJobBasedOnTimeCreated(unSortedJobs)
+  const filteredRecentJob = sortingUnsortedJobBasedOnTimeCreated(unSortedJobs);
 
   return filteredRecentJob as JOB_DETAILS[];
 }
