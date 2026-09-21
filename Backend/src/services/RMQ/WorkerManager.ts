@@ -1,8 +1,7 @@
 import { ChildProcess, fork } from "node:child_process";
 import path from "node:path";
-import { killAllWorkers } from "../../utility/workers/killAllWorker.js";
 import { shutdown } from "../../utility/workers/shutdown.js";
-import connectToMongoDb from "../../db/MongoDb.js";
+import spawnWorker from "../../utility/workers/spawn.js";
 
 const workerPath = path.resolve(
   process.cwd(),
@@ -16,118 +15,84 @@ const workerPath = path.resolve(
 let workers: ChildProcess[] = [];
 let shuttingDown = false;
 
-/**
- * Spawn consumer workers. Kills any previously spawned workers first
- * so they don't pile up across nodemon restarts or repeated calls.
- *
- * Resolves only after ALL workers have connected to RabbitMQ and are
- * actively consuming — so it's safe to publish immediately after.
- */
-export async function startScrapConsumer() {
-  // Tear down previous workers first
-  await killAllWorkers(workers);
-  
-  // instace of the mongoDb connection from the pool
-  await connectToMongoDb();
 
-  console.log("Connected to DB with worker")
+export async function startScrapConsumer(): Promise<void> {
+  /*
+   * Defensive cleanup.
+   *
+   * Normally workers should already be gone, but this protects
+   * against startScrapConsumer() being called again.
+   */
+  if (workers.length > 0) {
+    console.log("Stopping existing workers before starting new ones...");
+
+    await shutdown(workers, () => {
+      shuttingDown = true;
+    });
+
+    workers = [];
+  }
 
   shuttingDown = false;
 
-  const workerCount = Number(process.env.WORKER_COUNT ?? 4);
+  const workerCount = Number(
+    process.env.WORKER_COUNT ?? 4,
+  );
 
-  const readyPromises: Promise<void>[] = [];
+  const readyPromises: Promise<ChildProcess>[] = [];
 
   for (let i = 1; i <= workerCount; i++) {
     const workerId = `worker-${i}`;
 
-    const worker = fork(workerPath, {
-      execArgv: ["--import", "tsx"],
-
-      env: {
-        ...process.env,
-        WORKER_ID: workerId,
-      },
-    });
-
-    workers.push(worker);
-
-    // Wait for this worker to signal it's ready (queue bound + consuming)
-    const ready = new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error(`${workerId} did not become ready within 30s`));
-      }, 30_000);
-
-      worker.on("message", (msg: any) => {
-        if (msg?.type === "ready") {
-          clearTimeout(timeout);
-          console.log(`${workerId} is ready`);
-          resolve();
-        }
-      });
-
-      worker.once("exit", (code) => {
-        clearTimeout(timeout);
-        if (code !== 0) {
-          reject(
-            new Error(`${workerId} exited with code ${code} before ready`),
-          );
-        }
-      });
-    });
-
-    readyPromises.push(ready);
-
-    worker.on("exit", (code, signal) => {
-      console.log(`${workerId} exited. code=${code}, signal=${signal}`);
-
-      // Auto-restart only on actual crashes (positive exit code).
-      // Signal kills (SIGTERM) set code=null — those are intentional, not crashes.
-      if (!shuttingDown && code !== null && code !== 0) {
-        console.log(`${workerId} crashed — restarting in 3s...`);
-
-        setTimeout(() => {
-          if (shuttingDown) return;
-
-          const respawned = fork(workerPath, {
-            execArgv: ["--import", "tsx"],
-            env: {
-              ...process.env,
-              WORKER_ID: workerId,
-            },
-          });
-
-          // Replace the dead worker in the array
-          const idx = workers.indexOf(worker);
-          if (idx !== -1) workers[idx] = respawned;
-          else workers.push(respawned);
-
-          console.log(`${workerId} restarted`);
-        }, 3000);
-      }
-    });
-
-    worker.on("error", (error) => {
-      console.error(`${workerId} error:`, error);
-    });
+    readyPromises.push(
+      spawnWorker({
+        workerId,
+        workerPath,
+        workers,
+        shuttingDown,
+      }),
+    );
   }
 
-  // Wait for ALL workers to be ready before returning
+  /*
+   * Every worker must be ready before the function resolves.
+   */
   await Promise.all(readyPromises);
 
-  console.log("All workers listening Queue messages");
+  console.log(
+    `All ${workerCount} workers are listening for queue messages.`,
+  );
 }
 
-// On Windows, nodemon sends 'exit' on the process rather than SIGTERM.
-process.once("SIGINT", shutdown);
-process.once("SIGTERM", shutdown);
-process.once("SIGUSR2", shutdown);
+/*
+ * Nodemon / Ctrl+C / process termination.
+ *
+ * IMPORTANT:
+ * We perform asynchronous cleanup here, rather than
+ * waiting for the "exit" event.
+ */
+async function handleShutdown(): Promise<void> {
+  if (shuttingDown) return;
 
-// 'beforeExit' won't fire while the event loop is busy, but 'exit' always does.
-process.once("exit", () => {
-  for (const worker of workers) {
-    if (!worker.killed) {
-      worker.kill("SIGTERM");
-    }
-  }
+  await shutdown(workers, () => {
+    shuttingDown = true;
+  });
+
+  workers = [];
+
+  console.log("Manager shutdown complete.");
+
+  process.exit(0);
+}
+
+process.once("SIGINT", () => {
+  void handleShutdown();
+});
+
+process.once("SIGTERM", () => {
+  void handleShutdown();
+});
+
+process.once("SIGUSR2", () => {
+  void handleShutdown();
 });
