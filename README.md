@@ -1,122 +1,230 @@
-# BhaiDekhLe — Naukri Job Scrapper
+# BhaiDekhLe — Distributed Naukri Job Scraper
 
-A backend service that scrapes [Naukri.com](https://www.naukri.com) job listings using Playwright for session discovery, then paginates through results via direct HTTP requests. Jobs are filtered by title keywords and recency before being returned through a REST API.
+> **Version:** `1.1.0`  
+> **Status:** Production-Ready Distributed Architecture  
+> **Runtime:** Node.js (ESM) + TypeScript 7 + Express 5 + RabbitMQ + Playwright Stealth + MongoDB  
+
+BhaiDekhLe is an enterprise-grade, distributed scraping pipeline designed to scrape, filter, and ingest tech job listings from [Naukri.com](https://www.naukri.com) at high throughput while bypassing anti-bot protections (Cloudflare / reCAPTCHA) with stealth browser automation and RabbitMQ-backed worker orchestration.
 
 ---
 
-## 🏗️ Architecture Overview
+## 🚀 Key Highlights in Version 1.1.0
+
+- **Distributed Worker Orchestration (RabbitMQ):** Multi-process consumer workers spawned via Node.js `child_process.fork()`, supervised with IPC readiness handshakes, graceful signal handling, and auto-restart on crashes.
+- **Stealth Browser Session Discovery:** Headless Chromium automated via `playwright-extra` and `puppeteer-extra-plugin-stealth` to intercept authentic session cookies, dynamic headers, and API signatures without triggering bot detection.
+- **Mathematical Load Partitioning:** Deterministic distribution algorithm (`DistributingWork.ts`) dividing total search pages evenly across active worker processes.
+- **High-Throughput HTTP Fetching:** After one-time browser session capture, workers switch to low-footprint HTTP requests, stripping HTTP/2 pseudo-headers and streaming 20 jobs per page.
+- **Fault-Tolerant Rate-Limit Recovery:** Specialized `RateLimitError` detection tracking `lastPageCrashed`, relaunching browser environments on block to refresh credentials, and resuming pagination without exponential compounding delay stalls.
+- **Automated Filtering & Ingestion:** Strict keyword matching (React.js, JavaScript), 3-day posting recency validation, and idempotent MongoDB deduplication on `jobId`.
+
+---
+
+## 🏗️ Architecture & Pipeline Flow
+
+```
+                                  +-----------------------+
+                                  |   HTTP Client / API   |
+                                  +-----------+-----------+
+                                              |
+                                     GET /api/v1/job/getAll
+                                              |
+                                              v
+                              +---------------+---------------+
+                              |    job.controller.ts          |
+                              |    ScheduleScrapping()        |
+                              +---------------+---------------+
+                                              |
+                                              v  (Confirm Channel)
+                              +---------------+---------------+
+                              |   RabbitMQ Direct Exchange    |
+                              |       "TimedScrapping"        |
+                              +---------------+---------------+
+                                              |
+                                              v  Routing Key: "Scrapper"
+                              +---------------+---------------+
+                              |         RabbitMQ Queue        |
+                              |       "TimedScrapping"        |
+                              +---------------+---------------+
+                                       |             |
+                         prefetch(1)   |             |   prefetch(1)
+                                       v             v
+                           +-----------+---+     +---+-----------+
+                           |   worker-1    |     |   worker-2    |  (Spawned by WorkerManager.ts)
+                           +-------+-------+     +-------+-------+
+                                   |                     |
+           +-----------------------+---------------------+-----------------------+
+           |                                                                     |
+           v (Phase 1: Session Discovery)                                         v (Phase 2: Pagination)
++------------------------------------+                                +------------------------------------+
+| CreatingEnviromentToScrap.ts       |                                | GetDesiredJobs.ts                  |
+| - Playwright + Stealth Chromium    |                                | - DistributingWork.ts partitions   |
+| - Navigates & intercepts search    |                                | - ScrappingPaginatedJob() loop     |
+| - Sanitizes headers (no :pseudo)   |                                | - Fetch.ts (HTTP / 429 detection)  |
+| - Captures cookies & totalJobs     |                                | - Human randomized delays (1.5-3s) |
+| - Closes browser gracefully        |                                +------------------+-----------------+
++------------------------------------+                                                   |
+                                                                                         v (Phase 3: Filtering)
+                                                                      +------------------------------------+
+                                                                      | sortingJobBasedOnCreated.ts        |
+                                                                      | - Title: "react" | "javascript"    |
+                                                                      | - ValidatingProp.ts: <= 3 days     |
+                                                                      +------------------+-----------------+
+                                                                                         |
+                                                                                         v (Phase 4: Persistence)
+                                                                      +------------------------------------+
+                                                                      | MongoDB (JobModel)                 |
+                                                                      | - Indexed unique "jobId"           |
+                                                                      +------------------------------------+
+```
+
+---
+
+## 📂 Repository Structure
 
 ```
 Backend/
 ├── src/
-│   ├── index.ts                              # Server entry point (Express + MongoDB)
-│   ├── app.ts                                # Express app setup (CORS, routes, error handlers)
-│   ├── constants.ts                          # Naukri search URL composition & DB name
+│   ├── index.ts                              # Server entry point (Express + MongoDB + WorkerManager)
+│   ├── app.ts                                # Express setup (CORS, body parsers, routes, liveness probe)
+│   ├── constants.ts                          # URLs, RabbitMQ exchange names, DB names, retries
+│   ├── types.ts                              # Shared TypeScript types & interfaces
 │   │
 │   ├── config/
-│   │   ├── load-env.ts                       # dotenv loader (path-independent)
-│   │   ├── naukri-answers.json               # Naukri form auto-fill answers
-│   │   └── naukri-selectors.json             # Naukri page CSS selectors
+│   │   ├── load-env.ts                       # Path-independent dotenv configuration
+│   │   ├── naukri-answers.json               # Naukri form auto-fill data
+│   │   └── naukri-selectors.json             # Naukri DOM selector mappings
 │   │
 │   ├── controllers/
-│   │   └── job.controller.ts                 # Route handlers (createJob, getAllJobs, etc.)
+│   │   └── job.controller.ts                 # Express route controllers (getAllJobs, createJob)
 │   │
 │   ├── db/
-│   │   └── MongoDb.ts                        # Mongoose connection
+│   │   └── MongoDb.ts                        # Mongoose connection with error handling
 │   │
 │   ├── helpers/
-│   │   └── Playwright/
-│   │       ├── sanitizeCaptureHeaderUrl.ts    # Strips HTTP/2 pseudo-headers
-│   │       └── setIterativePagiantionParams.ts # Sets pageNo & noOfResults on URL
+│   │   ├── ScrappingPaginatedJob.ts          # Single-page pagination execution & rate-limit translation
+│   │   ├── Playwright/
+│   │   │   ├── interceptingBrowsersHttpCommunication.ts  # Network event interception
+│   │   │   ├── sanitizeCaptureHeaderUrl.ts   # Strips HTTP/2 pseudo-headers (:authority, :path)
+│   │   │   └── setIterativePaginationParams.ts # Mutates URL searchParams (pageNo, noOfResults)
+│   │   └── RMQ/
+│   │       └── DistributingWork.ts           # Math partitioner dividing page ranges per worker ID
 │   │
 │   ├── middlewares/
-│   │   └── error.middleware.ts               # JSON error handler + 404 catch-all
+│   │   └── error.middleware.ts               # JSON error & 404 response handlers
 │   │
 │   ├── models/
 │   │   └── Mongo/
-│   │       ├── job.models.ts                 # Job schema (title, skills, salary, etc.)
-│   │       └── user.models.ts                # User schema (auth, resume, preferences)
+│   │       ├── job.models.ts                 # Mongoose schema for unique Job listings
+│   │       └── user.models.ts                # User schema (auth, resume storage, preferences)
 │   │
 │   ├── routes/
-│   │   └── job.routes.ts                     # /api/v1/job/* route definitions
+│   │   └── job.routes.ts                     # /api/v1/job route definitions
 │   │
 │   ├── services/
-│   │   ├── Scrapper.ts                       # Playwright browser → captures first API request → hands off to HTTP pagination
-│   │   └── GetDesiredJobs.ts                 # Paginates up to 40 pages, filters by title & recency
+│   │   ├── Scrapper.ts                       # Scraper orchestrator with block recovery loop
+│   │   ├── GetDesiredJobs.ts                 # Worker pagination runner across assigned page range
+│   │   ├── Playwright/
+│   │   │   └── CreatingEnviromentToScrap.ts  # Playwright stealth launcher & session extractor
+│   │   └── RMQ/
+│   │       ├── WorkerManager.ts              # Master process supervisor for child worker processes
+│   │       ├── Producer/
+│   │       │   └── ScheduleScrape.ts         # RabbitMQ producer publishing scraping tasks
+│   │       └── consumer/
+│   │           └── ScheduleScrapWorker.ts    # Child worker consumer listening to queue
 │   │
 │   ├── utility/
-│   │   ├── ApiError.ts                       # Custom error class with status code
-│   │   ├── ApiResponse.ts                    # Standard success response wrapper
-│   │   ├── AsyncHandler.ts                   # Express async error-catching wrapper
-│   │   ├── AsyncHandlerContentWrapper.ts     # Generic try/catch wrapper for async ops
-│   │   ├── EndpointRequestBodyValidation.ts  # Request body empty-field validator
-│   │   ├── Fetch.ts                          # HTTP fetch wrapper for Naukri's job API
-│   │   ├── Logger.ts                         # Winston logger (file + console transports)
-│   │   ├── ValidatingProp.ts                 # Filters jobs posted within 3 days
-│   │   └── playwright/
-│   │       └── ComposeUrl.ts                 # Builds the initial Naukri search URL
+│   │   ├── ApiError.ts                       # Standard operational API error class
+│   │   ├── ApiResponse.ts                    # Standard API response formatting wrapper
+│   │   ├── AsyncHandler.ts                   # Async controller wrapper for Express
+│   │   ├── AsyncHandlerContentWrapper.ts     # Generic try/catch utility wrapper
+│   │   ├── EndpointRequestBodyValidation.ts  # Body validation helper
+│   │   ├── Fetch.ts                          # Resilient fetch utility (detects 429, 406 Recaptcha, HTML)
+│   │   ├── Logger.ts                         # Winston multi-transport logger
+│   │   ├── RateLimitingError.ts              # Custom error storing lastPage for seamless retry
+│   │   ├── ValidatingProp.ts                 # Posting age filter (<= 3 days)
+│   │   ├── sortingJobBasedOnCreated.ts       # Title keyword filter & createdDate sorter
+│   │   ├── playwright/
+│   │   │   └── ComposeUrl.ts                 # Builds Naukri search query URL
+│   │   └── workers/
+│   │       ├── killAllWorker.ts              # Graceful child process cleanup utility
+│   │       └── shutdown.ts                   # Process signal listener (SIGINT / SIGTERM)
 │   │
-│   └── Learn/                                # Playwright learning exercises (Phase1–Phase8)
+│   └── Learn/                                # Playwright exercises & learning sandbox
 │
-├── logs/                                     # Winston log output (error, combined, playwright)
-├── Dockerfile
-├── playwright.config.ts
-├── tsconfig.json
-└── package.json
+├── logs/                                     # Winston logs (error.log, combined.log, playwright.log)
+├── package.json                              # Project dependencies & scripts (v1.1.0)
+├── tsconfig.json                             # TypeScript compiler configuration
+└── playwright.config.ts                      # Playwright test config
 ```
-
----
-
-## ⚙️ How It Works
-
-1. **Session Discovery** — `Scrapper.ts` launches a Playwright Chromium instance, navigates to Naukri, and intercepts the first `/jobapi/v3/search` network request to capture the URL and auth headers.
-
-2. **Paginated Fetching** — `GetDesiredJobs.ts` replays that request via `fetch()` across up to 40 pages (20 results per page), collecting all job listings.
-
-3. **Filtering** — Jobs are filtered by:
-   - **Title keywords**: must contain "react" or "javascript"
-   - **Recency**: must have been posted within the last 3 days (`ValidatingProp.ts`)
-
-4. **Response** — Filtered jobs are returned as JSON through the Express API.
 
 ---
 
 ## 🛠️ Technology Stack
 
-| Layer      | Technology                          |
-| ---------- | ----------------------------------- |
-| Runtime    | Node.js + TypeScript 7              |
-| Framework  | Express 5                           |
-| Database   | MongoDB + Mongoose 9                |
-| Automation | Playwright 1.62 (Chromium)          |
-| Auth       | JWT + bcrypt                        |
-| Logging    | Winston (file + console transports) |
-| Build      | tsx (dev) / tsc (production)        |
+| Domain | Technology | Version | Purpose |
+| :--- | :--- | :--- | :--- |
+| **Language** | TypeScript | `7.0.2` | Strong type safety & modern ES syntax |
+| **Runtime** | Node.js | `>= 18` | ESM-native server environment |
+| **Framework** | Express | `5.2.1` | REST API routing and middleware |
+| **Message Broker** | RabbitMQ (`amqplib`) | `^2.0.1` | Asynchronous task queue & worker distribution |
+| **Automation** | Playwright + Playwright Extra | `^1.62.1` | Headless Chromium automation |
+| **Anti-Bot Stealth** | `puppeteer-extra-plugin-stealth` | `^2.11.2` | Bypasses Cloudflare & Naukri bot detection |
+| **Database** | MongoDB + Mongoose | `^9.9.5` | Job data persistence & indexing |
+| **Execution** | tsx + nodemon | `^4.20.6` / `^3.1.14` | Hot-reloading TypeScript execution |
+| **Logging** | Winston | `^3.19.0` | Production file and console log transports |
 
 ---
 
-## 🚀 Quick Start
+## ⚙️ How It Works: Step-by-Step
 
-### Prerequisites
+### 1. Master Server & Worker Bootstrapping
+When the application starts (`npm run dev`):
+1. Connects to MongoDB.
+2. `WorkerManager.ts` tears down any orphaned workers and forks `WORKER_COUNT` (default: 2 to 4) isolated child processes (`ScheduleScrapWorker.ts`).
+3. Each worker process connects to RabbitMQ, binds to the `TimedScrapping` queue with `prefetch(1)`, and emits an IPC `{ type: "ready" }` signal to the parent.
+4. The master server logs: `"All workers listening Queue messages"`.
 
-- Node.js ≥ 18
-- MongoDB instance (local or cloud)
+### 2. Job Scraping Trigger
+A client or cron job sends a request to `GET /api/v1/job/getAll`:
+1. `job.controller.ts` calls `ScheduleScrapping()`.
+2. The producer connects to RabbitMQ, creates a confirmation channel, asserts the `TimedScrapping` direct exchange, and publishes worker task messages with `persistent: true`.
+3. The HTTP endpoint immediately returns `200 OK`, allowing scraping to proceed asynchronously in the background.
 
-### Installation
+### 3. Session Discovery via Stealth Playwright
+When a worker receives a scrape message:
+1. It invokes `Scrapper(workerId)`.
+2. `CreatingEnviromentToScrap()` launches an isolated headless Chromium instance with stealth evasions enabled (`--no-sandbox`, `--start-minimized`).
+3. It navigates to the Naukri job search page, intercepts the first `/jobapi/v3/search` request, and captures:
+   - Target API endpoint URL.
+   - Authentication & session headers (stripping HTTP/2 pseudo headers).
+   - Initial JSON response (total available jobs count and page 1 results).
+4. The browser is closed immediately to save CPU and memory.
 
-```bash
-cd Backend
-npm install
+### 4. Mathematical Work Distribution
+`DistributingWork.ts` determines each worker's exact slice of pages:
+$$\text{totalPages} = \lceil \frac{\text{totalJobs}}{20} \rceil - 1$$
+Workers partition the total pages deterministically using their numeric worker index (e.g., `worker-1` handles pages 2–1043, `worker-2` handles pages 1044–2085).
 
-# Install Playwright's Chromium browser
-npm run playwright:install
+### 5. High-Speed Paginated Fetching & Resumption
+1. The worker iterates across its assigned page range using `GetAllJobs()` (`Fetch.ts`).
+2. Each request is spaced with a randomized human-like jitter (1.5s to 3.5s).
+3. **If blocked (HTTP 429 or 406 Recaptcha)**:
+   - `Fetch.ts` fast-fails by throwing `RECAPTCHA_BLOCK`.
+   - `Scrapper.ts` catches `RateLimitError` and preserves `lastPageCrashed`.
+   - The worker takes a fixed 1-second breather, relaunches a fresh stealth browser session to acquire new cookies/tokens, and **resumes directly from `lastPageCrashed`**.
 
-# Set up environment
-cp .env.example .env
-# Edit .env with your actual values
-```
+### 6. Ingestion & Filtering
+1. Raw jobs are passed through `sortingUnsortedJobBasedOnTimeCreated()`:
+   - Filters job titles for target keywords (e.g., "React", "JavaScript").
+   - Validates that listings were posted within the last 3 days (`ValidatingProp.ts`).
+   - Sorts chronologically by `createdDate`.
+2. Filtered listings are deduplicated and saved to MongoDB via `jobId`.
 
-### Environment Variables
+---
+
+## 🚦 Environment Configuration (`.env`)
+
+Create a `.env` file in the `Backend/` directory:
 
 ```env
 # Server
@@ -124,157 +232,141 @@ PORT=8000
 NODE_ENV=development
 
 # Database
-MONGODB_URI=mongodb://localhost:27017/
+MONGO_URI=mongodb+srv://<username>:<password>@cluster.mongodb.net
+# MONGO_DB_NAME defaults to "BhaiDekhLe" in constants.ts
 
-# Frontend (CORS origin)
-FRONTEND_URL=http://localhost:3000
+# Frontend / CORS
+FRONTEND_URL=http://localhost:5173
 
-# JWT
-ACCESS_TOKEN_SECRET=your_secret
-ACCESS_TOKEN_EXPIRY=1d
-REFRESH_TOKEN_SECRET=your_secret
-REFRESH_TOKEN_EXPIRY=7d
+# RabbitMQ (Local or CloudAMQP)
+RABBITMQ_URL_WITH_CREDENTIALS="amqps://<user>:<password>@<host>/<vhost>"
 
-# Logging
-LOG_LEVEL=info
+# Worker Configuration
+WORKER_COUNT=2
+WORKER_ID="worker-1"
+
+# AI Integration (Optional)
+GEMINI_API_KEY=your_gemini_api_key_here
 ```
 
-### Run
+---
 
+## 🚀 Quick Start
+
+### 1. Prerequisites
+- **Node.js**: `v18.x` or higher
+- **MongoDB**: Local or hosted MongoDB Atlas instance
+- **RabbitMQ**: Local RabbitMQ broker or hosted CloudAMQP instance
+
+### 2. Install Dependencies & Playwright
+```bash
+cd Backend
+npm install
+
+# Install Playwright Chromium binaries
+npm run playwright:install
+```
+
+### 3. Run Development Server
 ```bash
 npm run dev
 ```
 
-Server starts on `http://localhost:8000`.
+You will see:
+```text
+Server is running on 8000
+MongoDB connected
+worker-1 is ready
+worker-2 is ready
+All workers listening Queue messages
+```
 
----
-
-## 📡 API Endpoints
-
-### Jobs
-
-| Method   | Path                 | Description                   |
-| -------- | -------------------- | ----------------------------- |
-| `GET`    | `/api/v1/job/getAll` | Scrape & return filtered jobs |
-| `POST`   | `/api/v1/job/create` | Create a job record           |
-| `GET`    | `/api/v1/job/:id`    | Get job by ID                 |
-| `PUT`    | `/api/v1/job/:id`    | Update job                    |
-| `DELETE` | `/api/v1/job/:id`    | Delete job                    |
-
-### Health
-
-| Method | Path           | Description                      |
-| ------ | -------------- | -------------------------------- |
-| `GET`  | `/api/v1/test` | Liveness probe (uptime + status) |
-
-### Example
-
+### 4. Trigger Scraping Pipeline
 ```bash
-# Check server is alive
-curl http://localhost:8000/api/v1/test
+# Trigger asynchronous distributed scraping
+curl -X GET http://localhost:8000/api/v1/job/getAll
 
-# Scrape and fetch filtered Naukri jobs
-curl http://localhost:8000/api/v1/job/getAll
+# Check server health
+curl -X GET http://localhost:8000/api/v1/test
 ```
 
 ---
 
-## 📊 Database Schemas
+## 📡 API Reference
 
-### Job Model
+### Jobs API
 
-```typescript
-{
-  title: string              // Job title
-  jobId: string              // Naukri job ID
-  footerPlaceholderLabel: string  // e.g. "1 Day Ago"
-  companyName: string
-  tagsAndSkills: string[]    // e.g. ["React.js", "TypeScript"]
-  placeholders: object[]     // Experience, salary, location
-  jdURL: string              // Naukri job detail URL
-  JD: string                 // Full job description
-  createdDate: number        // Unix timestamp
-  salaryDetails: object
-  minExp: string
-  maxExp: string
-  applyByTime: string
-  walkIn: boolean
-}
-```
+| Method | Endpoint | Description | Response |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/job/getAll` | Triggers distributed scrape pipeline via RabbitMQ | `{ success: true }` |
 
-### User Model
+### System Health
+
+| Method | Endpoint | Description | Response |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/test` | Liveness probe returning server uptime | `{ success: true, status: "ok", uptime: 124.5 }` |
+
+---
+
+## 📋 Database Schema (`JobModel`)
 
 ```typescript
-{
-  username: string
-  email: string
-  fullname: string
-  password: string           // bcrypt hashed
-  refreshToken?: string
-  naukriStorageState?: string
-  resume?: {
-    path?: string
-    cloudinaryUrl?: string
-    cloudinaryId?: string
-    fileName?: string
-    mimeType?: string
-    uploadedAt?: Date
-    storage?: "local" | "cloudinary"
-  }
-  jobPreferences?: {
-    keywords: string[]
-    locations: string[]
-    minSalary: number
-    jobTypes: ("full-time" | "part-time" | "contract" | "internship")[]
-    employType: ("remote" | "on-site" | "hybrid")[]
-  }
+interface JOB_DETAILS {
+  title: string;                   // e.g., "Senior React Developer"
+  jobId: string;                   // Unique Naukri job ID (Unique Index)
+  footerPlaceholderLabel: string;  // e.g., "1 Day Ago"
+  companyName: string;             // e.g., "Tech Corp"
+  tagsAndSkills: string[];         // e.g., ["React.js", "TypeScript", "Redux"]
+  placeholders: Record<string, string>[]; // Experience, Salary, Location
+  jdURL: string;                   // Direct job detail URL
+  JD: string;                      // Full job description HTML/text
+  createdDate: number;             // Unix timestamp
+  salaryDetails: Record<string, unknown>;
+  minExp: string;                  // Minimum experience (years)
+  maxExp: string;                  // Maximum experience (years)
+  applyByTime: string;             // Application deadline string
+  walkIn: boolean;                 // Walk-in interview flag
+  createdAt: Date;                 // Auto-managed timestamp
+  updatedAt: Date;                 // Auto-managed timestamp
 }
 ```
 
 ---
 
-## 📁 NPM Scripts
+## 📜 NPM Scripts
 
-| Script                       | Description                         |
-| ---------------------------- | ----------------------------------- |
-| `npm run dev`                | Start dev server with tsx + nodemon |
-| `npm run build`              | Compile TypeScript to `dist/`       |
-| `npm start`                  | Run compiled production build       |
-| `npm run playwright:install` | Install Chromium for Playwright     |
-| `npm run test:playwright`    | Run Playwright tests                |
-
----
-
-## 📝 Logging
-
-Winston writes to three log files in `Backend/logs/`:
-
-| File             | Content                     |
-| ---------------- | --------------------------- |
-| `error.log`      | Error-level entries only    |
-| `combined.log`   | All log levels              |
-| `playwright.log` | Debug-level automation logs |
-
-Console output is enabled in development (`NODE_ENV !== 'production'`).
+| Command | Description |
+| :--- | :--- |
+| `npm run dev` | Starts server with nodemon + tsx hot-reloading |
+| `npm run build` | Compiles TypeScript to JavaScript in `dist/` |
+| `npm start` | Runs compiled production server from `dist/index.js` |
+| `npm run playwright:install` | Downloads Chromium browser binary for Playwright |
 
 ---
 
-## 📚 Learning Resources
+## 🏷️ Version Changelog
 
-Playwright learning exercises are in `Backend/src/Learn/Phase1` through `Phase8`.
+### Version `1.1.0` (Current)
+- **RabbitMQ Worker Cluster**: Process supervision via `WorkerManager` spawning child worker processes with IPC and crash auto-recovery.
+- **Stealth Browser Automation**: Integrated `playwright-extra` + `puppeteer-extra-plugin-stealth` to evade bot detection.
+- **Mathematical Page Partitioning**: Implemented `DistributingWork.ts` to assign non-overlapping page slices per worker.
+- **Optimized Recovery**: Eliminated escalating $10\text{s} \times \text{attempt}$ wait times in `Scrapper.ts` in favor of a constant 1-second breather with instant browser session renewal.
+- **Fast-Fail Recaptcha Detection**: Enhanced `Fetch.ts` to fast-fail on HTTP 406 / recaptcha blocks, preventing wasted retry loops with invalidated sessions.
+
+### Version `1.0.0`
+- Initial Express + MongoDB API.
+- Basic Playwright session interception.
+- Synchronous pagination and keyword filtering.
 
 ---
 
 ## 👤 Author
 
-**Sachin Singh Patwal**
+**Sachin Singh Patwal**  
+GitHub: [@SachinSinghPatwal](https://github.com/SachinSinghPatwal)
 
 ---
 
 ## 📄 License
 
-ISC
-
----
-
-**Last Updated**: 2026-09-13
+ISC License

@@ -2,6 +2,7 @@ import { ChildProcess, fork } from "node:child_process";
 import path from "node:path";
 import { killAllWorkers } from "../../utility/workers/killAllWorker.js";
 import { shutdown } from "../../utility/workers/shutdown.js";
+import connectToMongoDb from "../../db/MongoDb.js";
 
 const workerPath = path.resolve(
   process.cwd(),
@@ -25,10 +26,15 @@ let shuttingDown = false;
 export async function startScrapConsumer() {
   // Tear down previous workers first
   await killAllWorkers(workers);
+  
+  // instace of the mongoDb connection from the pool
+  await connectToMongoDb();
+
+  console.log("Connected to DB with worker")
 
   shuttingDown = false;
 
-  const workerCount = Number(process.env.WORKER_COUNT ?? 5);
+  const workerCount = Number(process.env.WORKER_COUNT ?? 4);
 
   const readyPromises: Promise<void>[] = [];
 
@@ -63,7 +69,9 @@ export async function startScrapConsumer() {
       worker.once("exit", (code) => {
         clearTimeout(timeout);
         if (code !== 0) {
-          reject(new Error(`${workerId} exited with code ${code} before ready`));
+          reject(
+            new Error(`${workerId} exited with code ${code} before ready`),
+          );
         }
       });
     });
