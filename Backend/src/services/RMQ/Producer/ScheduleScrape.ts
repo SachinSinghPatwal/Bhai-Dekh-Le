@@ -1,6 +1,7 @@
 import amqp from "amqplib";
 
 import { ScheduleScrape } from "../../../constants.js";
+import log from "../../../utility/Logger.js";
 
 export default async function ScheduleScrapping(): Promise<void> {
   const connection = await amqp.connect(
@@ -8,7 +9,7 @@ export default async function ScheduleScrapping(): Promise<void> {
   );
 
   try {
-    console.log("=== Producer CONNECTED ===");
+    log.success("Producer connected to RabbitMQ");
 
     const channel = await connection.createConfirmChannel();
 
@@ -29,12 +30,12 @@ export default async function ScheduleScrapping(): Promise<void> {
 
     await channel.waitForConfirms();
 
-    console.log(`${workerCount} messages published and confirmed`);
+    log.success(`${workerCount} messages published and confirmed`);
 
     await channel.close();
   } finally {
     await connection.close();
 
-    console.log("Producer connection closed");
+    log.info("Producer connection closed");
   }
 }

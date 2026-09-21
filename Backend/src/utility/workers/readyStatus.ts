@@ -1,4 +1,5 @@
 import { ChildProcess } from "node:child_process";
+import log from "../Logger.js";
 
 export default function waitForWorkerReady(
   worker: ChildProcess,
@@ -38,7 +39,7 @@ export default function waitForWorkerReady(
 
       clearTimeout(timeout);
 
-      console.log(`${workerId} is ready`);
+      log.success(`${workerId} is ready`);
 
       resolve();
     });

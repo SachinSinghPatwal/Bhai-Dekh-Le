@@ -6,6 +6,7 @@ import { dbSave, dbSaveExchange, ScheduleScrape } from "../../../constants.js";
 
 import Scrapper from "../../Scrapper.js";
 import type { JOB_DETAILS } from "../../../models/Mongo/job.models.js";
+import log from "../../../utility/Logger.js";
 
 const workerId = process.env.WORKER_ID ?? "worker-unknown";
 
@@ -79,13 +80,12 @@ async function start(): Promise<void> {
       return;
     }
 
-    console.log(
-      `[${workerId}] Received scrape task:`,
-      message.content.toString(),
+    log.info(
+      `[${workerId}] Received scrape task: ${message.content.toString()}`,
     );
 
     try {
-      console.log(`[${workerId}] PID=${process.pid} PPID=${process.ppid}`);
+      log.debug(`[${workerId}] PID=${process.pid} PPID=${process.ppid}`);
 
       /*
        * =========================
@@ -104,7 +104,7 @@ async function start(): Promise<void> {
       if (!Array.isArray(scrapedJobs) || scrapedJobs.length === 0) {
         channel!.ack(message);
 
-        console.log(`[${workerId}] No jobs found. Task acknowledged.`);
+        log.info(`[${workerId}] No jobs found. Task acknowledged.`);
 
         return;
       }
@@ -147,13 +147,12 @@ async function start(): Promise<void> {
 
       channel!.ack(message);
 
-      console.log(
+      log.success(
         `[${workerId}] Scrape result successfully handed to DB queue.`,
       );
     } catch (error) {
-      console.error(
-        `[${workerId}] Scraping or DB-queue publishing failed:`,
-        error,
+      log.error(
+        `[${workerId}] Scraping or DB-queue publishing failed: ${error}`,
       );
 
       /*
@@ -175,7 +174,7 @@ async function start(): Promise<void> {
     });
   }
 
-  console.log(`[${workerId}] Scraper worker ready.`);
+  log.success(`[${workerId}] Scraper worker ready.`);
 }
 
 async function shutdown(): Promise<void> {
@@ -185,14 +184,14 @@ async function shutdown(): Promise<void> {
 
   shuttingDown = true;
 
-  console.log(`[${workerId}] Shutting down...`);
+  log.info(`[${workerId}] Shutting down...`);
 
   try {
     await channel?.close();
 
     await connection?.close();
   } catch (error) {
-    console.error(`[${workerId}] RabbitMQ shutdown error:`, error);
+    log.error(`[${workerId}] RabbitMQ shutdown error: ${error}`);
   }
 
   channel = null;
@@ -218,7 +217,7 @@ process.once("disconnect", () => {
 });
 
 start().catch((error) => {
-  console.error(`[${workerId}] Fatal startup error:`, error);
+  log.error(`[${workerId}] Fatal startup error: ${error}`);
 
   process.exit(1);
 });

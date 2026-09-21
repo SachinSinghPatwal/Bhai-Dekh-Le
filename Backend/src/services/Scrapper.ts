@@ -5,6 +5,7 @@ import {
   SETUP_RETURNED_VALUES,
 } from "./Playwright/CreatingEnviromentToScrap.js";
 import { RateLimitError } from "../utility/RateLimitingError.js";
+import log from "../utility/Logger.js";
 
 export default async function Scrapper(
   workerId: string,
@@ -49,7 +50,7 @@ export default async function Scrapper(
     } catch (error: unknown) {
       if (error instanceof RateLimitError) {
         lastPageCrashed = error.lastPage;
-        console.error(error.message);
+        log.warn(error.message);
       }
 
       attempt++;

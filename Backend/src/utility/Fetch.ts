@@ -1,5 +1,6 @@
 import { JOB_DETAILS } from "../models/Mongo/job.models.js";
 import { RequestParams } from "../types.js";
+import log from "../utility/Logger.js";
 
 interface FetchParams extends Partial<RequestParams> {
   method?: "GET";
@@ -27,7 +28,7 @@ export default async function Fetch({
 
       if (response.headers.get("content-type")?.includes("text/html")) {
         const text = await response.text();
-        console.log("BODY START:", text.slice(0, 500));
+        log.debug(`[Fetch] BODY START: ${text.slice(0, 500)}`);
         throw new Error(
           "Received HTML instead of JSON. Possible Rate Limit or Block.",
         );
@@ -37,7 +38,7 @@ export default async function Fetch({
 
       // Fast fail on Recaptcha so we don't waste time retrying
       if (body.statusCode === 406 || body.message === "recaptcha required") {
-        console.log(`[Fetch] Recaptcha block, Fast failing...`);
+        log.warn("[Fetch] Recaptcha block, Fast failing...");
         throw new Error("RECAPTCHA_BLOCK"); // Special message we can catch
       }
 
@@ -47,9 +48,8 @@ export default async function Fetch({
         !jobDetails ||
         (Array.isArray(jobDetails) && jobDetails.length === 0)
       ) {
-        console.log(
-          `[Fetch] Empty jobDetails for Full body:`,
-          JSON.stringify(body).slice(0, 500),
+        log.warn(
+          `[Fetch] Empty jobDetails for Full body: ${JSON.stringify(body).slice(0, 500)}`,
         );
         throw new Error("Empty jobDetails returned, possible soft block.");
       }
@@ -65,7 +65,7 @@ export default async function Fetch({
       if (attempt >= MAX_RETRIES) {
         throw error;
       }
-      console.log(
+      log.warn(
         `[Fetch] Attempt ${attempt} failed. Retrying in ${(attempt % 3) * 5}s... (${error.message})`,
       );
       await new Promise((resolve) => setTimeout(resolve, (attempt % 3) * 5000));

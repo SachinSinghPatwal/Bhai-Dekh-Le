@@ -3,6 +3,7 @@ import { RequestParams } from "../types.js";
 import ScrappingPaginatedJob from "../helpers/ScrappingPaginatedJob.js";
 import { sortingUnsortedJobBasedOnTimeCreated } from "../utility/sortingJobBasedOnCreated.js";
 import DistributingLoadWithWorkers from "../helpers/RMQ/DistributingWork.js";
+import log from "../utility/Logger.js";
 
 export default async function getDesiredJobs({
   url,
@@ -16,7 +17,7 @@ export default async function getDesiredJobs({
 }: RequestParams): Promise<JOB_DETAILS[]> {
   const unSortedJobs: JOB_DETAILS[] = [];
 
-  console.log("total Number Of Pages :", Number(totalJobsAvaibles) / 20 - 1);
+  log.debug(`total Number Of Pages: ${Number(totalJobsAvaibles) / 20 - 1}`);
 
   let { startPage, endPage } = DistributingLoadWithWorkers(
     totalJobsAvaibles as number,
@@ -27,7 +28,7 @@ export default async function getDesiredJobs({
     startPage = retryStartingPage; // retrying on previous closed browser
   }
 
-  console.log(
+  log.info(
     `[${workerId}] Starting scraping work size: ${endPage - startPage + 1} pages (from ${startPage} to ${endPage})`,
   );
 

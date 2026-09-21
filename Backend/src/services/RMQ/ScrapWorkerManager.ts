@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { shutdown } from "../../utility/workers/shutdown.js";
 import spawnWorker from "../../utility/workers/spawn.js";
+import log from "../../utility/Logger.js";
 
 const workerPath = path.resolve(
   process.cwd(),
@@ -23,7 +24,7 @@ export async function startScrapConsumer(): Promise<void> {
    * is called more than once.
    */
   if (workers.length > 0) {
-    console.log("Stopping existing scraper workers...");
+    log.warn("Stopping existing scraper workers...");
 
     shuttingDown = true;
 
@@ -60,7 +61,7 @@ export async function startScrapConsumer(): Promise<void> {
 
   await Promise.all(readyPromises);
 
-  console.log(`All ${workerCount} scraper workers are listening.`);
+  log.success(`All ${workerCount} scraper workers are listening.`);
 }
 
 export async function handleShutdown(): Promise<void> {
@@ -76,5 +77,5 @@ export async function handleShutdown(): Promise<void> {
 
   workers = [];
 
-  console.log("Scraper worker manager shutdown complete.");
+  log.success("Scraper worker manager shutdown complete.");
 }

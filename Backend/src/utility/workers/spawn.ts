@@ -1,6 +1,7 @@
 import { ChildProcess, fork } from "node:child_process";
 
 import waitForWorkerReady from "./readyStatus.js";
+import log from "../Logger.js";
 
 interface CREATE_WORKER {
   workerId: string;
@@ -46,14 +47,14 @@ export default async function spawnWorker({
 
   workers.push(worker);
 
-  console.log(`${workerId} spawned. PID=${worker.pid}`);
+  log.info(`${workerId} spawned. PID=${worker.pid}`);
 
   worker.on("error", (error) => {
-    console.error(`[${workerId}] process error:`, error);
+    log.error(`[${workerId}] process error: ${error}`);
   });
 
   worker.once("exit", (code, signal) => {
-    console.log(`[${workerId}] exited. code=${code}, signal=${signal}`);
+    log.info(`[${workerId}] exited. code=${code}, signal=${signal}`);
 
     /*
      * Remove this dead process from the manager's
@@ -79,7 +80,7 @@ export default async function spawnWorker({
       return;
     }
 
-    console.log(
+    log.warn(
       `[${workerId}] crashed. Restarting in ${WORKER_RESTART_DELAY / 1000}s...`,
     );
 
@@ -100,9 +101,9 @@ export default async function spawnWorker({
           isShuttingDown,
         });
 
-        console.log(`[${workerId}] restarted. PID=${respawned.pid}`);
+        log.success(`[${workerId}] restarted. PID=${respawned.pid}`);
       } catch (error) {
-        console.error(`[${workerId}] failed to restart:`, error);
+        log.error(`[${workerId}] failed to restart: ${error}`);
       }
     }, WORKER_RESTART_DELAY);
   });

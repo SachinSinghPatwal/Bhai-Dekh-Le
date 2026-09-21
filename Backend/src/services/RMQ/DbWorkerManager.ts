@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { shutdown } from "../../utility/workers/shutdown.js";
 import spawnWorker from "../../utility/workers/spawn.js";
+import log from "../../utility/Logger.js";
 
 const dbWorkerPath = path.resolve(
   process.cwd(),
@@ -23,7 +24,7 @@ export async function startDbWorkers(): Promise<void> {
    * is called more than once.
    */
   if (dbWorkers.length > 0) {
-    console.log("Stopping existing DB workers...");
+    log.warn("Stopping existing DB workers...");
 
     shuttingDown = true;
 
@@ -59,7 +60,7 @@ export async function startDbWorkers(): Promise<void> {
 
   await Promise.all(readyPromises);
 
-  console.log(`All ${workerCount} DB workers are listening.`);
+  log.success(`All ${workerCount} DB workers are listening.`);
 }
 
 export async function handleDbWorkerShutdown(): Promise<void> {
@@ -75,5 +76,5 @@ export async function handleDbWorkerShutdown(): Promise<void> {
 
   dbWorkers = [];
 
-  console.log("DB worker manager shutdown complete.");
+  log.success("DB worker manager shutdown complete.");
 }

@@ -2,6 +2,7 @@ import "./config/load-env.js";
 
 import app from "./app.js";
 import connectToMongoDb from "./db/MongoDb.js";
+import log from "./utility/Logger.js";
 
 import {
   startScrapConsumer,
@@ -18,7 +19,7 @@ const port = Number(process.env.PORT) || 8000;
 let shuttingDown = false;
 
 app.listen(port, "0.0.0.0", () => {
-  console.log(`Server is running on ${port}`);
+  log.success(`Server is running on ${port}`);
 });
 
 async function handleShutdown(): Promise<void> {
@@ -28,7 +29,7 @@ async function handleShutdown(): Promise<void> {
 
   shuttingDown = true;
 
-  console.log("Application shutting down...");
+  log.info("Application shutting down...");
 
   try {
     /*
@@ -45,9 +46,9 @@ async function handleShutdown(): Promise<void> {
      */
     await handleDbWorkerShutdown();
 
-    console.log("Application shutdown complete.");
+    log.success("Application shutdown complete.");
   } catch (error) {
-    console.error("Application shutdown error:", error);
+    log.error("Application shutdown error:", error);
   } finally {
     process.exit(0);
   }
@@ -67,14 +68,14 @@ process.once("SIGUSR2", () => {
 
 connectToMongoDb()
   .then(async () => {
-    console.log("MongoDB connected");
+    log.success("MongoDB connected");
 
     await startScrapConsumer();
 
     await startDbWorkers();
 
-    console.log("All workers started.");
+    log.success("All workers started.");
   })
   .catch((err: unknown) => {
-    console.error("MongoDB connection or worker startup failed:", err);
+    log.error("MongoDB connection or worker startup failed:", err);
   });

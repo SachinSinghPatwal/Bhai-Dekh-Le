@@ -6,6 +6,7 @@ import { JobModel } from "../../../models/Mongo/job.models.js";
 import { dbSave, dbSaveExchange } from "../../../constants.js";
 
 import connectToMongoDb from "../../../utility/workers/connectToDb.js";
+import log from "../../../utility/Logger.js";
 
 let rabbitConnection: Awaited<ReturnType<typeof amqp.connect>> | null = null;
 
@@ -24,7 +25,7 @@ async function start(): Promise<void> {
   // from utiltiy as the exit 1 code is handled by the lifecycle
   await connectToMongoDb();
 
-  console.log(`[DB Worker ${process.pid}] MongoDB connected`);
+  log.success(`[DB Worker ${process.pid}] MongoDB connected`);
 
   /*
    * =========================
@@ -80,12 +81,12 @@ async function start(): Promise<void> {
       if (!Array.isArray(jobs) || jobs.length === 0) {
         channel!.ack(message);
 
-        console.log(`[DB Worker ${process.pid}] Empty job batch. ACK.`);
+        log.info(`[DB Worker ${process.pid}] Empty job batch. ACK.`);
 
         return;
       }
 
-      console.log(`[DB Worker ${process.pid}] Saving ${jobs.length} jobs`);
+      log.info(`[DB Worker ${process.pid}] Saving ${jobs.length} jobs`);
 
       /*
        * =========================
@@ -120,9 +121,9 @@ async function start(): Promise<void> {
 
       channel!.ack(message);
 
-      console.log(`[DB Worker ${process.pid}] Saved ${jobs.length} jobs.`);
+      log.success(`[DB Worker ${process.pid}] Saved ${jobs.length} jobs.`);
     } catch (error) {
-      console.error(`[DB Worker ${process.pid}] DB write failed:`, error);
+      log.error(`[DB Worker ${process.pid}] DB write failed: ${error}`);
 
       /*
        * Put the message back into RabbitMQ.
@@ -138,7 +139,7 @@ async function start(): Promise<void> {
     }
   });
 
-  console.log(`[DB Worker ${process.pid}] Ready.`);
+  log.success(`[DB Worker ${process.pid}] Ready.`);
 
   /*
    * Tell WorkerManager that this worker is
@@ -158,7 +159,7 @@ async function shutdown(): Promise<void> {
 
   shuttingDown = true;
 
-  console.log(`[DB Worker ${process.pid}] Shutting down...`);
+  log.info(`[DB Worker ${process.pid}] Shutting down...`);
 
   try {
     /*
@@ -178,7 +179,7 @@ async function shutdown(): Promise<void> {
      */
     await mongoose.connection.close();
   } catch (error) {
-    console.error(`[DB Worker ${process.pid}] Shutdown error:`, error);
+    log.error(`[DB Worker ${process.pid}] Shutdown error: ${error}`);
   }
 
   channel = null;
@@ -204,7 +205,7 @@ process.once("disconnect", () => {
 });
 
 start().catch((error) => {
-  console.error(`[DB Worker ${process.pid}] Fatal startup error:`, error);
+  log.error(`[DB Worker ${process.pid}] Fatal startup error: ${error}`);
 
   process.exit(1);
 });

@@ -1,11 +1,12 @@
 import { ChildProcess } from "node:child_process";
+import log from "../Logger.js";
 
 export async function killAllWorkers(workers: ChildProcess[]): Promise<void> {
   if (workers.length === 0) {
     return;
   }
 
-  console.log("Killing existing workers...");
+  log.warn("Killing existing workers...");
 
   await Promise.all(
     workers.map(
