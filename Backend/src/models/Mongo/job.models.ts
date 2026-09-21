@@ -88,6 +88,13 @@ const jobSchema = new Schema<Required<JOB_DETAILS>>(
   },
   {
     timestamps: true,
+  }
+);
+
+jobSchema.index(
+  { createdAt: 1 },
+  {
+    expireAfterSeconds: 24 * 60 * 60,
   },
 );
 
