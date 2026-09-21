@@ -5,38 +5,51 @@ export default function waitForWorkerReady(
   workerId: string,
 ): Promise<void> {
   const WORKER_READY_TIMEOUT = 30_000;
+
   return new Promise((resolve, reject) => {
     let settled = false;
 
     const timeout = setTimeout(() => {
-      if (settled) return;
+      if (settled) {
+        return;
+      }
 
       settled = true;
 
       reject(
         new Error(
-          `${workerId} did not become ready within ${WORKER_READY_TIMEOUT / 1000}s`,
+          `${workerId} did not become ready within ${
+            WORKER_READY_TIMEOUT / 1000
+          }s`,
         ),
       );
     }, WORKER_READY_TIMEOUT);
 
-    worker.on("message", (msg: any) => {
-      if (settled) return;
-
-      if (msg?.type === "ready") {
-        settled = true;
-        clearTimeout(timeout);
-
-        console.log(`${workerId} is ready`);
-
-        resolve();
+    worker.once("message", (msg: any) => {
+      if (settled) {
+        return;
       }
+
+      if (msg?.type !== "ready") {
+        return;
+      }
+
+      settled = true;
+
+      clearTimeout(timeout);
+
+      console.log(`${workerId} is ready`);
+
+      resolve();
     });
 
     worker.once("exit", (code, signal) => {
-      if (settled) return;
+      if (settled) {
+        return;
+      }
 
       settled = true;
+
       clearTimeout(timeout);
 
       reject(

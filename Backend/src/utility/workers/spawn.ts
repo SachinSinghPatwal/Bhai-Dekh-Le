@@ -1,4 +1,5 @@
 import { ChildProcess, fork } from "node:child_process";
+
 import waitForWorkerReady from "./readyStatus.js";
 
 interface CREATE_WORKER {
@@ -8,13 +9,10 @@ interface CREATE_WORKER {
 
 interface SPAWN_WORKERS extends CREATE_WORKER {
   workers: ChildProcess[];
-  shuttingDown: boolean;
+  isShuttingDown: () => boolean;
 }
 
-function createWorker({
-  workerId,
-  workerPath,
-}: CREATE_WORKER): ChildProcess {
+function createWorker({ workerId, workerPath }: CREATE_WORKER): ChildProcess {
   return fork(workerPath, {
     execArgv: ["--import", "tsx"],
 
@@ -31,9 +29,20 @@ export default async function spawnWorker({
   workerId,
   workerPath,
   workers,
-  shuttingDown,
+  isShuttingDown,
 }: SPAWN_WORKERS): Promise<ChildProcess> {
-  const worker = createWorker({ workerId, workerPath });
+  /*
+   * Do not create a worker while the manager
+   * is shutting down.
+   */
+  if (isShuttingDown()) {
+    throw new Error(`Cannot spawn ${workerId}: manager is shutting down.`);
+  }
+
+  const worker = createWorker({
+    workerId,
+    workerPath,
+  });
 
   workers.push(worker);
 
@@ -43,41 +52,70 @@ export default async function spawnWorker({
     console.error(`[${workerId}] process error:`, error);
   });
 
-  worker.on("exit", (code, signal) => {
+  worker.once("exit", (code, signal) => {
     console.log(`[${workerId}] exited. code=${code}, signal=${signal}`);
 
-    if (!shuttingDown && code !== null && code !== 0) {
-      console.log(
-        `[${workerId}] crashed. Restarting in ${WORKER_RESTART_DELAY / 1000}s...`,
-      );
+    /*
+     * Remove this dead process from the manager's
+     * worker collection.
+     */
+    const index = workers.indexOf(worker);
 
-      setTimeout(async () => {
-        if (shuttingDown) return;
-
-        try {
-          const respawned = await spawnWorker({
-            workerId,
-            workerPath,
-            workers,
-            shuttingDown,
-          });
-
-          console.log(`[${workerId}] restarted. PID=${respawned.pid}`);
-        } catch (error) {
-          console.error(`[${workerId}] failed to restart:`, error);
-        }
-      }, WORKER_RESTART_DELAY);
+    if (index !== -1) {
+      workers.splice(index, 1);
     }
+
+    /*
+     * Do not restart during intentional shutdown.
+     */
+    if (isShuttingDown()) {
+      return;
+    }
+
+    /*
+     * Normal exit with code 0 is not a crash.
+     */
+    if (code === 0) {
+      return;
+    }
+
+    console.log(
+      `[${workerId}] crashed. Restarting in ${WORKER_RESTART_DELAY / 1000}s...`,
+    );
+
+    setTimeout(async () => {
+      /*
+       * The manager may have entered shutdown
+       * while waiting for the restart delay.
+       */
+      if (isShuttingDown()) {
+        return;
+      }
+
+      try {
+        const respawned = await spawnWorker({
+          workerId,
+          workerPath,
+          workers,
+          isShuttingDown,
+        });
+
+        console.log(`[${workerId}] restarted. PID=${respawned.pid}`);
+      } catch (error) {
+        console.error(`[${workerId}] failed to restart:`, error);
+      }
+    }, WORKER_RESTART_DELAY);
   });
 
   try {
+    /*
+     * Wait until the worker has successfully
+     * initialized RabbitMQ and started consuming.
+     */
     await waitForWorkerReady(worker, workerId);
   } catch (error) {
     /*
-     * The worker failed during startup.
-     *
-     * Kill it if it is still alive so that we don't leave
-     * a partially initialized worker behind.
+     * Worker failed during startup.
      */
     if (worker.exitCode === null && worker.signalCode === null) {
       worker.kill("SIGTERM");

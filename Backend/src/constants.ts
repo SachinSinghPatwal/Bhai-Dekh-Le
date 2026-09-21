@@ -18,6 +18,8 @@ export const JOb_SEARCH_URL_WITH_QUERY = {
 };
 
 export const ScheduleScrape = "TimedScrapping";
+export const dbSaveExchange = "db_save_exchange";
+export const dbSave = "db_save";
 
 export const MatchedURLOfSearch = "/jobapi/v3/search";
 

@@ -20,17 +20,16 @@ export default async function Scrapper(
     try {
       const { url, request, totalJobsAvaibles, headers, jobDetails, browser } =
         (await CreatingEnviromentToScrap()) as SETUP_RETURNED_VALUES;
-        
+
       if (initialTotalJobs === 0) {
         initialTotalJobs = totalJobsAvaibles;
       }
 
       if (!customMaxRetries.changed) {
-
         customMaxRetries.changed = true; //flag for updated end page
-        
+
         customMaxRetries.times =
-          initialTotalJobs / Number(process.env.WORKER_COUNT ?? 4);
+          initialTotalJobs / Number(process.env.SCRAP_WORKER_COUNT ?? 4);
       }
 
       browserInstace = browser;
@@ -48,7 +47,6 @@ export default async function Scrapper(
       await browserInstace?.close();
       return orderedJobs as JOB_DETAILS[];
     } catch (error: unknown) {
-      
       if (error instanceof RateLimitError) {
         lastPageCrashed = error.lastPage;
         console.error(error.message);
@@ -60,4 +58,3 @@ export default async function Scrapper(
     }
   }
 }
-
