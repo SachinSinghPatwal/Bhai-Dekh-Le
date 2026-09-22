@@ -1,12 +1,16 @@
-import "../../../config/load-env.js";
+import "../../../../config/load-env.js";
 
 import amqp, { type Message } from "amqplib";
 
-import { dbSave, dbSaveExchange, ScheduleScrape } from "../../../constants.js";
+import {
+  dbSave,
+  dbSaveExchange,
+  ScheduleScrape,
+} from "../../../../constants.js";
 
-import Scrapper from "../../Scrapper.js";
-import type { JOB_DETAILS } from "../../../models/Mongo/job.models.js";
-import log from "../../../utility/Logger.js";
+import Scrapper from "../../../Playwright/services/Scrapper.js";
+import type { JOB_DETAILS } from "../../../../models/Mongo/job.models.js";
+import log from "../../../../utility/Logger.js";
 
 const workerId = process.env.WORKER_ID ?? "worker-unknown";
 

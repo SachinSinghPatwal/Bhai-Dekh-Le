@@ -1,4 +1,4 @@
-import { JOB_DETAILS } from "../models/Mongo/job.models.js";
+import { JOB_DETAILS } from "../../../models/Mongo/job.models.js";
 
 export default function ValidateJobIsPostedWithinThreeDays(
   each: JOB_DETAILS,

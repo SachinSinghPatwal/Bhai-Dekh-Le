@@ -1,9 +1,9 @@
-import { JOB_DETAILS } from "../models/Mongo/job.models.js";
-import { RequestParams } from "../types.js";
-import ScrappingPaginatedJob from "../helpers/ScrappingPaginatedJob.js";
+import { JOB_DETAILS } from "../../../models/Mongo/job.models.js";
+import { RequestParams } from "../../../types.js";
+import ScrappingPaginatedJob from "../../../helpers/ScrappingPaginatedJob.js";
 import { sortingUnsortedJobBasedOnTimeCreated } from "../utility/sortingJobBasedOnCreated.js";
-import DistributingLoadWithWorkers from "../helpers/RMQ/DistributingWork.js";
-import log from "../utility/Logger.js";
+import DistributingLoadWithWorkers from "../../../helpers/RMQ/DistributingWork.js";
+import log from "../../../utility/Logger.js";
 
 export default async function getDesiredJobs({
   url,

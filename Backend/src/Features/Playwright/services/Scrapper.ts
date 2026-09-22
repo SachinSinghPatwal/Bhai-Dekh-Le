@@ -1,11 +1,11 @@
 import makeHttpRequestToGetAllDesiredJobs from "./GetDesiredJobs.js";
-import { JOB_DETAILS } from "../models/Mongo/job.models.js";
+import { JOB_DETAILS } from "../../../models/Mongo/job.models.js";
 import {
   CreatingEnviromentToScrap,
   SETUP_RETURNED_VALUES,
-} from "./Playwright/CreatingEnviromentToScrap.js";
+} from "./CreatingEnviromentToScrap.js";
 import { RateLimitError } from "../utility/RateLimitingError.js";
-import log from "../utility/Logger.js";
+import log from "../../../utility/Logger.js";
 
 export default async function Scrapper(
   workerId: string,

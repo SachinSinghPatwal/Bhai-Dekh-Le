@@ -1,4 +1,5 @@
 import mongoose, { Document, Schema } from "mongoose";
+import { ApiResponse } from "../../utility/ApiResponse.js";
 
 export interface JOB_DETAILS extends Document {
   title: string;
@@ -88,13 +89,13 @@ const jobSchema = new Schema<Required<JOB_DETAILS>>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 jobSchema.index(
   { createdAt: 1 },
   {
-    expireAfterSeconds: 24 * 60 * 60,
+    expireAfterSeconds: 24 * 60 * 60, //after 24 hours it dissapears
   },
 );
 
@@ -105,10 +106,12 @@ jobSchema.post("save", function (error: any, _: any, next: any) {
       message: `${err.path} is invalid`,
     }));
 
-    return next({
-      statusCode: 400,
-      errors,
-    });
+    return next(
+      new ApiResponse({
+        statusCode: 202,
+        message: `Every Properties are required to be filled - ${errors}`,
+      }),
+    );
   }
 
   next(error);

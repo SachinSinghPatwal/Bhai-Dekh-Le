@@ -1,10 +1,10 @@
 import { Browser, BrowserContext, Request } from "playwright";
 import { chromium } from "playwright-extra";
 import stealth from "puppeteer-extra-plugin-stealth";
-import { interceptingBrowsersHttpCommunication } from "../../helpers/Playwright/interceptingBrowsersHttpCommunication.js";
-import UrlForPageToDirect from "../../utility/playwright/ComposeUrl.js";
-import { sanitizeCaptureHeaderUrl } from "../../helpers/Playwright/sanitizeCaptureHeaderUrl.js";
-import { JOB_DETAILS } from "../../models/Mongo/job.models.js";
+import { interceptingBrowsersHttpCommunication } from "../../../helpers/Playwright/interceptingBrowsersHttpCommunication.js";
+import UrlForPageToDirect from "../utility/ComposeUrl.js";
+import { sanitizeCaptureHeaderUrl } from "../../../helpers/Playwright/sanitizeCaptureHeaderUrl.js";
+import { JOB_DETAILS } from "../../../models/Mongo/job.models.js";
 
 chromium.use(stealth());
 

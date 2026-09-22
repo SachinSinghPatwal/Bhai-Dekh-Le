@@ -1,9 +1,9 @@
 import { ChildProcess } from "node:child_process";
 import path from "node:path";
 
-import { shutdown } from "../../utility/workers/shutdown.js";
-import spawnWorker from "../../utility/workers/spawn.js";
-import log from "../../utility/Logger.js";
+import { shutdown } from "../../../Workers/utility/shutdown.js";
+import spawnWorker from "../../../Workers/utility/spawn.js";
+import log from "../../../../utility/Logger.js";
 
 const dbWorkerPath = path.resolve(
   process.cwd(),

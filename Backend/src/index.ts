@@ -7,12 +7,12 @@ import log from "./utility/Logger.js";
 import {
   startScrapConsumer,
   handleShutdown as handleScrapWorkerShutdown,
-} from "./services/RMQ/ScrapWorkerManager.js";
+} from "./Features/RabbitMQ/utility/manager/ScrapWorkerManager.js";
 
 import {
   startDbWorkers,
   handleDbWorkerShutdown,
-} from "./services/RMQ/DbWorkerManager.js";
+} from "./Features/RabbitMQ/utility/manager/DbWorkerManager.js";
 
 const port = Number(process.env.PORT) || 8000;
 

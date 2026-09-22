@@ -1,6 +1,6 @@
-import { JOB_DETAILS } from "../models/Mongo/job.models.js";
-import { RequestParams } from "../types.js";
-import log from "../utility/Logger.js";
+import { JOB_DETAILS } from "../../../models/Mongo/job.models.js";
+import { RequestParams } from "../../../types.js";
+import log from "../../../utility/Logger.js";
 
 interface FetchParams extends Partial<RequestParams> {
   method?: "GET";

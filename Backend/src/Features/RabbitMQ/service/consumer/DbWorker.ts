@@ -1,12 +1,12 @@
-import "../../../config/load-env.js";
+import "../../../../config/load-env.js";
 
 import amqp, { type Message } from "amqplib";
 import mongoose from "mongoose";
-import { JobModel } from "../../../models/Mongo/job.models.js";
-import { dbSave, dbSaveExchange } from "../../../constants.js";
+import { JobModel } from "../../../../models/Mongo/job.models.js";
+import { dbSave, dbSaveExchange } from "../../../../constants.js";
 
-import connectToMongoDb from "../../../utility/workers/connectToDb.js";
-import log from "../../../utility/Logger.js";
+import connectToMongoDb from "../../../Workers/utility/connectToDb.js";
+import log from "../../../../utility/Logger.js";
 
 let rabbitConnection: Awaited<ReturnType<typeof amqp.connect>> | null = null;
 

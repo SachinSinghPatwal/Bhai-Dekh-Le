@@ -1,7 +1,7 @@
 import { ChildProcess, fork } from "node:child_process";
 
 import waitForWorkerReady from "./readyStatus.js";
-import log from "../Logger.js";
+import log from "../../../utility/Logger.js";
 
 interface CREATE_WORKER {
   workerId: string;

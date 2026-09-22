@@ -1,5 +1,5 @@
 import { ChildProcess } from "node:child_process";
-import log from "../Logger.js";
+import log from "../../../utility/Logger.js";
 
 export default function waitForWorkerReady(
   worker: ChildProcess,
