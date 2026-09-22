@@ -94,22 +94,16 @@ async function start(): Promise<void> {
        * =========================
        */
 
-      await JobModel.bulkWrite(
+      const response = await JobModel.bulkWrite(
         jobs.map((job) => ({
-          updateOne: {
-            filter: {
-              jobId: job.jobId,
-            },
-
-            update: {
-              $set: job,
-            },
-
-            upsert: true,
+          insertOne: {
+            document: job,
           },
         })),
+        {
+          ordered: false,
+        },
       );
-
       /*
        * bulkWrite() resolving means the
        * operation completed successfully.
@@ -118,10 +112,11 @@ async function start(): Promise<void> {
        * because the Mongoose BulkWriteResult type
        * does not expose that property in your setup.
        */
-
-      channel!.ack(message);
-
-      log.success(`[DB Worker ${process.pid}] Saved ${jobs.length} jobs.`);
+      if (response) {
+        channel!.ack(message);
+        log.success(`[DB Worker ${process.pid}] Saved ${jobs.length} jobs.`);
+      }
+      throw new Error("Something went wrong while inserting in the db");
     } catch (error) {
       log.error(`[DB Worker ${process.pid}] DB write failed: ${error}`);
 

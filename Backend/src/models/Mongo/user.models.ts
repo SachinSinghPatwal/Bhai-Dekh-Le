@@ -73,7 +73,6 @@ const userSchema = new Schema<User>(
         enum: ["full-time", "part-time", "contract", "internship", null],
         default: null,
       },
-
       employType: {
         type: String,
         enum: ["remote", "on-site", "hybrid", null],
