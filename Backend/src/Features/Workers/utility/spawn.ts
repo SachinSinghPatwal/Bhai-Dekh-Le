@@ -47,7 +47,7 @@ export default async function spawnWorker({
 
   workers.push(worker);
 
-  log.info(`${workerId} spawned. PID=${worker.pid}`);
+  log.debug(`${workerId} spawned. PID=${worker.pid}`);
 
   worker.on("error", (error) => {
     log.error(`[${workerId}] process error: ${error}`);

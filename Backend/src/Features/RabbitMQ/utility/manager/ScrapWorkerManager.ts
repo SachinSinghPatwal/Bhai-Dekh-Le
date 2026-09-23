@@ -8,8 +8,9 @@ import log from "../../../../utility/Logger.js";
 const workerPath = path.resolve(
   process.cwd(),
   "src",
-  "services",
-  "RMQ",
+  "Features",
+  "RabbitMQ",
+  "service",
   "consumer",
   "ScheduleScrapWorker.ts",
 );
@@ -77,5 +78,5 @@ export async function handleShutdown(): Promise<void> {
 
   workers = [];
 
-  log.success("Scraper worker manager shutdown complete.");
+  log.debug("Scraper worker manager shutdown complete.");
 }

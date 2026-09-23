@@ -19,7 +19,7 @@ const port = Number(process.env.PORT) || 8000;
 let shuttingDown = false;
 
 app.listen(port, "0.0.0.0", () => {
-  log.success(`Server is running on ${port}`);
+  log.info(`Server is running on ${port}`);
 });
 
 async function handleShutdown(): Promise<void> {
@@ -29,7 +29,7 @@ async function handleShutdown(): Promise<void> {
 
   shuttingDown = true;
 
-  log.info("Application shutting down...");
+  log.debug("Application shutting down...");
 
   try {
     /*
@@ -46,7 +46,7 @@ async function handleShutdown(): Promise<void> {
      */
     await handleDbWorkerShutdown();
 
-    log.success("Application shutdown complete.");
+    log.debug("Application shutdown complete.");
   } catch (error) {
     log.error("Application shutdown error:", error);
   } finally {
@@ -74,7 +74,7 @@ connectToMongoDb()
 
     await startDbWorkers();
 
-    log.success("All workers started.");
+    log.debug("All workers started.");
   })
   .catch((err: unknown) => {
     log.error("MongoDB connection or worker startup failed:", err);

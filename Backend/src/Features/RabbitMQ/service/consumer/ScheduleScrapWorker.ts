@@ -177,8 +177,6 @@ async function start(): Promise<void> {
       type: "ready",
     });
   }
-
-  log.success(`[${workerId}] Scraper worker ready.`);
 }
 
 async function shutdown(): Promise<void> {

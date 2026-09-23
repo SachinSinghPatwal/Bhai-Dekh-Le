@@ -8,8 +8,9 @@ import log from "../../../../utility/Logger.js";
 const dbWorkerPath = path.resolve(
   process.cwd(),
   "src",
-  "services",
-  "RMQ",
+  "Features",
+  "RabbitMQ",
+  "service",
   "consumer",
   "DbWorker.ts",
 );
@@ -76,5 +77,5 @@ export async function handleDbWorkerShutdown(): Promise<void> {
 
   dbWorkers = [];
 
-  log.success("DB worker manager shutdown complete.");
+  log.debug("DB worker manager shutdown complete.");
 }

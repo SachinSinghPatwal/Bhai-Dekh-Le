@@ -134,7 +134,7 @@ async function start(): Promise<void> {
     }
   });
 
-  log.success(`[DB Worker ${process.pid}] Ready.`);
+  log.debug(`[DB Worker ${process.pid}] Ready.`);
 
   /*
    * Tell WorkerManager that this worker is

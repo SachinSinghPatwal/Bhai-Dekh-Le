@@ -39,8 +39,6 @@ export default function waitForWorkerReady(
 
       clearTimeout(timeout);
 
-      log.success(`${workerId} is ready`);
-
       resolve();
     });
 
