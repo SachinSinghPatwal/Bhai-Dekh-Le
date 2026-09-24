@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Interactive terminal script that builds JOb_SEARCH_URL_WITH_QUERY
  * from user answers.
  *
@@ -12,7 +12,6 @@
 
 import { createInterface } from "readline/promises";
 import { stdin, stdout } from "process";
-import log from "../../../utility/Logger.js";
 
 /*
  * ─────────────────────────────────────────
@@ -27,43 +26,115 @@ const rl = createInterface({
 
 /*
  * ─────────────────────────────────────────
- * HELPERS
+ * UI CONSTANTS & HELPERS
+ * ─────────────────────────────────────────
+ */
+
+const UI_WIDTH = 60;
+
+// ANSI escape helpers
+const RESET = "\x1b[0m";
+const BOLD = "\x1b[1m";
+const DIM = "\x1b[2m";
+const RED = "\x1b[31m";
+const GREEN = "\x1b[32m";
+const YELLOW = "\x1b[33m";
+const CYAN = "\x1b[36m";
+
+/** Strip ANSI escape sequences to get the visible text length. */
+function visibleLength(text: string): number {
+  return text.replace(/\x1b\[[0-9;]*m/g, "").length;
+}
+
+/** Center `text` within `width` characters (ANSI-aware). */
+function centerText(text: string, width: number = UI_WIDTH): string {
+  const visible = visibleLength(text);
+  if (visible >= width) return text;
+  const padLeft = Math.floor((width - visible) / 2);
+  return " ".repeat(padLeft) + text;
+}
+
+/** A horizontal line spanning UI_WIDTH. */
+function divider(char = "─"): string {
+  return char.repeat(UI_WIDTH);
+}
+
+/** Boxed heading (top border, centered title, bottom border). */
+function heading(title: string): void {
+  const inner = UI_WIDTH - 2;
+  const styledTitle = `${BOLD}${CYAN}${title}${RESET}`;
+  const centered = centerText(styledTitle, inner);
+  const padRight = inner - visibleLength(centered);
+  console.log(`\n┌${"─".repeat(inner)}┐`);
+  console.log(`│${centered}${" ".repeat(Math.max(0, padRight))}│`);
+  console.log(`└${"─".repeat(inner)}┘`);
+}
+
+/** Section separator with step counter and subtitle. */
+function section(step: string, title: string, subtitle?: string): void {
+  console.log(`\n${DIM}${divider()}${RESET}`);
+  console.log(centerText(`${DIM}${step}${RESET}`));
+  console.log(centerText(`${BOLD}${title}${RESET}`));
+  if (subtitle) {
+    console.log(centerText(`${DIM}${subtitle}${RESET}`));
+  }
+  console.log(`${DIM}${divider()}${RESET}\n`);
+}
+
+/** Styled note block. */
+function note(lines: string[]): void {
+  console.log(`  ${BOLD}${YELLOW}NOTE:${RESET} ${lines[0]}`);
+  for (let i = 1; i < lines.length; i++) {
+    console.log(`        ${lines[i]}`);
+  }
+  console.log();
+}
+
+/** Styled warning/hint block. */
+function warning(lines: string[]): void {
+  console.log(`  ${BOLD}${YELLOW}⚠${RESET}  ${lines[0]}`);
+  for (let i = 1; i < lines.length; i++) {
+    console.log(`     ${lines[i]}`);
+  }
+  console.log();
+}
+
+/** Styled success block. */
+function success(text: string): void {
+  console.log(`  ${GREEN}✓${RESET} ${text}`);
+}
+
+/*
+ * ─────────────────────────────────────────
+ * PROMPT HELPERS
  * ─────────────────────────────────────────
  */
 
 /** Prompt the user and return a trimmed string. Re-prompts on empty if required. */
 async function ask(question: string, required = true): Promise<string> {
   while (true) {
-    const answer = (await rl.question(`  ${question} `)).trim();
+    const answer = (await rl.question(`  › ${question} `)).trim();
 
     if (answer !== "" || !required) {
       return answer;
     }
 
-    console.log("  This field is required, please enter a value.\n");
+    console.log(`  ${RED}✗${RESET} This field is required. Please enter a value.\n`);
   }
 }
 
 /** Prompt a yes / no boolean gate. Returns true for "y" / "yes". */
 async function askBool(question: string): Promise<boolean> {
   while (true) {
-    const answer = (await rl.question(`  ${question} [y/n]: `))
+    const answer = (await rl.question(`  › ${question} ${DIM}[y/n]:${RESET} `))
       .trim()
       .toLowerCase();
 
     if (answer === "y" || answer === "yes") return true;
     if (answer === "n" || answer === "no") return false;
 
-    console.log("  Please answer y or n.\n");
+    console.log(`  ${YELLOW}⚠${RESET} Please answer ${BOLD}y${RESET} or ${BOLD}n${RESET}.\n`);
   }
-}
-
-/** Print a section divider with a title. */
-function section(title: string) {
-  const line = "-".repeat(54);
-  console.log(`\n${line}`);
-  console.log(`  ${title}`);
-  console.log(`${line}`);
 }
 
 /*
@@ -82,49 +153,27 @@ interface QueryConfig {
   job_Search_By: string;
 }
 
-interface JobSearchConfig {
-  protocol: string;
-  domain: string;
-  generic_Job_Description: string;
-  query: QueryConfig;
-}
-
 /*
  * ─────────────────────────────────────────
  * MAIN
  * ─────────────────────────────────────────
  */
 
-async function buildJobSearchConfig(): Promise<JobSearchConfig> {
-  log.info("\n=======================================================");
-  log.info("       Job Search Config Builder For Naukri        ");
-  log.info("=======================================================");
-  log.info(
-    "\nAnswer the questions below to build your JOb_SEARCH_URL_WITH_QUERY.\n" +
-      "Press Enter to accept the default shown in [brackets].\n",
-  );
+async function buildJobSearchConfig(): Promise<QueryConfig> {
+  heading("JOB SEARCH BUILDER");
 
-  /*
-   * REQUIRED: Base URL fields
-   */
-  section("1 / 3  --  Base URL  (required)");
-
-  const protocol =
-    (await ask("Protocol [https://]:", false)) || "https://";
-
-  const domain =
-    (await ask("Domain  [www.naukri.com/]:", false)) || "www.naukri.com/";
-
-  const generic_Job_Description =
-    (await ask("Job description path  [react-jobs?]:", false)) || "react-jobs?";
+    note([
+      "Answer the questions below to build your job search configuration.",
+      `Press ${BOLD}${YELLOW}Enter${RESET} to accept the default shown in ${CYAN}[brackets]${RESET}.`,
+    ]);
 
   /*
    * REQUIRED: Keyword
    */
-  section("2 / 3  --  Required Query Params");
+  section("1 / 2", "REQUIRED QUERY PARAMS", "Search keyword");
 
   const rawKeyword = await ask(
-    'Job keyword (e.g. "react", "node")  [react]:',
+    `Job keyword (e.g. react, node) Default-${CYAN}[react]${RESET}:`,
     false,
   );
   const keywordValue = rawKeyword || "react";
@@ -133,13 +182,13 @@ async function buildJobSearchConfig(): Promise<JobSearchConfig> {
   /*
    * OPTIONAL Query Params
    */
-  section("3 / 3  --  Optional Filters");
+  section("2 / 2", "OPTIONAL FILTERS", "Narrow your search");
 
-  console.log(
-    "\n  NOTE: Each filter below is OPTIONAL.\n" +
-      "  Adding filters narrows the search and may significantly\n" +
-      "  REDUCE the number of jobs returned.\n",
-  );
+  note([
+    "Each filter below is optional.",
+    "Adding filters narrows the search and may",
+    `${RED}"MIGHT" significantly reduce${RESET} the number of jobs returned.`,
+  ]);
 
   const query: QueryConfig = {
     keyword,
@@ -147,11 +196,9 @@ async function buildJobSearchConfig(): Promise<JobSearchConfig> {
   };
 
   // Location
-  const useLocation = await askBool(
-    "Filter by location? (may reduce results)",
-  );
+  const useLocation = await askBool("Filter by location? (may reduce results)");
   if (useLocation) {
-    const loc = await ask('Location (e.g. "Bhopal", "Bangalore"):');
+    const loc = await ask('Location (e.g. "Delhi"):');
     query.location = `l=${encodeURIComponent(loc)}&`;
   }
 
@@ -169,45 +216,13 @@ async function buildJobSearchConfig(): Promise<JobSearchConfig> {
     "Filter by salary/CTC range? (may reduce results)",
   );
   if (useSalary) {
-    console.log(
-      "\n  Naukri CTC filter format: <min>to<max>  (e.g. 0to3, 3to6, 6to10)\n",
-    );
+    warning([
+      `Naukri CTC filter format: ${BOLD}<min>to<max>${RESET}  (e.g. 0to3, 3to6, 6to10)`,
+    ]);
     const salaryRange = await ask('CTC range (e.g. "0to3"):');
     query.salary = `ctcFilter=${encodeURIComponent(salaryRange)}&`;
   }
-
-  // Job Type
-  const useJobType = await askBool(
-    "Filter by job type (code number)? (may reduce results)",
-  );
-  if (useJobType) {
-    console.log(
-      "\n  Naukri uses numeric codes for job type.\n" +
-        "  Check the URL when you filter on naukri.com to find the number.\n",
-    );
-    const jobType = await ask('Job type code (e.g. "0"):');
-    query.jobType = jobType;
-  }
-
-  // Department
-  const useDepartment = await askBool(
-    "Filter by department (functionalArealGrid code)? (may reduce results)",
-  );
-  if (useDepartment) {
-    console.log(
-      "\n  Naukri uses numeric codes for department.\n" +
-        "  Check the URL when you filter on naukri.com to find the number.\n",
-    );
-    const department = await ask('Department code (e.g. "5"):');
-    query.department = department;
-  }
-
-  return {
-    protocol,
-    domain,
-    generic_Job_Description,
-    query,
-  };
+  return query
 }
 
 /*
@@ -220,11 +235,13 @@ const config = await buildJobSearchConfig();
 
 rl.close();
 
-const divider = "-".repeat(54);
+console.log("consfig" , config)
 
-console.log(`\n${divider}`);
-console.log("  Your JOb_SEARCH_URL_WITH_QUERY config:");
-console.log(`${divider}\n`);
+console.log(`\n${divider()}`);
+console.log(centerText(`${BOLD}${GREEN}CONFIGURATION READY${RESET}`));
+console.log(`${divider()}\n`);
+
+console.log(`  Your ${BOLD}JOb_SEARCH_URL_WITH_QUERY${RESET} config:\n`);
 
 console.log(
   "export const JOb_SEARCH_URL_WITH_QUERY = " +
@@ -232,6 +249,6 @@ console.log(
     ";",
 );
 
-console.log(`\n${divider}`);
-console.log("  Copy the block above into src/constants.ts");
-console.log(`${divider}\n`);
+console.log();
+success("Copy the block above into src/constants.ts");
+console.log(`\n${divider()}\n`);

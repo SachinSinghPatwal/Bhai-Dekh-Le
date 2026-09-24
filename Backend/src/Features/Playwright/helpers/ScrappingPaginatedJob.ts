@@ -1,8 +1,8 @@
-import { JOB_DETAILS } from "../models/Mongo/job.models.js";
-import { RequestParams } from "../types.js";
-import GetAllJobs from "../Features/Playwright/utility/Fetch.js";
-import { RateLimitError } from "../Features/Playwright/utility/RateLimitingError.js";
-import { setIterativePaginationParams } from "./Playwright/setIterativePaginationParams.js";
+import { JOB_DETAILS } from "../../../models/Mongo/job.models.js";
+import { RequestParams } from "../../../types.js";
+import GetAllJobs from "../utility/Fetch.js";
+import { RateLimitError } from "../utility/RateLimitingError.js";
+import { setIterativePaginationParams } from "./setIterativePaginationParams.js";
 
 interface SCRAPPING_PAGINATED_JOBS extends Partial<RequestParams> {
   unSortedJobs: JOB_DETAILS[];

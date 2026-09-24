@@ -1,6 +1,4 @@
 import winston from "winston";
-import path from "path";
-import fs from "fs";
 
 /*
  * ===========================================
@@ -53,30 +51,6 @@ interface AppLogger extends winston.Logger {
 
 /*
  * ===========================================
- * LOG DIRECTORY
- * ===========================================
- */
-
-const logsDir = path.join(process.cwd(), "logs");
-if (!fs.existsSync(logsDir)) {
-  fs.mkdirSync(logsDir, { recursive: true });
-}
-
-/*
- * ===========================================
- * FILE FORMAT (JSON, no ANSI codes)
- * ===========================================
- */
-
-const fileFormat = winston.format.combine(
-  winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
-  winston.format.errors({ stack: true }),
-  winston.format.splat(),
-  winston.format.json(),
-);
-
-/*
- * ===========================================
  * CONSOLE FORMAT (Full-line colorization)
  * ===========================================
  *
@@ -102,42 +76,18 @@ const consoleFormat = winston.format.combine(
  * ===========================================
  * SINGLETON LOGGER INSTANCE
  * ===========================================
+ *
+ * Console-only — no files are written to disk.
  */
 
 const log = winston.createLogger({
   levels: customLevels.levels,
   level: process.env.LOG_LEVEL || "debug",
-  format: fileFormat,
   transports: [
-    /*
-     * Error-only log file.
-     */
-    new winston.transports.File({
-      filename: path.join(logsDir, "error.log"),
-      level: "error",
-      maxsize: 5_242_880, // 5 MB
-      maxFiles: 5,
-    }),
-
-    /*
-     * Combined log file (all levels).
-     */
-    new winston.transports.File({
-      filename: path.join(logsDir, "combined.log"),
-      maxsize: 5_242_880,
-      maxFiles: 5,
+    new winston.transports.Console({
+      format: consoleFormat,
     }),
   ],
 }) as AppLogger;
-
-/*
- * Console transport is always added so workers
- * (child processes) also get colored output.
- */
-log.add(
-  new winston.transports.Console({
-    format: consoleFormat,
-  }),
-);
 
 export default log;

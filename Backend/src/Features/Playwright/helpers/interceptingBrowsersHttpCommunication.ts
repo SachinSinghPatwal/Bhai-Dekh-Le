@@ -1,5 +1,5 @@
 import { type Page, type Request, type Response } from "playwright";
-import { MatchedURLOfSearch } from "../../constants.js";
+import { MatchedURLOfSearch } from "../../../constants.js";
 
 type CommunicationMap = {
   request: Request;
