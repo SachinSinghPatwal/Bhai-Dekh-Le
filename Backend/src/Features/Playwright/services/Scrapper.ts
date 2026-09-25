@@ -11,7 +11,6 @@ export default async function Scrapper(
   workerId: string,
 ): Promise<JOB_DETAILS[] | undefined> {
   let attempt = 0;
-  let browserInstace;
   let lastPageCrashed = 0;
   let customMaxRetries = { times: 10, changed: false };
   let orderedJobs;
@@ -19,7 +18,7 @@ export default async function Scrapper(
 
   while (attempt < customMaxRetries.times) {
     try {
-      const { url, request, totalJobsAvaibles, headers, jobDetails, browser } =
+      const { url, request, totalJobsAvaibles, headers, jobDetails } =
         (await CreatingEnviromentToScrap()) as SETUP_RETURNED_VALUES;
 
       if (initialTotalJobs === 0) {
@@ -33,8 +32,6 @@ export default async function Scrapper(
           initialTotalJobs / Number(process.env.SCRAP_WORKER_COUNT ?? 4);
       }
 
-      browserInstace = browser;
-
       orderedJobs = await makeHttpRequestToGetAllDesiredJobs({
         url,
         headers,
@@ -44,8 +41,6 @@ export default async function Scrapper(
         workerId,
         jobDetails,
       });
-
-      await browserInstace?.close();
       return orderedJobs as JOB_DETAILS[];
     } catch (error: unknown) {
       if (error instanceof RateLimitError) {
@@ -54,8 +49,6 @@ export default async function Scrapper(
       }
 
       attempt++;
-
-      await browserInstace?.close();
     }
   }
 }

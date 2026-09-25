@@ -51,10 +51,10 @@ export default async function getDesiredJobs({
         startPage,
       });
     }
-  } catch (error) {
+  } catch (error:any) {
     log.error(
       `Error while collecting fetched Data from [${workerId}] :`,
-      error,
+      error.message,
     );
     throw error;
   }

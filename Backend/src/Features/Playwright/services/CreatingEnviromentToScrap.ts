@@ -14,7 +14,6 @@ export interface SETUP_RETURNED_VALUES {
   totalJobsAvaibles: number;
   headers: Record<string, string>;
   jobDetails: JOB_DETAILS[];
-  browser: Browser;
 }
 export async function CreatingEnviromentToScrap(): Promise<
   SETUP_RETURNED_VALUES | undefined
@@ -85,7 +84,6 @@ export async function CreatingEnviromentToScrap(): Promise<
       totalJobsAvaibles,
       headers,
       jobDetails,
-      browser: null as any,
     };
   } catch (error: unknown) {
     if (browser) await browser.close();
