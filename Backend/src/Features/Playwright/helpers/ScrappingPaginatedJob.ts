@@ -12,7 +12,7 @@ interface SCRAPPING_PAGINATED_JOBS extends Partial<RequestParams> {
   workerId: string;
   endPage: number;
   expectedStartPage: number;
-  retryStartingPage:number|null;
+  retryStartingPage: number | null;
 }
 
 export default async function ScrappingPaginatedJob({
@@ -25,11 +25,6 @@ export default async function ScrappingPaginatedJob({
   expectedStartPage,
   retryStartingPage,
 }: SCRAPPING_PAGINATED_JOBS): Promise<any> {
-  let lastPage = currentPageNumber - expectedStartPage;
-
-  if (retryStartingPage) {
-    console.log("retrying on previous closed browser Page Number", retryStartingPage);
-  }
 
   setIterativePaginationParams(url as URL, currentPageNumber);
 
@@ -42,14 +37,14 @@ export default async function ScrappingPaginatedJob({
   if (response instanceof RateLimitError || response instanceof Error) {
     log.debug("snapShotting the jobs before throwing error");
 
-    await saveSnapShots(lastPage, unSortedJobs).catch((err) => {
+    await saveSnapShots(unSortedJobs).catch((err) => {
       throw new Error(
         `[${workerId}] Error while saving snapshot before throwing error: ${err.message}`,
       );
     });
 
     throw new RateLimitError(
-      `Rate limited by Application [${workerId}] last page was [[${currentPageNumber}]] total pages complted ${lastPage} | Reason: ${response.message}`,
+      `Rate limited by Application [${workerId}] last page was [[${currentPageNumber}]] total pages completed and retrying on ${retryStartingPage} page number | Reason: ${response.message}`,
       currentPageNumber,
     );
   } else {

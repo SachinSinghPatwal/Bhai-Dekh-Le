@@ -13,10 +13,15 @@ import {
   startDbWorkers,
   handleDbWorkerShutdown,
 } from "./Features/RabbitMQ/utility/manager/DbWorkerManager.js";
+import { getAllSnapshotJobs } from "./utility/getAllSnapShots.js";
 
 const port = Number(process.env.PORT) || 8000;
 
 let shuttingDown = false;
+
+const jobs = await getAllSnapshotJobs("./snapshots");
+
+console.log(jobs, "Total jobs:", jobs.length);
 
 app.listen(port, "0.0.0.0", () => {
   log.info(`Server is running on ${port}`);

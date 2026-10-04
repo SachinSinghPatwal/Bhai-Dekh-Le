@@ -7,14 +7,13 @@ import crypto from "node:crypto";
 import { encryptSnapshot } from "./encryption.js";
 
 export default async function saveSnapShots(
-  ScrappedjobsAmount: number,
   jobs: JOB_DETAILS[],
 ) {
   if (jobs.length === 0) {
     return;
   }
 
-  const { dateFolder, fileName } = getSnapShotFileName(ScrappedjobsAmount);
+  const { dateFolder, fileName } = getSnapShotFileName(jobs.length);
 
   const dateDir = path.join(FOLDER_NAME, dateFolder);
 

@@ -28,9 +28,9 @@ export default async function getDesiredJobs({
       await DistributingLoadWithWorkers(totalJobsAvaibles as number, workerId);
 
     if (!retryStartingPage) {
-      initialPage = retryStartingPage as number;
-    } else {
       initialPage = expectedStartPage;
+    } else {
+      initialPage = retryStartingPage as number;
     }
 
     log.info(
