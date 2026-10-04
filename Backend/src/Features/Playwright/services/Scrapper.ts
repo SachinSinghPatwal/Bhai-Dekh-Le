@@ -12,7 +12,7 @@ export default async function Scrapper(
   totalNumberOfJobs: number,
 ): Promise<JOB_DETAILS[] | undefined> {
   let attempt = 0;
-  let lastPageCrashed = 0;
+  let lastPageCrashed = null;
   let customMaxRetries = { times: 10, changed: false };
   let orderedJobs;
   let initialTotalJobs = 0;

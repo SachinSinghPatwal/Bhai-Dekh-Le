@@ -1,16 +1,18 @@
 import { JOB_DETAILS } from "../../../models/Mongo/job.models.js";
 import { RequestParams } from "../../../types.js";
 import log from "../../../utility/Logger.js";
+import saveSnapShots from "../../../utility/SaveSnapShots.js";
 import GetAllJobs from "../utility/Fetch.js";
 import { RateLimitError } from "../utility/RateLimitingError.js";
 import { setIterativePaginationParams } from "./setIterativePaginationParams.js";
 
 interface SCRAPPING_PAGINATED_JOBS extends Partial<RequestParams> {
   unSortedJobs: JOB_DETAILS[];
-  pageNumber: number;
+  currentPageNumber: number;
   workerId: string;
   endPage: number;
-  startPage: number;
+  expectedStartPage: number;
+  retryStartingPage:number|null;
 }
 
 export default async function ScrappingPaginatedJob({
@@ -18,11 +20,18 @@ export default async function ScrappingPaginatedJob({
   headers,
   request,
   unSortedJobs,
-  pageNumber,
+  currentPageNumber,
   workerId,
-  startPage,
+  expectedStartPage,
+  retryStartingPage,
 }: SCRAPPING_PAGINATED_JOBS): Promise<any> {
-  setIterativePaginationParams(url as URL, pageNumber);
+  let lastPage = currentPageNumber - expectedStartPage;
+
+  if (retryStartingPage) {
+    console.log("retrying on previous closed browser Page Number", retryStartingPage);
+  }
+
+  setIterativePaginationParams(url as URL, currentPageNumber);
 
   const response = await GetAllJobs({
     url,
@@ -31,9 +40,17 @@ export default async function ScrappingPaginatedJob({
   });
 
   if (response instanceof RateLimitError || response instanceof Error) {
+    log.debug("snapShotting the jobs before throwing error");
+
+    await saveSnapShots(lastPage, unSortedJobs).catch((err) => {
+      throw new Error(
+        `[${workerId}] Error while saving snapshot before throwing error: ${err.message}`,
+      );
+    });
+
     throw new RateLimitError(
-      `Rate limited by Application [${workerId}] last page was [[${pageNumber}]] total pages complted [[${pageNumber - startPage}]] | Reason: ${response.message}`,
-      pageNumber,
+      `Rate limited by Application [${workerId}] last page was [[${currentPageNumber}]] total pages complted ${lastPage} | Reason: ${response.message}`,
+      currentPageNumber,
     );
   } else {
     if (Array.isArray(response) && response.length > 0) {

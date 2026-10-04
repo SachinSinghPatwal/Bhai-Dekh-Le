@@ -17,10 +17,13 @@ export const JOb_SEARCH_URL_WITH_QUERY = {
   },
 };
 
+// RabbitMQ Constants
 export const ScheduleScrape = "TimedScrapping";
 export const dbSaveExchange = "db_save_exchange";
 export const dbSave = "db_save";
 
+// URL Constants
 export const MatchedURLOfSearch = "/jobapi/v3/search";
 
-export const DEFAULT_MAX_RETRIES = 5;
+// Misc Constants
+export const FOLDER_NAME = "snapShots";

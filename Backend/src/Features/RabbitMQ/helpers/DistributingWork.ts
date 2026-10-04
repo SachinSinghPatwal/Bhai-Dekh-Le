@@ -7,10 +7,9 @@ export default async function DistributingLoadWithWorkers(
   prevtotalNumberOfJobs: number,
   workerId: string,
 ) {
-
   /*
-   * Final Check on the Total pages from consumer to self 
-   */ 
+   * Final Check on the Total pages from consumer to self
+   */
   const { totalJobsAvaibles: currenttotalNumberOfJobs } =
     (await CreatingEnviromentToScrap()) as Pick<
       SETUP_RETURNED_VALUES,
@@ -20,7 +19,7 @@ export default async function DistributingLoadWithWorkers(
     prevtotalNumberOfJobs,
     currenttotalNumberOfJobs,
   );
-  
+
   const jobsPerPage = 20;
   const totalPages = Math.ceil(totalJobsAvaibles / jobsPerPage) - 1; // page 1 already fetched
   const totalWorkers = Number(process.env.SCRAP_WORKER_COUNT);

@@ -15,41 +15,41 @@ export default async function getDesiredJobs({
   retryStartingPage,
 }: RequestParams): Promise<JOB_DETAILS[]> {
   const unSortedJobs: JOB_DETAILS[] = [];
-
+  let initialPage: number = 0;
+  /*
+    Intial request interception provide body and no of total jobs exist
+  */
   if (Array.isArray(jobDetails) && jobDetails.length > 0) {
     unSortedJobs.push(...jobDetails);
   }
 
   try {
-    let { startPage, endPage } = await DistributingLoadWithWorkers(
-      totalJobsAvaibles as number,
-      workerId,
-    );
+    const { startPage: expectedStartPage, endPage } =
+      await DistributingLoadWithWorkers(totalJobsAvaibles as number, workerId);
 
-    if (retryStartingPage > 0) {
-      startPage = retryStartingPage; // retrying on previous closed browser
+    if (!retryStartingPage) {
+      initialPage = retryStartingPage as number;
+    } else {
+      initialPage = expectedStartPage;
     }
 
     log.info(
-      `[${workerId}] Starting scraping work size: ${endPage - startPage + 1} pages (from ${startPage} to ${endPage})`,
+      `[${workerId}] Starting scraping work size: ${endPage - initialPage + 1} pages (from ${initialPage} to ${endPage})`,
     );
-
-    /*
-    Intial request interception provide body and no of total jobs exist
-  */
 
     console.log("going for work");
 
-    for (let i = startPage; i < endPage; i++) {
+    for (let i = initialPage; i < endPage; i++) {
       await ScrappingPaginatedJob({
         url: new URL(url.toString()),
         headers,
         request,
         unSortedJobs, // pushing to this array sequentially is safe
-        pageNumber: i,
+        currentPageNumber: i,
+        retryStartingPage,
         workerId,
         endPage,
-        startPage,
+        expectedStartPage,
       });
     }
     const filteredRecentJob =

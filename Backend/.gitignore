@@ -26,6 +26,7 @@ playwright-report/
 # OS
 .DS_Store
 Thumbs.db
+snapShots
 
 # Testing
 coverage/
