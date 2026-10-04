@@ -1,6 +1,8 @@
 import { JOB_DETAILS } from "../../../models/Mongo/job.models.js";
 import { RequestParams } from "../../../types.js";
 import log from "../../../utility/Logger.js";
+import bodyValidation from "../helpers/Naukri/bodyValidation.js";
+import responseValidation from "./responseValidation.js";
 
 interface FetchParams extends Partial<RequestParams> {
   method?: "GET";
@@ -11,7 +13,7 @@ export default async function Fetch({
   request,
   headers,
   method = "GET",
-}: FetchParams): Promise<JOB_DETAILS> {
+}: FetchParams): Promise<JOB_DETAILS | undefined> {
   const MAX_RETRIES = 3;
   let attempt = 0;
 
@@ -22,55 +24,20 @@ export default async function Fetch({
         headers,
       });
 
-      if (response.status === 429) {
-        throw new Error("Rate Limited - 429 Too Many Requests");
-      }
-
-      if (response.headers.get("content-type")?.includes("text/html")) {
-        const text = await response.text();
-        log.debug(`[Fetch] BODY START: ${text.slice(0, 500)}`);
-        throw new Error(
-          "Received HTML instead of JSON. Possible Rate Limit or Block.",
-        );
-      }
+      await responseValidation(response);
 
       const body = await response.json();
 
-      // Fast fail on Recaptcha so we don't waste time retrying
-      if (body.statusCode === 406 || body.message === "recaptcha required") {
-        log.warn("[Fetch] Recaptcha block, Fast failing...");
-        throw new Error("RECAPTCHA_BLOCK"); // Special message we can catch
-      }
-
-      const { jobDetails } = body;
-
-      if (
-        !jobDetails ||
-        (Array.isArray(jobDetails) && jobDetails.length === 0)
-      ) {
-        log.warn(
-          `[Fetch] Empty jobDetails for Full body: ${JSON.stringify(body).slice(0, 500)}`,
-        );
-        throw new Error("Empty jobDetails returned, possible soft block.");
-      }
+      const jobDetails = bodyValidation(body);
 
       return jobDetails;
     } catch (error: any) {
       // If it's a hard recaptcha block, don't bother retrying with the same flagged session
-      if (error.message === "RECAPTCHA_BLOCK") {
-        throw error;
-      }
-
-      attempt++;
-      if (attempt >= MAX_RETRIES) {
-        throw error;
-      }
-      log.warn(
-        `[Fetch] Attempt ${attempt} failed. Retrying in ${(attempt % 3) * 5}s... (${error.message})`,
+      log.debug(
+        `[Fetch] Attempt ${attempt} failed. Retrying in ${(attempt % 3) * 2}s... (${error.message})`,
       );
-      await new Promise((resolve) => setTimeout(resolve, (attempt % 3) * 5000));
+      await new Promise((resolve) => setTimeout(resolve, (attempt % 3) * 2000));
+      return error;
     }
   }
-
-  return [] as any; // Fallback
 }

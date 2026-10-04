@@ -2,6 +2,10 @@ import amqp from "amqplib";
 
 import { ScheduleScrape } from "../../../../constants.js";
 import log from "../../../../utility/Logger.js";
+import {
+  CreatingEnviromentToScrap,
+  SETUP_RETURNED_VALUES,
+} from "../../../Playwright/services/CreatingEnviromentToScrap.js";
 
 export default async function ScheduleScrapping(): Promise<void> {
   const connection = await amqp.connect(
@@ -20,12 +24,20 @@ export default async function ScheduleScrapping(): Promise<void> {
 
     const workerCount = Number(process.env.SCRAP_WORKER_COUNT ?? 4);
 
-    for (let i = 0; i < workerCount; i++) {
-      const message = `scrapping task ${i + 1}`;
+    const { totalJobsAvaibles } = (await CreatingEnviromentToScrap()) as Pick<
+      SETUP_RETURNED_VALUES,
+      "totalJobsAvaibles"
+    >;
 
-      channel.publish(ScheduleScrape, "Scrapper", Buffer.from(message), {
-        persistent: true,
-      });
+    for (let i = 0; i < workerCount; i++) {
+      channel.publish(
+        ScheduleScrape,
+        "Scrapper",
+        Buffer.from(String(totalJobsAvaibles)),
+        {
+          persistent: true,
+        },
+      );
     }
 
     await channel.waitForConfirms();

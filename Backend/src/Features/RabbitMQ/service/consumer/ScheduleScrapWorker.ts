@@ -84,20 +84,19 @@ async function start(): Promise<void> {
       return;
     }
 
-    log.info(
-      `[${workerId}] Received scrape task: ${message.content.toString()}`,
-    );
-
     try {
       log.debug(`[${workerId}] PID=${process.pid} PPID=${process.ppid}`);
-
       /*
        * =========================
        * 1. SCRAPE
        * =========================
        */
+      const totalNumberOfJobs = Number(message.content.toString());
 
-      const scrapedJobs = (await Scrapper(workerId)) as JOB_DETAILS[];
+      const scrapedJobs = (await Scrapper(
+        workerId,
+        totalNumberOfJobs,
+      )) as JOB_DETAILS[];
 
       /*
        * =========================

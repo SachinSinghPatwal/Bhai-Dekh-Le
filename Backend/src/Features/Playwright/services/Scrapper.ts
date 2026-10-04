@@ -9,6 +9,7 @@ import log from "../../../utility/Logger.js";
 
 export default async function Scrapper(
   workerId: string,
+  totalNumberOfJobs: number,
 ): Promise<JOB_DETAILS[] | undefined> {
   let attempt = 0;
   let lastPageCrashed = 0;
@@ -18,11 +19,14 @@ export default async function Scrapper(
 
   while (attempt < customMaxRetries.times) {
     try {
-      const { url, request, totalJobsAvaibles, headers, jobDetails } =
-        (await CreatingEnviromentToScrap()) as SETUP_RETURNED_VALUES;
+      /*
+       * Final Check on the Total pages from consumer to self
+       */
+      const { url, request, headers, totalJobsAvaibles, jobDetails } =
+        (await CreatingEnviromentToScrap()) as Required<SETUP_RETURNED_VALUES>;
 
       if (initialTotalJobs === 0) {
-        initialTotalJobs = totalJobsAvaibles;
+        initialTotalJobs = Math.max(totalJobsAvaibles, totalNumberOfJobs);
       }
 
       if (!customMaxRetries.changed) {

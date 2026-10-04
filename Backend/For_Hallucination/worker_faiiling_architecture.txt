@@ -1,0 +1,22 @@
+
+
+                                                             Scrape Request
+                                                                   │
+                                                                   ▼
+                                                             Response/Error
+                                                                   │
+                                                     ┌─────────────┴─────────────┐
+                                                     │                           │
+                                                  CAPTCHA                   Rate Limit
+                                                     │                           │
+                                                     ▼                           ▼
+                                               HUMAN REQUIRED              BACKOFF / WAIT
+                                                     │                           │
+                                               pause this job             retry later
+                                                     │                           │
+                                               user solves                  ┌────┴────┐
+                                                     │                      │         │
+                                                     ▼                   success    limit again
+                                               resume same session          │         │
+                                                                            ▼         ▼
+                                                                          continue   longer backoff

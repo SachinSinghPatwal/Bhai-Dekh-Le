@@ -1,5 +1,6 @@
 import { JOB_DETAILS } from "../../../models/Mongo/job.models.js";
 import { RequestParams } from "../../../types.js";
+import log from "../../../utility/Logger.js";
 import GetAllJobs from "../utility/Fetch.js";
 import { RateLimitError } from "../utility/RateLimitingError.js";
 import { setIterativePaginationParams } from "./setIterativePaginationParams.js";
@@ -23,22 +24,24 @@ export default async function ScrappingPaginatedJob({
 }: SCRAPPING_PAGINATED_JOBS): Promise<any> {
   setIterativePaginationParams(url as URL, pageNumber);
 
-  try {
-    const jobDetails = await GetAllJobs({
-      url,
-      headers,
-      request,
-    });
+  const response = await GetAllJobs({
+    url,
+    headers,
+    request,
+  });
 
-    if (Array.isArray(jobDetails) && jobDetails.length > 0) {
-      unSortedJobs.push(...jobDetails);
-    } else {
-      throw new Error("Empty jobDetails returned (caught by else block)");
-    }
-  } catch (error: any) {
+  if (response instanceof RateLimitError || response instanceof Error) {
     throw new RateLimitError(
-      `Rate limited by Application ${workerId} last page was ${pageNumber} total pages complted ${pageNumber - startPage} | Reason: ${error.message}`,
+      `Rate limited by Application [${workerId}] last page was [[${pageNumber}]] total pages complted [[${pageNumber - startPage}]] | Reason: ${response.message}`,
       pageNumber,
     );
+  } else {
+    if (Array.isArray(response) && response.length > 0) {
+      unSortedJobs.push(...response);
+    } else {
+      throw new Error(
+        `[${workerId}] cannot iterate over the jobs , Jobs are not iteratable`,
+      );
+    }
   }
 }
