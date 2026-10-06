@@ -46,7 +46,7 @@ export default async function getDesiredJobs({
         request,
         unSortedJobs, // pushing to this array sequentially is safe
         currentPageNumber: i,
-        retryStartingPage,
+        initialPage,
         workerId,
         endPage,
       });

@@ -35,7 +35,7 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/lodash": "^4.17.25",
-    "@types/node": "^26.5.1",
+    "@types/node": "^26.6.4",
     "nodemon": "^3.1.14",
     "oxlint": "^1.83.0",
     "prettier": "^3.9.6",

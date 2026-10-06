@@ -24,6 +24,9 @@ export async function CreatingEnviromentToScrap(): Promise<
     browser = await chromium.launch({
       headless: true,
       args: ["--no-sandbox", "--start-minimized"],
+      proxy: {
+        server: "http://62.72.43.79:3129",
+      },
     });
 
     context = await browser.newContext();
@@ -88,8 +91,9 @@ export async function CreatingEnviromentToScrap(): Promise<
   } catch (error: unknown) {
     if (browser) await browser.close();
     if (error instanceof Error) {
+      console.log(error)
       throw new Error(
-        "Seomthing Went Wrong While Creating the Enviroment to Scrap",
+        "Seomthing Went Wrong While Creating the Enviroment to Scrap",error,
       );
     }
   }
