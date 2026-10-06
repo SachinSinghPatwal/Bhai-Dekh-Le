@@ -11,7 +11,6 @@ interface SCRAPPING_PAGINATED_JOBS extends Partial<RequestParams> {
   currentPageNumber: number;
   workerId: string;
   endPage: number;
-  expectedStartPage: number;
   retryStartingPage: number | null;
 }
 
@@ -22,7 +21,6 @@ export default async function ScrappingPaginatedJob({
   unSortedJobs,
   currentPageNumber,
   workerId,
-  expectedStartPage,
   retryStartingPage,
 }: SCRAPPING_PAGINATED_JOBS): Promise<any> {
 

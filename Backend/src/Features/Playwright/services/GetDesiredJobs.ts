@@ -49,7 +49,6 @@ export default async function getDesiredJobs({
         retryStartingPage,
         workerId,
         endPage,
-        expectedStartPage,
       });
     }
     const filteredRecentJob =

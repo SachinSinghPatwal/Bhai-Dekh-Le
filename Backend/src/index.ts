@@ -19,7 +19,7 @@ const port = Number(process.env.PORT) || 8000;
 
 let shuttingDown = false;
 
-const jobs = await getAllSnapshotJobs("./snapshots");
+const jobs = await getAllSnapshotJobs("./snapShots");
 
 console.log(jobs, "Total jobs:", jobs.length);
 
