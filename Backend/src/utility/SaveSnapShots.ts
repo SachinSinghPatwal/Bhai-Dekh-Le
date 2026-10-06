@@ -3,7 +3,6 @@ import path from "node:path";
 import { FOLDER_NAME } from "../constants.js";
 import { JOB_DETAILS } from "../models/Mongo/job.models.js";
 import { getSnapShotFileName } from "../helper/SnapShotsFileNamingConvention.js";
-import crypto from "node:crypto";
 import { encryptSnapshot } from "./encryption.js";
 
 export default async function saveSnapShots(

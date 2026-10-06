@@ -11,7 +11,7 @@ export function getSnapShotFileName(
   const year = now.getFullYear();
   const seconds = String(now.getSeconds()).padStart(2, "0");
   const milliseconds = String(now.getMilliseconds()).padStart(3, "0");
-  const fileName = `${hours}-${minutes}-${seconds}-${milliseconds}_Jobs_Scrapped_Count-${jobsAmount}.json`;
+  const fileName = `${hours}-${minutes}-${seconds}-${milliseconds}_Jobs_Scrapped_Count-${jobsAmount}.encrypted.json`;
 
   const dateFolder = `${day}-${month}-${year}`;
 
