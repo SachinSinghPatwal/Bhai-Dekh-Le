@@ -7,7 +7,7 @@ interface EncryptedSnapshot {
   data: string;
 }
 
-export async function decryptSnapshot(filePath: string) {
+export async function decrypt(filePath: string) {
   // Read encrypted JSON file
   const file = await fs.readFile(filePath, "utf8");
 

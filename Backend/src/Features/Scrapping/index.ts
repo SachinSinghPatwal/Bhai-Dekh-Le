@@ -6,11 +6,13 @@ import {
   dbSaveExchange,
   JOB_SEARCH_URL,
 } from "../../constants.js";
+import { getFileFolderNamingConvention } from "../../helper/SnapShotsFileNamingConvention.js";
 export {
   JOB_DETAILS,
   log,
   PROXIES,
   dbSaveExchange,
   JOB_AUTH_URL,
+  getFileFolderNamingConvention,
   JOB_SEARCH_URL,
 };

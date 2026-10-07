@@ -23,7 +23,8 @@ export const dbSave = "db_save";
 export const MatchedURLOfSearch = "/jobapi/v3/search";
 
 // Misc Constants
-export const FOLDER_NAME = "snapShots";
+export const SNAPSHOT_FOLDER_NAME = "snapShots";
+export const CLIENT_DATA_FOLDER_NAME = "src/Features/Scrapping/data"
 
 // proxies
 export const PROXIES = ["http://62.72.43.79:3129"];

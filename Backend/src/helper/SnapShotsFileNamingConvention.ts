@@ -1,5 +1,5 @@
-export function getSnapShotFileName(
-  jobsAmount: number,
+export function getFileFolderNamingConvention(
+  jobsAmount?: number,
 ): Record<string, string> {
   const now = new Date();
 
