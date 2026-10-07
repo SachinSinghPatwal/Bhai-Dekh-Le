@@ -1,11 +1,11 @@
 import { ConfirmChannel, Message } from "amqplib";
-import { JOB_DETAILS, log } from "../../index.js";
-import { RateLimitError } from "../../utility/playwright/RateLimitingError.js";
+import { JOB_DETAILS, log } from "../../../Scrapping/index.js";
+import { RateLimitError } from "../../../Scrapping/utility/playwright/RateLimitingError.js";
 import {
   CreatingEnviromentToScrap,
   SETUP_RETURNED_VALUES,
-} from "../CreatingEnviromentToScrap.js";
-import makeHttpRequestToGetAllDesiredJobs from "../GetDesiredJobs.js";
+} from "../../../Scrapping/services/CreatingEnviromentToScrap.js";
+import makeHttpRequestToGetAllDesiredJobs from "../../../Scrapping/services/GetDesiredJobs.js";
 import { dbSaveExchange } from "../../../../constants.js";
 
 export default async function httpScrapping(

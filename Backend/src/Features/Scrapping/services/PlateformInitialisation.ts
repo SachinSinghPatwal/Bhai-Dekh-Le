@@ -1,6 +1,6 @@
 import { ConfirmChannel, Message } from "amqplib";
-import domScrapping from "./naukri/DomBasedScrap.js";
-import httpScrapping from "./naukri/HttpBasedScrap.js";
+import domScrapping from "../../UserInteractions/utility/naukri/DomBasedScrap.js";
+import httpScrapping from "../../UserInteractions/utility/naukri/HttpBasedScrap.js";
 
 export default async function PlateformInitialisation(
   workerId: string,
