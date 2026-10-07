@@ -1,6 +1,6 @@
 import { ConfirmChannel, Message } from "amqplib";
 import { JOB_DETAILS, log } from "../../index.js";
-import { RateLimitError } from "../../utility/RateLimitingError.js";
+import { RateLimitError } from "../../utility/playwright/RateLimitingError.js";
 import {
   CreatingEnviromentToScrap,
   SETUP_RETURNED_VALUES,

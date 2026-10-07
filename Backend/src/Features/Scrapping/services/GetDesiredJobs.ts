@@ -2,7 +2,7 @@ import { JOB_DETAILS } from "../../../models/Mongo/job.models.js";
 import { RequestParams } from "../../../types.js";
 import ScrappingPaginatedJob from "../helpers/ScrappingPaginatedJob.js";
 import { sortingUnsortedJobBasedOnTimeCreated } from "../utility/sortingJobBasedOnCreated.js";
-import DistributingLoadWithWorkers from "../../RabbitMQ/helpers/DistributingWork.js";
+import DistributingLoadWithWorkers from "../../MessageQueues/helpers/DistributingWork.js";
 import log from "../../../utility/Logger.js";
 
 export default async function getDesiredJobs({

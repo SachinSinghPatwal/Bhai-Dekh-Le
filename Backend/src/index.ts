@@ -7,13 +7,13 @@ import log from "./utility/Logger.js";
 import {
   startScrapConsumer,
   handleShutdown as handleScrapWorkerShutdown,
-} from "./Features/RabbitMQ/utility/manager/ScrapWorkerManager.js";
+} from "./Features/MessageQueues/utility/manager/ScrapWorkerManager.js";
 
 import {
   startDbWorkers,
   handleDbWorkerShutdown,
-} from "./Features/RabbitMQ/utility/manager/DbWorkerManager.js";
-import { getAllSnapshotJobs } from "./utility/getAllSnapShots.js";
+} from "./Features/MessageQueues/utility/manager/DbWorkerManager.js";
+import { getAllSnapshotJobs } from "./helper/getAllSnapShots.js";
 
 const port = Number(process.env.PORT) || 8000;
 

@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { JOB_DETAILS } from "../models/Mongo/job.models.js";
+import { JOB_DETAILS } from "../../models/Mongo/job.models.js";
 
 export function encryptSnapshot(jobs: JOB_DETAILS[]) {
   const key = Buffer.from(process.env.SNAPSHOT_ENCRYPTION_KEY!, "hex");

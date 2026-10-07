@@ -1,6 +1,6 @@
 import { JOB_DETAILS } from "../models/Mongo/job.models.js";
 import fs from "node:fs/promises";
-import { decryptSnapshot } from "./decryption.js";
+import { decryptSnapshot } from "../utility/crypto/decryption.js";
 import path from "node:path";
 
 export async function getAllSnapshotJobs(rootDir: string) {

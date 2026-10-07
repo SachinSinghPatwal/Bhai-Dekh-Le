@@ -1,5 +1,5 @@
 import { Page,Request,Response } from "playwright";
-import { interceptingBrowsersHttpCommunication } from "../helpers/interceptingBrowsersHttpCommunication.js";
+import { interceptingBrowsersHttpCommunication } from "../../helpers/interceptingBrowsersHttpCommunication.js";
 
 export default  function eventCaptured(page: Page): {
   capturedRequest: Promise<Request>;

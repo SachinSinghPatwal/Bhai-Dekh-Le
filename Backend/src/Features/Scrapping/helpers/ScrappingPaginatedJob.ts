@@ -1,9 +1,9 @@
 import { JOB_DETAILS } from "../../../models/Mongo/job.models.js";
 import { RequestParams } from "../../../types.js";
 import log from "../../../utility/Logger.js";
-import saveSnapShots from "../../../utility/SaveSnapShots.js";
+import saveSnapShots from "../../../helper/SaveSnapShots.js";
 import GetAllJobs from "../utility/Fetch.js";
-import { RateLimitError } from "../utility/RateLimitingError.js";
+import { RateLimitError } from "../utility/playwright/RateLimitingError.js";
 import { setIterativePaginationParams } from "./setIterativePaginationParams.js";
 
 interface SCRAPPING_PAGINATED_JOBS extends Partial<RequestParams> {
@@ -11,7 +11,7 @@ interface SCRAPPING_PAGINATED_JOBS extends Partial<RequestParams> {
   currentPageNumber: number;
   workerId: string;
   endPage: number;
-  initialPage:number;
+  initialPage: number;
 }
 
 export default async function ScrappingPaginatedJob({
@@ -21,9 +21,8 @@ export default async function ScrappingPaginatedJob({
   unSortedJobs,
   currentPageNumber,
   workerId,
-  initialPage
+  initialPage,
 }: SCRAPPING_PAGINATED_JOBS): Promise<any> {
-
   setIterativePaginationParams(url as URL, currentPageNumber);
 
   const response = await GetAllJobs({

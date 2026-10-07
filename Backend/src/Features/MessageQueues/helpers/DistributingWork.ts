@@ -1,7 +1,7 @@
 import {
   CreatingEnviromentToScrap,
   SETUP_RETURNED_VALUES,
-} from "../../Playwright/services/CreatingEnviromentToScrap.js";
+} from "../../Scrapping/services/CreatingEnviromentToScrap.js";
 
 export default async function DistributingLoadWithWorkers(
   prevtotalNumberOfJobs: number,

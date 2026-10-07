@@ -1,5 +1,5 @@
 import mongoose, { Document, Schema } from "mongoose";
-import { ApiResponse } from "../../utility/ApiResponse.js";
+import { ApiResponse } from "../../utility/endpointWrapper/ApiResponse.js";
 
 export interface JOB_DETAILS extends Document {
   title: string;

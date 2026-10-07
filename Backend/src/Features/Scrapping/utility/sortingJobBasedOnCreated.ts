@@ -1,5 +1,5 @@
 import { JOB_DETAILS } from "../../../models/Mongo/job.models.js";
-import ValidateJobIsPostedWithinThreeDays from "./ValidatingProp.js";
+import ValidateJobIsPostedWithinThreeDays from "./playwright/ValidatingProp.js";
 
 export function sortingUnsortedJobBasedOnTimeCreated(
   unSortedJobs: JOB_DETAILS[],

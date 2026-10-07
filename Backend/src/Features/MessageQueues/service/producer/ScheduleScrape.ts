@@ -5,7 +5,7 @@ import log from "../../../../utility/Logger.js";
 import {
   CreatingEnviromentToScrap,
   SETUP_RETURNED_VALUES,
-} from "../../../Playwright/services/CreatingEnviromentToScrap.js";
+} from "../../../Scrapping/services/CreatingEnviromentToScrap.js";
 
 export default async function ScheduleScrapping(): Promise<void> {
   const connection = await amqp.connect(

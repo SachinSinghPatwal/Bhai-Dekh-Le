@@ -6,7 +6,7 @@ import {
   ScheduleScrape,
 } from "../../../../constants.js";
 import log from "../../../../utility/Logger.js";
-import PlateformInitialisation from "../../../Playwright/services/PlateformInitialisation.js";
+import PlateformInitialisation from "../../../Scrapping/services/PlateformInitialisation.js";
 
 const workerId = process.env.WORKER_ID ?? "worker-unknown";
 

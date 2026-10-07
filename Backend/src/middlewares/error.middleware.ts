@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
-import { ApiError } from "../utility/ApiError.js";
+import { ApiError } from "../utility/endpointWrapper/ApiError.js";
 import logger from "../utility/Logger.js";
 
 /**

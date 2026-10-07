@@ -4,9 +4,8 @@ import stealth from "puppeteer-extra-plugin-stealth";
 import UrlForPageToDirect from "../utility/ComposeUrl.js";
 import { sanitizeCaptureHeaderUrl } from "../helpers/sanitizeCaptureHeaderUrl.js";
 import { JOB_DETAILS } from "../../../models/Mongo/job.models.js";
-import eventCaptured from "../utility/CaputringEvents.js";
-import { PROXIES } from "../index.js";
-import RaceForResponseOrTimeOut from "../../../utility/RaceForResponseOrTimeOut.js";
+import eventCaptured from "../utility/playwright/CaputringEvents.js";
+import RaceForResponseOrTimeOut from "../utility/playwright/RaceForResponseOrTimeOut.js";
 import { TimeoutError } from "../../../utility/TimeOutError.js";
 
 chromium.use(stealth());

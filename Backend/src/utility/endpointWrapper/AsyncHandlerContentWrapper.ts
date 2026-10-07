@@ -1,4 +1,4 @@
-import log from "./Logger.js";
+import log from "../Logger.js";
 
 export default async function AsyncHandlerContentWrapper(fn: Function, req:object):Promise<Response> {
   try {

@@ -1,4 +1,4 @@
-import timeOut from "../utility/TimeOut.js";
+import timeOut from "../../../../utility/TimeOut.js";
 
 export default function RaceForResponseOrTimeOut<T>(
   process: Promise<T>,

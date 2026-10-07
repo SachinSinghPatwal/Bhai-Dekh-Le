@@ -1,7 +1,7 @@
-import { AsyncHandler } from "../utility/AsyncHandler.js";
+import { AsyncHandler } from "../utility/endpointWrapper/AsyncHandler.js";
 import type { Request, Response } from "express";
-import ScheduleScrapping from "../Features/RabbitMQ/service/producer/ScheduleScrape.js";
-import { ApiResponse } from "../utility/ApiResponse.js";
+import ScheduleScrapping from "../Features/MessageQueues/service/producer/ScheduleScrape.js";
+import { ApiResponse } from "../utility/endpointWrapper/ApiResponse.js";
 
 export const getAllJobs = AsyncHandler(async (_: Request, res: Response) => {
   await ScheduleScrapping();

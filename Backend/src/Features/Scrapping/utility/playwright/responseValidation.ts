@@ -1,4 +1,4 @@
-import log from "../../../utility/Logger.js";
+import log from "../../../../utility/Logger.js";
 
 export default async function responseValidation(response: Response) {
   if (response.status === 429) {
