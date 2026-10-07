@@ -36,7 +36,7 @@ export async function CreatingEnvironmentToScrap({
       args:
         browserShutdownStatus == "kill"
           ? ["--no-sandbox", "--start-minimized"]
-          : [""],
+          : ["--no-sandbox"],
       // proxy: {
       //   server: PROXIES[0],
       // },
