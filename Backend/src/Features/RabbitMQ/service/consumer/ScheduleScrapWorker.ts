@@ -1,24 +1,18 @@
 import "../../../../config/load-env.js";
-
-import amqp, { type Message } from "amqplib";
-
+import amqp, { type Message, type ConfirmChannel } from "amqplib";
 import {
   dbSave,
   dbSaveExchange,
   ScheduleScrape,
 } from "../../../../constants.js";
-
-import Scrapper from "../../../Playwright/services/Scrapper.js";
-import type { JOB_DETAILS } from "../../../../models/Mongo/job.models.js";
 import log from "../../../../utility/Logger.js";
+import PlateformInitialisation from "../../../Playwright/services/PlateformInitialisation.js";
 
 const workerId = process.env.WORKER_ID ?? "worker-unknown";
 
 let connection: Awaited<ReturnType<typeof amqp.connect>> | null = null;
 
-let channel: Awaited<
-  ReturnType<Awaited<ReturnType<typeof amqp.connect>>["createConfirmChannel"]>
-> | null = null;
+let channel: ConfirmChannel | null = null;
 
 let shuttingDown = false;
 
@@ -54,7 +48,11 @@ async function start(): Promise<void> {
     durable: true,
   });
 
-  await channel.bindQueue(ScheduleScrape, ScheduleScrape, "Scrapper");
+  await channel.bindQueue(
+    ScheduleScrape,
+    ScheduleScrape,
+    "PlateformInitialisation",
+  );
 
   /*
    * =========================
@@ -93,65 +91,20 @@ async function start(): Promise<void> {
        */
       const totalNumberOfJobs = Number(message.content.toString());
 
-      const scrapedJobs = (await Scrapper(
-        workerId,
-        totalNumberOfJobs,
-      )) as JOB_DETAILS[];
+      const plateform = "naukri";
+      const type = "http";
 
-      /*
-       * =========================
-       * 2. NOTHING FOUND
-       * =========================
-       */
-
-      if (!Array.isArray(scrapedJobs) || scrapedJobs.length === 0) {
-        channel!.ack(message);
-
-        log.info(`[${workerId}] No jobs found. Task acknowledged.`);
-
-        return;
+      if (!channel) {
+        throw new Error("RabbitMQ channel is not initialized");
       }
 
-      /*
-       * =========================
-       * 3. PUBLISH TO DB QUEUE
-       * =========================
-       */
-
-      channel!.publish(
-        dbSaveExchange,
-        "Save",
-        Buffer.from(
-          JSON.stringify({
-            jobs: scrapedJobs,
-          }),
-        ),
-        {
-          persistent: true,
-        },
-      );
-
-      /*
-       * =========================
-       * 4. WAIT FOR BROKER CONFIRM
-       * =========================
-       *
-       * Do NOT ACK the original scrape task
-       * before this.
-       */
-
-      await channel!.waitForConfirms();
-
-      /*
-       * =========================
-       * 5. ACK SCRAPE TASK
-       * =========================
-       */
-
-      channel!.ack(message);
-
-      log.success(
-        `[${workerId}] Scrape result successfully handed to DB queue.`,
+      await PlateformInitialisation(
+        workerId,
+        totalNumberOfJobs,
+        plateform,
+        type,
+        channel,
+        message,
       );
     } catch (error) {
       log.error(

@@ -1,16 +1,19 @@
-import { Browser, BrowserContext, Request } from "playwright";
+import { Browser, BrowserContext, Request, Response } from "playwright";
 import { chromium } from "playwright-extra";
 import stealth from "puppeteer-extra-plugin-stealth";
-import { interceptingBrowsersHttpCommunication } from "../helpers/interceptingBrowsersHttpCommunication.js";
 import UrlForPageToDirect from "../utility/ComposeUrl.js";
 import { sanitizeCaptureHeaderUrl } from "../helpers/sanitizeCaptureHeaderUrl.js";
 import { JOB_DETAILS } from "../../../models/Mongo/job.models.js";
+import eventCaptured from "../utility/CaputringEvents.js";
+import { PROXIES } from "../index.js";
+import RaceForResponseOrTimeOut from "../../../utility/RaceForResponseOrTimeOut.js";
+import { TimeoutError } from "../../../utility/TimeOutError.js";
 
 chromium.use(stealth());
 
 export interface SETUP_RETURNED_VALUES {
   url: URL;
-  request: Request;
+  request: string;
   totalJobsAvaibles: number;
   headers: Record<string, string>;
   jobDetails: JOB_DETAILS[];
@@ -24,48 +27,28 @@ export async function CreatingEnviromentToScrap(): Promise<
     browser = await chromium.launch({
       headless: true,
       args: ["--no-sandbox", "--start-minimized"],
-      proxy: {
-        server: "http://62.72.43.79:3129",
-      },
+      // proxy: {
+      //   server: PROXIES[0],
+      // },
     });
 
     context = await browser.newContext();
 
     const page = await context.newPage();
 
-    const capturedRequest = new Promise<Request>((resolve) => {
-      page.on(
-        "request",
-        interceptingBrowsersHttpCommunication(page, resolve as any, "request"),
-      );
-    });
+    const { capturedRequest, capturedResponse } = eventCaptured(page);
 
-    const capturedResponse = new Promise<Response>((resolve) => {
-      page.on(
-        "response",
-        interceptingBrowsersHttpCommunication(page, resolve as any, "response"),
-      );
-    });
     await page.goto(UrlForPageToDirect(), {
       waitUntil: "domcontentloaded",
     });
 
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(
-        () => reject(new Error("Timeout intercepting network requests")),
-        30000,
-      ),
-    );
+    const request = await RaceForResponseOrTimeOut<Request>(capturedRequest);
 
-    const request = (await Promise.race([
-      capturedRequest,
-      timeoutPromise,
-    ])) as Request;
-    const response = (await Promise.race([
-      capturedResponse,
-      timeoutPromise,
-    ])) as Response;
+    const response = await RaceForResponseOrTimeOut<Response>(capturedResponse);
 
+    if (request instanceof TimeoutError || response instanceof TimeoutError) {
+      throw new Error("Request or Response timed out");
+    }
     const url = new URL(request.url());
 
     const capturedHeaders = await request.allHeaders();
@@ -74,16 +57,15 @@ export async function CreatingEnviromentToScrap(): Promise<
     const jsonData = await response.json();
 
     const jobDetails = jsonData.jobDetails;
-    const totalJobsAvaibles = jsonData.noOfJobs ?? jsonData.totalJobs ?? 100; // default to 100 for safety if missing
+    const totalJobsAvaibles = jsonData.noOfJobs;
 
     const method = request.method();
-    const mockRequest = { method: () => method } as any;
 
     await browser.close();
 
     return {
       url,
-      request: mockRequest,
+      request: method,
       totalJobsAvaibles,
       headers,
       jobDetails,
@@ -91,9 +73,10 @@ export async function CreatingEnviromentToScrap(): Promise<
   } catch (error: unknown) {
     if (browser) await browser.close();
     if (error instanceof Error) {
-      console.log(error)
+      console.log(error);
       throw new Error(
-        "Seomthing Went Wrong While Creating the Enviroment to Scrap",error,
+        "Seomthing Went Wrong While Creating the Enviroment to Scrap",
+        error,
       );
     }
   }

@@ -1,26 +1,23 @@
 import { JOB_DETAILS } from "../../../models/Mongo/job.models.js";
 import { RequestParams } from "../../../types.js";
 import log from "../../../utility/Logger.js";
-import bodyValidation from "../helpers/Naukri/bodyValidation.js";
+import bodyValidation from "../helpers/naukri/bodyValidation.js";
 import responseValidation from "./responseValidation.js";
 
-interface FetchParams extends Partial<RequestParams> {
-  method?: "GET";
-}
+
 
 export default async function Fetch({
   url,
   request,
   headers,
-  method = "GET",
-}: FetchParams): Promise<JOB_DETAILS | undefined> {
+}: Partial<RequestParams>): Promise<JOB_DETAILS | undefined> {
   const MAX_RETRIES = 3;
   let attempt = 0;
 
   while (attempt < MAX_RETRIES) {
     try {
       const response = await fetch(url!, {
-        method: request?.method() ?? method,
+        method: request,
         headers,
       });
 

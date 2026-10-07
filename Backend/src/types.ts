@@ -3,7 +3,7 @@ import { JOB_DETAILS } from "./models/Mongo/job.models.js";
 
 export interface RequestParams {
   url: URL;
-  request: Request;
+  request: string;
   headers: Record<string, string>;
   readonly totalJobsAvaibles?: number;
   jobDetails: JOB_DETAILS[];

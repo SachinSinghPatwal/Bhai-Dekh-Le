@@ -27,3 +27,9 @@ export const MatchedURLOfSearch = "/jobapi/v3/search";
 
 // Misc Constants
 export const FOLDER_NAME = "snapShots";
+
+// proxies
+export const PROXIES = ["http://62.72.43.79:3129"];
+
+// General TimeOut 
+export const GENERAL_TIMEOUT = 30000; // 30 seconds
