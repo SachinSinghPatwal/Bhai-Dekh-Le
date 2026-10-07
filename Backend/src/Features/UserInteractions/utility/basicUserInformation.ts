@@ -192,7 +192,7 @@ async function buildJobSearchConfig(): Promise<QueryConfig> {
 
   const query: QueryConfig = {
     keyword,
-    job_Search_By: "nignbevent_src=jobsearchDeskGNB&",
+    job_Search_By: "nignbevent_src=docsearchDeskGNB&",
   };
 
   // Location
@@ -235,7 +235,7 @@ const config = await buildJobSearchConfig();
 
 rl.close();
 
-console.log("consfig" , config)
+console.log("config" , config)
 
 console.log(`\n${divider()}`);
 console.log(centerText(`${BOLD}${GREEN}CONFIGURATION READY${RESET}`));

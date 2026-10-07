@@ -4,7 +4,7 @@ import stealth from "puppeteer-extra-plugin-stealth";
 import UrlForPageToDirect from "../utility/ComposeUrl.js";
 import { sanitizeCaptureHeaderUrl } from "../helpers/sanitizeCaptureHeaderUrl.js";
 import { JOB_DETAILS } from "../../../models/Mongo/job.models.js";
-import eventCaptured from "../utility/playwright/CaputringEvents.js";
+import eventCaptured from "../utility/playwright/CapturingEvents.js";
 import RaceForResponseOrTimeOut from "../utility/playwright/RaceForResponseOrTimeOut.js";
 import { TimeoutError } from "../../../utility/TimeOutError.js";
 
@@ -13,11 +13,11 @@ chromium.use(stealth());
 export interface SETUP_RETURNED_VALUES {
   url: URL;
   request: string;
-  totalJobsAvaibles: number;
+  totalJobsAvailable: number;
   headers: Record<string, string>;
   jobDetails: JOB_DETAILS[];
 }
-export async function CreatingEnviromentToScrap(): Promise<
+export async function CreatingEnvironmentToScrap(): Promise<
   SETUP_RETURNED_VALUES | undefined
 > {
   let browser: Browser | null = null;
@@ -56,7 +56,7 @@ export async function CreatingEnviromentToScrap(): Promise<
     const jsonData = await response.json();
 
     const jobDetails = jsonData.jobDetails;
-    const totalJobsAvaibles = jsonData.noOfJobs;
+    const totalJobsAvailable = jsonData.noOfJobs;
 
     const method = request.method();
 
@@ -65,7 +65,7 @@ export async function CreatingEnviromentToScrap(): Promise<
     return {
       url,
       request: method,
-      totalJobsAvaibles,
+      totalJobsAvailable,
       headers,
       jobDetails,
     };
@@ -74,7 +74,7 @@ export async function CreatingEnviromentToScrap(): Promise<
     if (error instanceof Error) {
       console.log(error);
       throw new Error(
-        "Seomthing Went Wrong While Creating the Enviroment to Scrap",
+        "Something Went Wrong While Creating the Environment to Scrap",
         error,
       );
     }
