@@ -9,7 +9,7 @@ const workerPath = path.resolve(
   process.cwd(),
   "src",
   "Features",
-  "RabbitMQ",
+  "MessageQueues",
   "service",
   "consumer",
   "ScheduleScrapWorker.ts",

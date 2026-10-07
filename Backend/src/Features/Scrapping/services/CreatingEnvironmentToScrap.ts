@@ -15,22 +15,28 @@ export interface SETUP_RETURNED_VALUES {
   totalJobsAvailable: number;
   headers: Record<string, string>;
   jobDetails: JOB_DETAILS[];
-  page:Page;
+  page: Page;
 }
 export interface SETUP_ENVIRONMENT_PARAMS {
   navigateTo: string;
   headless: boolean;
+  browserShutdownStatus: "keepAlive" | "kill";
 }
 
-export async function CreatingEnvironmentToScrap({ navigateTo, headless }: SETUP_ENVIRONMENT_PARAMS): Promise<
-  SETUP_RETURNED_VALUES | undefined
-> {
+export async function CreatingEnvironmentToScrap({
+  navigateTo,
+  headless,
+  browserShutdownStatus,
+}: SETUP_ENVIRONMENT_PARAMS): Promise<SETUP_RETURNED_VALUES | undefined> {
   let browser: Browser | null = null;
   let context: BrowserContext | null = null;
   try {
     browser = await chromium.launch({
       headless,
-      args: ["--no-sandbox", "--start-minimized"],
+      args:
+        browserShutdownStatus == "kill"
+          ? ["--no-sandbox", "--start-minimized"]
+          : [""],
       // proxy: {
       //   server: PROXIES[0],
       // },
@@ -65,7 +71,9 @@ export async function CreatingEnvironmentToScrap({ navigateTo, headless }: SETUP
 
     const method = request.method();
 
-    await browser.close();
+    if (browserShutdownStatus == "kill") {
+      await browser.close();
+    }
 
     return {
       url,
@@ -76,6 +84,10 @@ export async function CreatingEnvironmentToScrap({ navigateTo, headless }: SETUP
       page,
     };
   } catch (error: unknown) {
+    /**
+     * @description prevent zombie chrome browser if stealth mode is enabled
+     *
+     */
     if (browser) await browser.close();
     if (error instanceof Error) {
       console.log(error);
@@ -86,3 +98,36 @@ export async function CreatingEnvironmentToScrap({ navigateTo, headless }: SETUP
     }
   }
 }
+
+/**
+ * Lightweight browser setup for DOM-based scraping flows.
+ *
+ * Unlike {@link CreatingEnvironmentToScrap}, this function does **not** set up
+ * HTTP request/response interceptors. The HTTP flow expects a specific JSON API
+ * response that is never emitted on pages like the login page — calling the
+ * full setup there would always timeout or capture the wrong request.
+ *
+ * Returns only the Playwright {@link Page} so the caller can drive the browser
+ * directly (e.g. fill login form, click buttons, navigate between pages).
+ * The browser is kept alive; the caller is responsible for closing it when done.
+ *
+ * @param navigateTo - Full URL to navigate to on launch.
+ * @param headless   - Whether to run headless.
+ */
+export async function CreatingDOMEnvironment({
+  navigateTo,
+  headless,
+}: Pick<SETUP_ENVIRONMENT_PARAMS, "navigateTo" | "headless">): Promise<Page> {
+  const browser = await chromium.launch({
+    headless,
+    args: ["--no-sandbox"],
+  });
+
+  const context = await browser.newContext();
+  const page = await context.newPage();
+
+  await page.goto(navigateTo, { waitUntil: "domcontentloaded" });
+
+  return page;
+}
+

@@ -1,7 +1,9 @@
 import {
   CreatingEnvironmentToScrap,
   SETUP_RETURNED_VALUES,
-} from "../../Scrapping/services/CreatingEnviromentToScrap.js";
+} from "../../Scrapping/services/CreatingEnvironmentToScrap.js";
+import ComposeUrl from "../../Scrapping/utility/ComposeUrl.js";
+import { JOB_SEARCH_URL } from "../../../constants.js";
 
 export default async function DistributingLoadWithWorkers(
   prevtotalNumberOfJobs: number,
@@ -11,10 +13,11 @@ export default async function DistributingLoadWithWorkers(
    * Final Check on the Total pages from consumer to self
    */
   const { totalJobsAvailable: currenttotalNumberOfJobs } =
-    (await CreatingEnvironmentToScrap()) as Pick<
-      SETUP_RETURNED_VALUES,
-      "totalJobsAvailable"
-    >;
+    (await CreatingEnvironmentToScrap({
+      navigateTo: ComposeUrl(JOB_SEARCH_URL.path, JOB_SEARCH_URL.query),
+      headless: true,
+      browserShutdownStatus: "kill",
+    })) as Pick<SETUP_RETURNED_VALUES, "totalJobsAvailable">;
   const totalJobsAvaibles = Math.max(
     prevtotalNumberOfJobs,
     currenttotalNumberOfJobs,

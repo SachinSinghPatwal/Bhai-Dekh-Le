@@ -6,7 +6,7 @@ export default async function PlatformInitialization(
   workerId: string,
   totalNumberOfJobs: number,
   platform: string,
-  type: string,
+  type: "DOM" | "HTTP",
   channel: ConfirmChannel,
   message: Message,
 ) {
@@ -16,6 +16,7 @@ export default async function PlatformInitialization(
      * */
     if (type === "DOM") {
       await domScrapping(workerId, totalNumberOfJobs);
+      channel.ack(message);
     } else {
       await httpScrapping(workerId, totalNumberOfJobs, channel, message);
     }

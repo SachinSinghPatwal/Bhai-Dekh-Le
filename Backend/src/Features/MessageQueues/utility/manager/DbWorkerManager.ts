@@ -9,7 +9,7 @@ const dbWorkerPath = path.resolve(
   process.cwd(),
   "src",
   "Features",
-  "RabbitMQ",
+  "MessageQueues",
   "service",
   "consumer",
   "DbWorker.ts",

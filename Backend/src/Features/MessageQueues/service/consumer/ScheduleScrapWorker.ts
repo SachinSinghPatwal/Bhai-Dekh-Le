@@ -51,7 +51,7 @@ async function start(): Promise<void> {
   await channel.bindQueue(
     ScheduleScrape,
     ScheduleScrape,
-    "PlateformInitialisation",
+    "Scrapper",
   );
 
   /*
@@ -89,10 +89,28 @@ async function start(): Promise<void> {
        * 1. SCRAPE
        * =========================
        */
-      const totalNumberOfJobs = Number(message.content.toString());
+      let content: { platform?: string; type?: "DOM" | "HTTP"; totalNumberOfJobs?: number };
+      try {
+        content = JSON.parse(message.content.toString());
+      } catch (parseErr) {
+        log.error(
+          `[${workerId}] Discarding unparseable message: ${message.content.toString()}`,
+        );
+        channel?.ack(message);
+        return;
+      }
 
-      const plateform = "naukri";
-      const type = "http";
+      const { platform, type } = content;
+      if (!platform || !type) {
+        log.error(
+          `[${workerId}] Discarding message with missing platform or type`,
+        );
+        channel?.ack(message);
+        return;
+      }
+
+      let totalNumberOfJobs =
+        content.type === "HTTP" ? Number(content.totalNumberOfJobs ?? 0) : 0;
 
       if (!channel) {
         throw new Error("RabbitMQ channel is not initialized");
@@ -101,7 +119,7 @@ async function start(): Promise<void> {
       await PlateformInitialisation(
         workerId,
         totalNumberOfJobs,
-        plateform,
+        platform,
         type,
         channel,
         message,

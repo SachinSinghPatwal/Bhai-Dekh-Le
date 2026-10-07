@@ -9,7 +9,7 @@ import { RateLimitError } from "../../../Scrapping/utility/playwright/RateLimiti
 import {
   CreatingEnvironmentToScrap,
   SETUP_RETURNED_VALUES,
-} from "../../../Scrapping/services/CreatingEnviromentToScrap.js";
+} from "../CreatingEnvironmentToScrap.js";
 import makeHttpRequestToGetAllDesiredJobs from "../../../Scrapping/services/GetDesiredJobs.js";
 
 import ComposeUrl from "../../utility/ComposeUrl.js";
@@ -34,6 +34,7 @@ export default async function httpScrapping(
             ComposeUrl(JOB_SEARCH_URL.path, JOB_SEARCH_URL.query),
           ),
           headless: true,
+          browserShutdownStatus: "kill",
         })) as Required<SETUP_RETURNED_VALUES>;
 
       /**
