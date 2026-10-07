@@ -5,8 +5,8 @@ export interface RequestParams {
   url: URL;
   request: string;
   headers: Record<string, string>;
-  readonly totalJobsAvaibles?: number;
+  readonly totalJobsAvailable?: number;
   jobDetails: JOB_DETAILS[];
   workerId: string;
-  retryStartingPage: number|null;
+  retryStartingPage: number | null;
 }

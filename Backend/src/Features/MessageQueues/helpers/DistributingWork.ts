@@ -1,5 +1,5 @@
 import {
-  CreatingEnviromentToScrap,
+  CreatingEnvironmentToScrap,
   SETUP_RETURNED_VALUES,
 } from "../../Scrapping/services/CreatingEnviromentToScrap.js";
 
@@ -10,10 +10,10 @@ export default async function DistributingLoadWithWorkers(
   /*
    * Final Check on the Total pages from consumer to self
    */
-  const { totalJobsAvaibles: currenttotalNumberOfJobs } =
-    (await CreatingEnviromentToScrap()) as Pick<
+  const { totalJobsAvailable: currenttotalNumberOfJobs } =
+    (await CreatingEnvironmentToScrap()) as Pick<
       SETUP_RETURNED_VALUES,
-      "totalJobsAvaibles"
+      "totalJobsAvailable"
     >;
   const totalJobsAvaibles = Math.max(
     prevtotalNumberOfJobs,

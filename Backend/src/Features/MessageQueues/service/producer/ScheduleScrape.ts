@@ -3,7 +3,7 @@ import amqp from "amqplib";
 import { ScheduleScrape } from "../../../../constants.js";
 import log from "../../../../utility/Logger.js";
 import {
-  CreatingEnviromentToScrap,
+  CreatingEnvironmentToScrap,
   SETUP_RETURNED_VALUES,
 } from "../../../Scrapping/services/CreatingEnviromentToScrap.js";
 
@@ -24,16 +24,16 @@ export default async function ScheduleScrapping(): Promise<void> {
 
     const workerCount = Number(process.env.SCRAP_WORKER_COUNT ?? 4);
 
-    const { totalJobsAvaibles } = (await CreatingEnviromentToScrap()) as Pick<
+    const { totalJobsAvailable } = (await CreatingEnvironmentToScrap()) as Pick<
       SETUP_RETURNED_VALUES,
-      "totalJobsAvaibles"
+      "totalJobsAvailable"
     >;
 
     for (let i = 0; i < workerCount; i++) {
       channel.publish(
         ScheduleScrape,
         "Scrapper",
-        Buffer.from(String(totalJobsAvaibles)),
+        Buffer.from(String(totalJobsAvailable)),
         {
           persistent: true,
         },

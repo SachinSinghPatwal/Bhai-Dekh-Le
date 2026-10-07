@@ -1,20 +1,17 @@
 export const MONGO_DB_NAME = "BhaiDekhLe";
 
-export const JOb_SEARCH_URL_WITH_QUERY = {
-  protocol: "https://",
-  domain: "www.naukri.com/",
-  generic_Job_Description:
-    "react-jobs?",
+export const NAUKRI_BASE_URL = "https://www.naukri.com";
+
+export const JOB_SEARCH_URL = {
+  path: "react-jobs",
   query: {
-    keyword:
-      "k=react&",
-    // location: "l=Bhopal&",
-    // experince: "experience=1&",
-    job_Search_By: "nignbevent_src=jobsearchDeskGNB&",
-    // jobType: 0, naukri uses code number to predict the type
-    // department: 5, functionalArealGrid prop used
-    // salary: "ctcFilter=0to3",
+    k: "react",
+    nignbevent_src: "jobsearchDeskGNB",
   },
+};
+
+export const JOB_AUTH_URL = {
+  path: "nlogin/login",
 };
 
 // RabbitMQ Constants
@@ -31,5 +28,5 @@ export const FOLDER_NAME = "snapShots";
 // proxies
 export const PROXIES = ["http://62.72.43.79:3129"];
 
-// General TimeOut 
+// General TimeOut
 export const GENERAL_TIMEOUT = 30000; // 30 seconds

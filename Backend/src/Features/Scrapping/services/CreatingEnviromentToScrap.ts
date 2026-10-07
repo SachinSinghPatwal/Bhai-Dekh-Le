@@ -1,7 +1,6 @@
-import { Browser, BrowserContext, Request, Response } from "playwright";
+import { Browser, BrowserContext, Page, Request, Response } from "playwright";
 import { chromium } from "playwright-extra";
 import stealth from "puppeteer-extra-plugin-stealth";
-import UrlForPageToDirect from "../utility/ComposeUrl.js";
 import { sanitizeCaptureHeaderUrl } from "../helpers/sanitizeCaptureHeaderUrl.js";
 import { JOB_DETAILS } from "../../../models/Mongo/job.models.js";
 import eventCaptured from "../utility/playwright/CapturingEvents.js";
@@ -16,15 +15,21 @@ export interface SETUP_RETURNED_VALUES {
   totalJobsAvailable: number;
   headers: Record<string, string>;
   jobDetails: JOB_DETAILS[];
+  page:Page;
 }
-export async function CreatingEnvironmentToScrap(): Promise<
+export interface SETUP_ENVIRONMENT_PARAMS {
+  navigateTo: string;
+  headless: boolean;
+}
+
+export async function CreatingEnvironmentToScrap({ navigateTo, headless }: SETUP_ENVIRONMENT_PARAMS): Promise<
   SETUP_RETURNED_VALUES | undefined
 > {
   let browser: Browser | null = null;
   let context: BrowserContext | null = null;
   try {
     browser = await chromium.launch({
-      headless: true,
+      headless,
       args: ["--no-sandbox", "--start-minimized"],
       // proxy: {
       //   server: PROXIES[0],
@@ -37,7 +42,7 @@ export async function CreatingEnvironmentToScrap(): Promise<
 
     const { capturedRequest, capturedResponse } = eventCaptured(page);
 
-    await page.goto(UrlForPageToDirect(), {
+    await page.goto(navigateTo, {
       waitUntil: "domcontentloaded",
     });
 
@@ -68,6 +73,7 @@ export async function CreatingEnvironmentToScrap(): Promise<
       totalJobsAvailable,
       headers,
       jobDetails,
+      page,
     };
   } catch (error: unknown) {
     if (browser) await browser.close();

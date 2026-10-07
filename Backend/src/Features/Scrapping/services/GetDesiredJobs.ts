@@ -9,7 +9,7 @@ export default async function getDesiredJobs({
   url,
   request,
   headers,
-  totalJobsAvaibles,
+  totalJobsAvailable ,
   jobDetails,
   workerId,
   retryStartingPage,
@@ -25,7 +25,7 @@ export default async function getDesiredJobs({
 
   try {
     const { startPage: expectedStartPage, endPage } =
-      await DistributingLoadWithWorkers(totalJobsAvaibles as number, workerId);
+      await DistributingLoadWithWorkers(totalJobsAvailable as number, workerId);
 
     if (!retryStartingPage) {
       initialPage = expectedStartPage;

@@ -1,12 +1,18 @@
 import { ConfirmChannel, Message } from "amqplib";
-import { JOB_DETAILS, log } from "../../../Scrapping/index.js";
+import {
+  JOB_DETAILS,
+  log,
+  JOB_SEARCH_URL,
+  dbSaveExchange,
+} from "../../index.js";
 import { RateLimitError } from "../../../Scrapping/utility/playwright/RateLimitingError.js";
 import {
-  CreatingEnviromentToScrap,
+  CreatingEnvironmentToScrap,
   SETUP_RETURNED_VALUES,
 } from "../../../Scrapping/services/CreatingEnviromentToScrap.js";
 import makeHttpRequestToGetAllDesiredJobs from "../../../Scrapping/services/GetDesiredJobs.js";
-import { dbSaveExchange } from "../../../../constants.js";
+
+import ComposeUrl from "../../utility/ComposeUrl.js";
 
 export default async function httpScrapping(
   workerId: string,
@@ -22,14 +28,19 @@ export default async function httpScrapping(
 
   while (attempt < customMaxRetries.times) {
     try {
-      /*
-       * Final Check on the Total pages from consumer to self
-       */
-      const { url, request, headers, totalJobsAvaibles, jobDetails } =
-        (await CreatingEnviromentToScrap()) as Required<SETUP_RETURNED_VALUES>;
+      const { url, request, headers, totalJobsAvailable, jobDetails } =
+        (await CreatingEnvironmentToScrap({
+          navigateTo: ComposeUrl(
+            ComposeUrl(JOB_SEARCH_URL.path, JOB_SEARCH_URL.query),
+          ),
+          headless: true,
+        })) as Required<SETUP_RETURNED_VALUES>;
 
+      /**
+       * @description Final Check on the Total pages from consumer to self
+       */
       if (initialTotalJobs === 0) {
-        initialTotalJobs = Math.max(totalJobsAvaibles, totalNumberOfJobs);
+        initialTotalJobs = Math.max(totalJobsAvailable, totalNumberOfJobs);
       }
 
       if (!customMaxRetries.changed) {
@@ -43,7 +54,7 @@ export default async function httpScrapping(
         url,
         headers,
         request,
-        totalJobsAvaibles: initialTotalJobs,
+        totalJobsAvailable: initialTotalJobs,
         retryStartingPage: lastPageCrashed,
         workerId,
         jobDetails,

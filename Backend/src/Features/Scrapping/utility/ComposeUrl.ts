@@ -1,8 +1,14 @@
-import { JOb_SEARCH_URL_WITH_QUERY } from "../../../constants.js";
+import { NAUKRI_BASE_URL } from "../../../constants.js";
 
-export default function ComposeUrl() {
-  const { protocol, domain, query, generic_Job_Description } =
-    JOb_SEARCH_URL_WITH_QUERY;
-  const url = `${protocol}${domain}${generic_Job_Description}${query.keyword}${query.job_Search_By}`;
-  return url;
+export default function ComposeUrl(
+  path: string,
+  query?: Record<string, string>,
+): string {
+  const url = new URL(path, `${NAUKRI_BASE_URL}/`);
+
+  if (query) {
+    url.search = new URLSearchParams(query).toString();
+  }
+
+  return url.toString();
 }
