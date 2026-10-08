@@ -2,7 +2,7 @@ import { JOB_DETAILS } from "../../../models/Mongo/job.models.js";
 import { RequestParams } from "../../../types.js";
 import log from "../../../utility/Logger.js";
 import bodyValidation from "../helpers/naukri/bodyValidation.js";
-import responseValidation from "./playwright/responseValidation.js";
+import ResponseValidation from "./playwright/ResponseValidation.js";
 
 export default async function Fetch({
   url,
@@ -19,7 +19,7 @@ export default async function Fetch({
         headers,
       });
 
-      await responseValidation(response);
+      await ResponseValidation(response);
 
       const body = await response.json();
 

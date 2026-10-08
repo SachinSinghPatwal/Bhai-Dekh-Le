@@ -1,5 +1,3 @@
-// eventCapturing.ts
-
 import { Page } from "playwright";
 import { interceptingBrowsersHttpCommunication } from "../../helpers/interceptingBrowsersHttpCommunication.js";
 

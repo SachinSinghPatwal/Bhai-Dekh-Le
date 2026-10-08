@@ -6,6 +6,9 @@ import { JOB_DETAILS } from "../../../models/Mongo/job.models.js";
 import eventCapturing from "../utility/playwright/CapturingEvents.js";
 import RaceForResponseOrTimeOut from "../utility/playwright/RaceForResponseOrTimeOut.js";
 import { TimeoutError } from "../../../utility/TimeOutError.js";
+import fs from "node:fs/promises";
+import { decrypt } from "../../../utility/crypto/decryption.js";
+import { CLIENT_DATA_PATH } from "../../../constants.js";
 
 chromium.use(stealth());
 
@@ -29,10 +32,13 @@ export async function CreatingEnvironmentToScrap({
 }: SETUP_ENVIRONMENT_PARAMS): Promise<
   | Partial<SETUP_RETURNED_VALUES>
   | undefined
-  | { page: Page; capturedResponse: Promise<Response> }
+  | { page: Page; capturedResponse: Promise<Response>; context: BrowserContext }
 > {
   let browser: Browser | null = null;
   let context: BrowserContext | null = null;
+  
+  const state = await decrypt(CLIENT_DATA_PATH);
+
   try {
     browser = await chromium.launch({
       headless,
@@ -45,7 +51,9 @@ export async function CreatingEnvironmentToScrap({
       // },
     });
 
-    context = await browser.newContext();
+    context = await browser.newContext({
+      storageState: state,
+    });
 
     const page = await context.newPage();
 
@@ -73,7 +81,7 @@ export async function CreatingEnvironmentToScrap({
      */
 
     if (!headless && browserShutdownStatus == "keepAlive") {
-      return { page, capturedResponse };
+      return { page, capturedResponse, context };
     }
 
     const request = await RaceForResponseOrTimeOut<Request>(capturedRequest);

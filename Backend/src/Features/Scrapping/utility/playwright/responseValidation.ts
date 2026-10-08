@@ -1,6 +1,6 @@
 import log from "../../../../utility/Logger.js";
 
-export default async function responseValidation(response: Response) {
+export default async function ResponseValidation(response: Response) {
   if (response.status === 429) {
     throw new Error("Rate Limited - 429 Too Many Requests");
   } else if (response.headers.get("content-type")?.includes("text/html")) {

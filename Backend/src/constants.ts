@@ -24,10 +24,14 @@ export const MatchedURLOfSearch = "/jobapi/v3/search";
 
 // Misc Constants
 export const SNAPSHOT_FOLDER_NAME = "snapShots";
-export const CLIENT_DATA_FOLDER_NAME = "src/Features/Scrapping/data"
+export const CLIENT_DATA_FOLDER_NAME = "src/Features/Scrapping/data";
 
 // proxies
 export const PROXIES = ["http://62.72.43.79:3129"];
 
 // General TimeOut
 export const GENERAL_TIMEOUT = 30000; // 30 seconds
+
+// path
+export const CLIENT_DATA_PATH =
+  "./src/Features/Scrapping/data/client.encrypt.json";
