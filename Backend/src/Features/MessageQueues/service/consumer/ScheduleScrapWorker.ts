@@ -6,7 +6,7 @@ import {
   ScheduleScrape,
 } from "../../../../constants.js";
 import log from "../../../../utility/Logger.js";
-import PlateformInitialisation from "../../../Scrapping/services/PlateformInitialisation.js";
+import PlatformInitialization from "../../../Scrapping/services/PlatformInitialization.js"; 
 
 const workerId = process.env.WORKER_ID ?? "worker-unknown";
 
@@ -48,11 +48,7 @@ async function start(): Promise<void> {
     durable: true,
   });
 
-  await channel.bindQueue(
-    ScheduleScrape,
-    ScheduleScrape,
-    "Scrapper",
-  );
+  await channel.bindQueue(ScheduleScrape, ScheduleScrape, "Scrapper");
 
   /*
    * =========================
@@ -89,19 +85,23 @@ async function start(): Promise<void> {
        * 1. SCRAPE
        * =========================
        */
-      let content: { platform?: string; type?: "DOM" | "HTTP"; totalNumberOfJobs?: number };
+      let content: {
+        platform?: string;
+        isScrappingWithBrowserDOM: boolean;
+        totalNumberOfJobs?: number;
+      };
       try {
         content = JSON.parse(message.content.toString());
       } catch (parseErr) {
         log.error(
-          `[${workerId}] Discarding unparseable message: ${message.content.toString()}`,
+          `[${workerId}] Discarding message: ${message.content.toString()}`,
         );
         channel?.ack(message);
         return;
       }
 
-      const { platform, type } = content;
-      if (!platform || !type) {
+      const { platform, isScrappingWithBrowserDOM } = content;
+      if (!platform || !isScrappingWithBrowserDOM) {
         log.error(
           `[${workerId}] Discarding message with missing platform or type`,
         );
@@ -109,18 +109,17 @@ async function start(): Promise<void> {
         return;
       }
 
-      let totalNumberOfJobs =
-        content.type === "HTTP" ? Number(content.totalNumberOfJobs ?? 0) : 0;
+      let totalNumberOfJobs = Number(content.totalNumberOfJobs ?? 0);
 
       if (!channel) {
         throw new Error("RabbitMQ channel is not initialized");
       }
 
-      await PlateformInitialisation(
+      await PlatformInitialization(
         workerId,
         totalNumberOfJobs,
         platform,
-        type,
+        isScrappingWithBrowserDOM,
         channel,
         message,
       );

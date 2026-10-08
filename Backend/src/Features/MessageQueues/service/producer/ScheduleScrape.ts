@@ -10,7 +10,7 @@ import { JOB_SEARCH_URL, ScheduleScrape } from "../../../../constants.js";
 
 export default async function ScheduleScrapping(): Promise<void> {
   const platform = "naukri";
-  const type = process.env.SCRAP_TYPE!;
+  const isScrappingWithBrowserDOM = process.env.USE_BROWSER_SCRAPING!;
   const connection = await amqp.connect(
     process.env.RABBITMQ_URL_WITH_CREDENTIALS!,
   );
@@ -29,10 +29,10 @@ export default async function ScheduleScrapping(): Promise<void> {
 
     let totalJobsAvailable: number = 0;
 
-    if (type == "HTTP") {
+    if (isScrappingWithBrowserDOM == "HTTP") {
       /**
-       * @deprecated this will be deprecated after login integration 
-       * */ 
+       * @deprecated this will be deprecated after login integration
+       * */
       const env = (await CreatingEnvironmentToScrap({
         navigateTo: ComposeUrl(JOB_SEARCH_URL.path, JOB_SEARCH_URL.query),
         headless: true,
@@ -45,7 +45,13 @@ export default async function ScheduleScrapping(): Promise<void> {
       channel.publish(
         ScheduleScrape,
         "Scrapper",
-        Buffer.from(JSON.stringify({ type, platform, totalJobsAvailable })),
+        Buffer.from(
+          JSON.stringify({
+            isScrappingWithBrowserDOM,
+            platform,
+            totalJobsAvailable,
+          }),
+        ),
         {
           persistent: true,
         },

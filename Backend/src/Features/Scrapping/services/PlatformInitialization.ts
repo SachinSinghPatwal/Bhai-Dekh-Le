@@ -6,7 +6,7 @@ export default async function PlatformInitialization(
   workerId: string,
   totalNumberOfJobs: number,
   platform: string,
-  type: "DOM" | "HTTP",
+  isScrappingWithBrowserDOM: boolean,
   channel: ConfirmChannel,
   message: Message,
 ) {
@@ -14,14 +14,13 @@ export default async function PlatformInitialization(
     /**
      * @privatePlatform
      * */
-    if (type === "DOM") {
+    if (isScrappingWithBrowserDOM) {
       await domScrapping(workerId, totalNumberOfJobs);
       channel.ack(message);
     } else {
       await httpScrapping(workerId, totalNumberOfJobs, channel, message);
     }
   } else if (platform === "linkedIn") {
-    
   } else {
     /**
      * @publicPlatforms
