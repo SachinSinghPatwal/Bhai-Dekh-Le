@@ -10,7 +10,7 @@ import { JOB_SEARCH_URL, ScheduleScrape } from "../../../../constants.js";
 
 export default async function ScheduleScrapping(): Promise<void> {
   const platform = "naukri";
-  const type = "DOM";
+  const type = process.env.SCRAP_TYPE!;
   const connection = await amqp.connect(
     process.env.RABBITMQ_URL_WITH_CREDENTIALS!,
   );

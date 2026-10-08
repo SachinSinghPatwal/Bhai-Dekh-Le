@@ -1,22 +1,23 @@
-import { type Page, type Request, type Response } from "playwright";
+// interceptingBrowsersHttpCommunication.ts
+
+import { Page, Request, Response } from "playwright";
 import { MatchedURLOfSearch } from "../../../constants.js";
 
-type CommunicationMap = {
-  request: Request;
-  response: Response;
-};
+type Communication = Request | Response;
 
-export function interceptingBrowsersHttpCommunication<
-  E extends keyof CommunicationMap,
->(page: Page, resolve: (value: CommunicationMap[E]) => void, event: E) {
-  const handler = (param: CommunicationMap[E]) => {
+export function interceptingBrowsersHttpCommunication<T>(
+  page: Page,
+  resolve: (value: T) => void,
+  event: "request" | "response",
+) {
+  const handler = (param: Communication) => {
     if (!param.url().includes(MatchedURLOfSearch)) {
       return;
     }
 
-    page.off(event as any, handler as any);
+    (page.off as any)(event, handler);
 
-    resolve(param);
+    resolve(param as T);
   };
 
   return handler;

@@ -25,6 +25,6 @@ export default async function loginToNaukri(page: Page): Promise<void> {
       { timeout: 10_000 },
     );
   } catch (error) {
-    throw new Error("Something went wrong while loggin in")
+    throw new Error("Something went wrong while logging in")
   }
 }

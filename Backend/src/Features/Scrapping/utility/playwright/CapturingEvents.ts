@@ -1,23 +1,18 @@
-import { Page,Request,Response } from "playwright";
+// eventCapturing.ts
+
+import { Page } from "playwright";
 import { interceptingBrowsersHttpCommunication } from "../../helpers/interceptingBrowsersHttpCommunication.js";
 
-export default  function eventCaptured(page: Page): {
-  capturedRequest: Promise<Request>;
-  capturedResponse: Promise<Response>;
-} {
-  const capturedRequest = new Promise<Request>((resolve) => {
-    page.on(
-      "request",
-      interceptingBrowsersHttpCommunication(page, resolve as any, "request"),
+type CaptureEvent = "request" | "response";
+
+export default function eventCapturing<T>(
+  page: Page,
+  capturingOn: CaptureEvent,
+): Promise<T> {
+  return new Promise<T>((resolve) => {
+    (page.on as any)(
+      capturingOn,
+      interceptingBrowsersHttpCommunication<T>(page, resolve, capturingOn),
     );
   });
-
-  const capturedResponse = new Promise<Response>((resolve) => {
-    page.on(
-      "response",
-      interceptingBrowsersHttpCommunication(page, resolve as any, "response"),
-    );
-  });
-
-  return { capturedRequest, capturedResponse };
 }

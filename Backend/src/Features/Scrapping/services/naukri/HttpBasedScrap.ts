@@ -27,16 +27,15 @@ export default async function httpScrapping(
   let initialTotalJobs = 0;
 
   while (attempt < customMaxRetries.times) {
+    const { url, request, headers, totalJobsAvailable, jobDetails } =
+      (await CreatingEnvironmentToScrap({
+        navigateTo: ComposeUrl(
+          ComposeUrl(JOB_SEARCH_URL.path, JOB_SEARCH_URL.query),
+        ),
+        headless: true,
+        browserShutdownStatus: "kill",
+      })) as Required<SETUP_RETURNED_VALUES>;
     try {
-      const { url, request, headers, totalJobsAvailable, jobDetails } =
-        (await CreatingEnvironmentToScrap({
-          navigateTo: ComposeUrl(
-            ComposeUrl(JOB_SEARCH_URL.path, JOB_SEARCH_URL.query),
-          ),
-          headless: true,
-          browserShutdownStatus: "kill",
-        })) as Required<SETUP_RETURNED_VALUES>;
-
       /**
        * @description Final Check on the Total pages from consumer to self
        */
