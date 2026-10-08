@@ -27,9 +27,12 @@ export default async function ScheduleScrapping(): Promise<void> {
 
     const workerCount = Number(process.env.SCRAP_WORKER_COUNT ?? 4);
 
-    let totalJobsAvailable: number | undefined;
+    let totalJobsAvailable: number = 0;
 
-    if (type !== "DOM") {
+    if (type == "HTTP") {
+      /**
+       * @deprecated this will be deprecated after login integration 
+       * */ 
       const env = (await CreatingEnvironmentToScrap({
         navigateTo: ComposeUrl(JOB_SEARCH_URL.path, JOB_SEARCH_URL.query),
         headless: true,
@@ -42,13 +45,7 @@ export default async function ScheduleScrapping(): Promise<void> {
       channel.publish(
         ScheduleScrape,
         "Scrapper",
-        Buffer.from(
-          JSON.stringify(
-            type == "DOM"
-              ? { type, platform }
-              : { type, platform, totalJobsAvailable },
-          ),
-        ),
+        Buffer.from(JSON.stringify({ type, platform, totalJobsAvailable })),
         {
           persistent: true,
         },
