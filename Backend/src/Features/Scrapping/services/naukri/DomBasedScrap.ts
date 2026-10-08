@@ -1,9 +1,9 @@
-import { JOB_AUTH_URL, log } from "../../index.js";
+import { JOB_AUTH_URL, log, RaceForResponseOrTimeOut, TimeoutError } from "../../index.js";
 import ComposeUrl from "../../utility/ComposeUrl.js";
-import { CreatingEnvironmentToScrap } from "../CreatingEnvironmentToScrap.js";
+import { CreatingEnvironmentToScrap, DOM_SETUP_VALUES } from "../CreatingEnvironmentToScrap.js";
 import loginToNaukri from "./naukriAuth/Login.js";
 import searchSkillsAndKeywords from "./naukriSearch/SearchingSkillsAndKeywords.js";
-import type { Page, Response, BrowserContext } from "playwright";
+import type { Response } from "playwright";
 
 import path from "node:path";
 import fs from "node:fs/promises";
@@ -17,20 +17,19 @@ export default async function domScrapping(
 ) {
   const hasSavedSession = existsSync(CLIENT_DATA_PATH);
 
-  const { page, capturedResponse: _capturedResponse, context } = (await CreatingEnvironmentToScrap(
-    {
-      navigateTo: hasSavedSession
-        ? "https://naukri.com/mnjuser/homepage"
-        : ComposeUrl(JOB_AUTH_URL.path),
-      headless: false,
-      browserShutdownStatus: "keepAlive",
-      useStorageState: hasSavedSession,
-    },
-  )) as {
-    page: Page;
-    capturedResponse: Promise<Response>;
-    context: BrowserContext;
-  };
+  const {
+    page,
+    capturedResponse: capturedResponse,
+    context,
+  } = (await CreatingEnvironmentToScrap({
+    navigateTo: hasSavedSession
+      ? "https://naukri.com/mnjuser/homepage"
+      : ComposeUrl(JOB_AUTH_URL.path),
+    headless: false,
+    browserShutdownStatus: "keepAlive",
+    useStorageState: hasSavedSession,
+    mode: "DOM",
+  })) as DOM_SETUP_VALUES;
   try {
     if (!hasSavedSession) {
       await loginToNaukri(page, context);
@@ -45,13 +44,24 @@ export default async function domScrapping(
       await fs.mkdir(path.dirname(CLIENT_DATA_PATH), { recursive: true });
       await fs.writeFile(CLIENT_DATA_PATH, JSON.stringify(encrypted), "utf8");
 
-      log.success(`[${workerId}] Successfully stored encrypted client auth state.`);
+      log.success(
+        `[${workerId}] Successfully stored encrypted client auth state.`,
+      );
       await searchSkillsAndKeywords(page);
     } else {
-      log.info(`[${workerId}] Authenticated session loaded. Ready on homepage.`);
+      log.info(
+        `[${workerId}] Authenticated session loaded. Ready on homepage.`,
+      );
       await searchSkillsAndKeywords(page);
     }
+
+    const response = await RaceForResponseOrTimeOut<Response>(capturedResponse);
+    if (response instanceof TimeoutError || !response) {
+      throw new Error("Request or Response timed out");
+    }
+    const jsonData = await response.json();
+    console.log(jsonData.jobDetails.length, jsonData.jobDetails[1]);
   } catch (error) {
-    log.warn(error);
+    log.error(error);
   }
 }

@@ -8,7 +8,7 @@ import {
 import { RateLimitError } from "../../../Scrapping/utility/playwright/RateLimitingError.js";
 import {
   CreatingEnvironmentToScrap,
-  SETUP_RETURNED_VALUES,
+  HTTP_SETUP_VALUES,
 } from "../CreatingEnvironmentToScrap.js";
 import makeHttpRequestToGetAllDesiredJobs from "../../../Scrapping/services/GetDesiredJobs.js";
 
@@ -34,7 +34,8 @@ export default async function httpScrapping(
         ),
         headless: true,
         browserShutdownStatus: "kill",
-      })) as Required<SETUP_RETURNED_VALUES>;
+        mode: "HTTP",
+      })) as Required<HTTP_SETUP_VALUES>;
     try {
       /**
        * @description Final Check on the Total pages from consumer to self

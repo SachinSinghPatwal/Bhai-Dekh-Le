@@ -12,40 +12,48 @@ import { CLIENT_DATA_PATH } from "../../../constants.js";
 
 chromium.use(stealth());
 
-export interface SETUP_RETURNED_VALUES {
+export interface HTTP_SETUP_VALUES {
   url: URL;
   request: string;
   headers: Record<string, string>;
   jobDetails: JOB_DETAILS[];
   totalJobsAvailable: number;
 }
-export interface SETUP_ENVIRONMENT_PARAMS {
+
+export interface DOM_SETUP_VALUES {
+  page: Page;
+  capturedResponse: Promise<Response>;
+  context: BrowserContext;
+}
+
+type ENVIRONMENT_RETURNED_VALUES = HTTP_SETUP_VALUES | DOM_SETUP_VALUES;
+
+export interface ENVIRONMENT_SETUP_PARAMS {
   navigateTo: string;
   headless: boolean;
   browserShutdownStatus: "keepAlive" | "kill";
   useStorageState?: boolean;
+  mode: "DOM" | "HTTP";
 }
 
 export async function CreatingEnvironmentToScrap({
   navigateTo,
   headless,
   browserShutdownStatus,
-  useStorageState = false,
-}: SETUP_ENVIRONMENT_PARAMS): Promise<
-  | Partial<SETUP_RETURNED_VALUES>
-  | undefined
-  | { page: Page; capturedResponse: Promise<Response>; context: BrowserContext }
-> {
+  useStorageState = false, // soon depricate !
+  mode,
+}: ENVIRONMENT_SETUP_PARAMS): Promise<ENVIRONMENT_RETURNED_VALUES | Error> {
   let browser: Browser | null = null;
   let context: BrowserContext | null = null;
+  let capturedRequest;
 
   let state: any = undefined;
   if (useStorageState) {
     try {
       await fs.access(CLIENT_DATA_PATH);
       state = await decrypt(CLIENT_DATA_PATH);
-    } catch {
-      // client.encrypt.json does not exist or failed to decrypt; proceed without stored session
+    } catch(error) {
+      throw error
     }
   }
 
@@ -67,34 +75,23 @@ export async function CreatingEnvironmentToScrap({
 
     const page = await context.newPage();
 
-    const capturedRequest = eventCapturing<Request>(page, "request");
+    if (mode === "HTTP") {
+      capturedRequest = eventCapturing<Request>(page, "request");
+    }
+
     const capturedResponse = eventCapturing<Response>(page, "response");
 
     await page.goto(navigateTo, {
       waitUntil: "domcontentloaded",
     });
 
-    /**
-     * Lightweight browser setup for DOM-based scraping flows.
-     *
-     * Unlike {@link CreatingEnvironmentToScrap}, this function does **not** set up
-     * HTTP request/response interceptors. The HTTP flow expects a specific JSON API
-     * response that is never emitted on pages like the login page — calling the
-     * full setup there would always timeout or capture the wrong request.
-     *
-     * Returns only the Playwright {@link Page} so the caller can drive the browser
-     * directly (e.g. fill login form, click buttons, navigate between pages).
-     * The browser is kept alive; the caller is responsible for closing it when done.
-     *
-     * @param navigateTo - Full URL to navigate to on launch.
-     * @param headless   - Whether to run headless.
-     */
-
     if (!headless && browserShutdownStatus == "keepAlive") {
       return { page, capturedResponse, context };
     }
 
-    const request = await RaceForResponseOrTimeOut<Request>(capturedRequest);
+    const request = await RaceForResponseOrTimeOut<Request>(
+      capturedRequest as Promise<Request>,
+    );
 
     const response = await RaceForResponseOrTimeOut<Response>(capturedResponse);
 
@@ -125,15 +122,58 @@ export async function CreatingEnvironmentToScrap({
   } catch (error: unknown) {
     /**
      * @description prevent zombie chrome browser if stealth mode is enabled
-     *
      */
     if (browser) await browser.close();
-    if (error instanceof Error) {
-      console.log(error);
-      throw new Error(
-        "Something Went Wrong While Creating the Environment to Scrap",
-        error,
-      );
+    throw new Error(
+      "Something Went Wrong While Creating the Environment to Scrap",
+      error as ErrorOptions,
+    );
+  }
+}
+
+export async function interceptingTrafficAndExtractingValues(
+  page: Page,
+  browser: Browser,
+) {
+  // if (!headless && browserShutdownStatus == "keepAlive") {
+  //   return { page, capturedResponse, context };
+  // }
+  try {
+    const capturedRequest = eventCapturing<Request>(page, "request");
+    const capturedResponse = eventCapturing<Response>(page, "response");
+
+    const request = await RaceForResponseOrTimeOut<Request>(
+      capturedRequest as Promise<Request>,
+    );
+
+    const response = await RaceForResponseOrTimeOut<Response>(capturedResponse);
+
+    if (request instanceof TimeoutError || response instanceof TimeoutError) {
+      throw new Error("Request or Response timed out");
     }
+    const url = new URL(request.url());
+
+    const capturedHeaders = await request.allHeaders();
+    const headers = sanitizeCaptureHeaderUrl(capturedHeaders);
+
+    const jsonData = await response.json();
+
+    const jobDetails = jsonData.jobDetails;
+    const totalJobsAvailable = jsonData.noOfJobs;
+
+    const method = request.method();
+
+    await browser.close();
+
+    return {
+      url,
+      request: method,
+      totalJobsAvailable,
+      headers,
+      jobDetails,
+      page,
+    };
+  } catch (error) {
+    throw new Error("Semething went wrong while intercepting signal");
   }
 }

@@ -5,19 +5,7 @@ import {
   typeIntoField,
   waitForPageReady,
 } from "../../../utility/playwright/interactions/index.js";
-
-const SELECTORS = {
-  searchExpand:
-    ".nI-gNb-sb__expand, .nI-gNb-sb__placeholder, #ni-gnb-searchbar, .nI-gNb-sb__main",
-  suggestorInput: ".suggestor-input",
-  searchSubmit: ".nI-gNb-sb__icon-wrapper, button[aria-label='Search']",
-  sortButton:
-    "#filter-sort, .styles_sort-droop-label__TxC3K, .styles_ss__menu-btn__4s9fF",
-  sortMenu:
-    "ul[data-filter-id='sort'], .styles_sort-droop-list__BmFFW, .styles_ss__menu_9TuCu",
-  dateSortOption:
-    "li.styles_ss__menu-item__T4rgB[title='Date'], a[data-id='filter-sort-f'], li[title='Date']",
-} as const;
+import {SELECTORS} from "../../../index.js"
 
 /**
  * Ensures the search bar is expanded and the suggestor input is ready.
@@ -108,12 +96,9 @@ export default async function searchSkillsAndKeywords(
   for (const keyword of keywordList) {
     await closeObstacles(page);
     await expandSearchBar(page);
-    await typeIntoField(
-      page,
-      { className: "suggestor-input" },
-      keyword,
-      { humanDelay: 100 },
-    );
+    await typeIntoField(page, { className: "suggestor-input" }, keyword, {
+      humanDelay: 100,
+    });
     await submitSearch(page);
     await selectSortOption(page);
   }

@@ -40,3 +40,17 @@ export const CLIENT_DATA_PATH = path.resolve(
   process.cwd(),
   "src/Features/Scrapping/data/client.encrypted.json",
 );
+
+// selectores DONT CHANGE
+export const SELECTORS = {
+  searchExpand:
+    ".nI-gNb-sb__expand, .nI-gNb-sb__placeholder, #ni-gnb-searchbar, .nI-gNb-sb__main",
+  suggestorInput: ".suggestor-input",
+  searchSubmit: ".nI-gNb-sb__icon-wrapper, button[aria-label='Search']",
+  sortButton:
+    "#filter-sort, .styles_sort-droop-label__TxC3K, .styles_ss__menu-btn__4s9fF",
+  sortMenu:
+    "ul[data-filter-id='sort'], .styles_sort-droop-list__BmFFW, .styles_ss__menu_9TuCu",
+  dateSortOption:
+    "li.styles_ss__menu-item__T4rgB[title='Date'], a[data-id='filter-sort-f'], li[title='Date']",
+} as const;
