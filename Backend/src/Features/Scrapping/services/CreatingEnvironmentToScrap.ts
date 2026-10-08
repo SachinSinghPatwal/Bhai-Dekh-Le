@@ -23,12 +23,14 @@ export interface SETUP_ENVIRONMENT_PARAMS {
   navigateTo: string;
   headless: boolean;
   browserShutdownStatus: "keepAlive" | "kill";
+  useStorageState?: boolean;
 }
 
 export async function CreatingEnvironmentToScrap({
   navigateTo,
   headless,
   browserShutdownStatus,
+  useStorageState = false,
 }: SETUP_ENVIRONMENT_PARAMS): Promise<
   | Partial<SETUP_RETURNED_VALUES>
   | undefined
@@ -36,8 +38,16 @@ export async function CreatingEnvironmentToScrap({
 > {
   let browser: Browser | null = null;
   let context: BrowserContext | null = null;
-  
-  const state = await decrypt(CLIENT_DATA_PATH);
+
+  let state: any = undefined;
+  if (useStorageState) {
+    try {
+      await fs.access(CLIENT_DATA_PATH);
+      state = await decrypt(CLIENT_DATA_PATH);
+    } catch {
+      // client.encrypt.json does not exist or failed to decrypt; proceed without stored session
+    }
+  }
 
   try {
     browser = await chromium.launch({
@@ -51,9 +61,9 @@ export async function CreatingEnvironmentToScrap({
       // },
     });
 
-    context = await browser.newContext({
-      storageState: state,
-    });
+    context = await browser.newContext(
+      state ? { storageState: state } : undefined,
+    );
 
     const page = await context.newPage();
 

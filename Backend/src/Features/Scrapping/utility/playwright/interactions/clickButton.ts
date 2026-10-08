@@ -26,19 +26,28 @@ import { resolveSelector, waitForPageReady } from "./utils.js";
  * // Click with raw selector
  * await clickButton(page, { selector: "button[type='submit']" });
  */
+export interface ClickOptions extends WaitOptions {
+  /** If true, bypasses actionability checks when clicking */
+  force?: boolean;
+}
+
 export async function clickButton(
   page: Page,
   target: ElementSelector,
-  options: WaitOptions = {},
+  options: ClickOptions = {},
 ): Promise<void> {
-  const { timeout = 30_000 } = options;
+  const { timeout = 10_000, force = true } = options;
   const cssSelector = resolveSelector(target);
 
-  // Most assured readiness check – networkidle covers DOM + network + assets + JS
-  await waitForPageReady(page, timeout);
+  await waitForPageReady(page, 3_000);
 
-  // Additionally wait for the specific element to be visible before clicking
-  await page.waitForSelector(cssSelector, { state: "visible", timeout });
+  const locator = page.locator(cssSelector).first();
+  await locator.waitFor({ state: "attached", timeout });
 
-  await page.click(cssSelector, { timeout });
+  try {
+    await locator.click({ timeout: 5_000, force });
+  } catch {
+    // If Playwright click is intercepted or blocked by overlay, dispatch DOM click
+    await locator.dispatchEvent("click");
+  }
 }

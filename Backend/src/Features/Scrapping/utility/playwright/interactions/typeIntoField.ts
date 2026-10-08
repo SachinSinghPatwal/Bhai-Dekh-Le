@@ -80,7 +80,7 @@ export async function typeIntoField(
   options: TypeOptions = {},
 ): Promise<void> {
   const {
-    timeout = 30_000,
+    timeout = 10_000,
     clearFirst = true,
     humanDelay = 0,
     postTypeDelay = 0,
@@ -88,22 +88,28 @@ export async function typeIntoField(
 
   const cssSelector = resolveSelector(field);
 
-  // Ensure page is fully ready before interacting
-  await waitForPageReady(page, timeout);
-  await page.waitForSelector(cssSelector, { state: "visible", timeout });
+  await waitForPageReady(page, 3_000);
+
+  const locator = page.locator(cssSelector).first();
+  await locator.waitFor({ state: "attached", timeout });
+
+  // Ensure input is focused by clicking into it
+  try {
+    await locator.click({ timeout: 5_000, force: true });
+  } catch {
+    await locator.focus().catch(() => {});
+  }
 
   if (clearFirst) {
-    // Triple-click to select all existing text, then clear it
-    await page.click(cssSelector, { clickCount: 3, timeout });
-    await page.keyboard.press("Backspace");
+    await locator.fill("").catch(() => {});
   }
 
   if (humanDelay > 0) {
-    // Human-like keystroke-by-keystroke typing with per-key delay
-    await page.locator(cssSelector).pressSequentially(text, { delay: humanDelay });
+    // Human-like typing with per-key delay
+    await locator.pressSequentially(text, { delay: humanDelay });
   } else {
-    // Instant fill — sets value + dispatches input/change events
-    await page.fill(cssSelector, text, { timeout });
+    // Instant fill
+    await locator.fill(text);
   }
 
   if (postTypeDelay > 0) {

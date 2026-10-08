@@ -14,8 +14,11 @@ import { ElementSelector } from "./types.js";
  */
 export function resolveSelector(sel: ElementSelector): string {
   if (sel.selector) return sel.selector;
-  if (sel.id) return `#${sel.id}`;
-  if (sel.className) return `.${sel.className}`;
+  if (sel.id) return `#${sel.id.trim()}`;
+  if (sel.className) {
+    const classes = sel.className.trim().split(/\s+/).filter(Boolean);
+    return classes.map((c) => `.${c}`).join("");
+  }
   if (sel.attribute) return `[${sel.attribute.name}="${sel.attribute.value}"]`;
   throw new Error(
     "ElementSelector must have at least one of: selector, id, className, attribute",
@@ -36,7 +39,12 @@ export function resolveSelector(sel: ElementSelector): string {
  */
 export async function waitForPageReady(
   page: Page,
-  timeout = 30_000,
+  timeout = 5_000,
 ): Promise<void> {
-  await page.waitForLoadState("networkidle", { timeout });
+  try {
+    // Quick check if network settles within 1.5s, otherwise fall back to DOM ready
+    await page.waitForLoadState("networkidle", { timeout: Math.min(timeout, 1_500) });
+  } catch {
+    await page.waitForLoadState("domcontentloaded", { timeout: 5_000 }).catch(() => {});
+  }
 }
