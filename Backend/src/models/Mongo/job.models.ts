@@ -1,5 +1,5 @@
 import mongoose, { Document, Schema } from "mongoose";
-import { ApiResponse } from "../../utility/endpointWrapper/ApiResponse.js";
+import { ApiError } from "../../utility/endpointWrapper/ApiError.js";
 
 export interface JOB_DETAILS extends Document {
   readonly title: string;
@@ -72,7 +72,7 @@ const jobSchema = new Schema<Required<JOB_DETAILS>>(
     },
     salaryDetails: {
       type: Object,
-      required: true,
+      default: {},
     },
     minExp: {
       type: String,
@@ -85,7 +85,7 @@ const jobSchema = new Schema<Required<JOB_DETAILS>>(
     },
     applyByTime: {
       type: String,
-      required: true,
+      default: "",
     },
     walkIn: {
       type: Boolean,
@@ -106,16 +106,16 @@ jobSchema.index(
 
 jobSchema.post("save", function (error: any, _: any, next: any) {
   if (error.name === "ValidationError") {
-    const errors = Object.values(error.errors).map((err: any) => ({
-      field: err.path,
-      message: `${err.path} is invalid`,
-    }));
+    const errorDetails = Object.values(error.errors || {})
+      .map((err: any) => `${err.path}: ${err.message}`)
+      .join(", ");
 
     return next(
-      new ApiResponse({
-        statusCode: 202,
-        message: `Every Properties are required to be filled - ${errors}`,
-      }),
+      new ApiError(
+        400,
+        `Validation failed: Every required property must be provided - ${errorDetails}`,
+        errorDetails,
+      ),
     );
   }
 

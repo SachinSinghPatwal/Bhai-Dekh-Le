@@ -1,7 +1,7 @@
 import { JOB_DETAILS } from "../../../../models/Mongo/job.models.js";
 
 export default function ValidateJobIsPostedWithinSetDays(
-  each: JOB_DETAILS,
+  each: any,
 ): JOB_DETAILS | undefined {
   const jobAge = Number(
     String(each.footerPlaceholderLabel).split(" ")[0].replace("+", ""),
@@ -16,13 +16,13 @@ export default function ValidateJobIsPostedWithinSetDays(
       tagsAndSkills,
       placeholders,
       jdURL,
-      JD,
+      jobDescription: JD,
       createdDate,
-      salaryDetails,
-      minExp,
-      maxExp,
+      salaryDetail: salaryDetails,
+      minimumExperience: minExp,
+      maximumExperience: maxExp,
       applyByTime,
-      walkIn,
+      walkinJob: walkIn,
       footerPlaceholderColor,
     } = each;
     return {

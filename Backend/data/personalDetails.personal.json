@@ -1,0 +1,39 @@
+{
+  "personalDetails": {
+    "fullName": "Job Seeker",
+    "email": "fowlerfowlem.r1.1.199.4@gmail.com",
+    "resumeLink": "https://example.com/resume.pdf"
+  },
+  "jobDetails": {
+    "role": "React Developer",
+    "experience": "2 Years",
+    "location": "Remote",
+    "workMode": "Remote / Hybrid",
+    "noticePeriod": "Immediate"
+  },
+  "skills": {
+    "primary": [
+      "React",
+      "JavaScript",
+      "TypeScript"
+    ],
+    "secondary": [
+      "Node.js",
+      "Express",
+      "MongoDB",
+      "Git"
+    ]
+  },
+  "searchPreferences": {
+    "keywords": [
+      "react",
+      "frontend developer"
+    ],
+    "platforms": [
+      "naukri",
+      "linkedin"
+    ]
+  },
+  "createdAt": "2026-10-09T11:31:14.094Z",
+  "updatedAt": "2026-10-09T11:31:14.094Z"
+}

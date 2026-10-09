@@ -42,6 +42,11 @@ export const CLIENT_DATA_PATH = path.resolve(
   "src/Features/Scrapping/data/client.encrypted.json",
 );
 
+export const PERSONAL_DETAILS_PATH = path.resolve(
+  process.cwd(),
+  "data/personalDetails.personal.json",
+);
+
 // Authentication and Account Creation Selectors
 export const AUTH_SELECTORS = {
   usernameField: "#usernameField",

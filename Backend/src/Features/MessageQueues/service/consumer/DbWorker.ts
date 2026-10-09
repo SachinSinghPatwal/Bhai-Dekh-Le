@@ -113,8 +113,25 @@ async function start(): Promise<void> {
        * does not expose that property in your setup.
        */
       if (response) {
+        if (response.mongoose?.validationErrors?.length) {
+          const errorDetails = response.mongoose.validationErrors
+            .map((err: any) =>
+              Object.values(err.errors || {})
+                .map((e: any) => e.message)
+                .join(", "),
+            )
+            .filter(Boolean)
+            .join(" | ");
+
+          throw new Error(
+            `Document validation failed for ${response.mongoose.validationErrors.length} jobs: ${errorDetails}`,
+          );
+        }
+
         channel!.ack(message);
-        log.success(`[DB Worker] Saved ${jobs.length} jobs.`);
+        log.success(
+          `[DB Worker] Saved ${response.insertedCount} new jobs in MongoDB (received: ${jobs.length}).`,
+        );
         return;
       }
       throw new Error("Something went wrong while inserting in the db");
