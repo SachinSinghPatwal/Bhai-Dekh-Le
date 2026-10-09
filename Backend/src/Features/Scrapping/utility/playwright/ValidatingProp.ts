@@ -1,13 +1,13 @@
 import { JOB_DETAILS } from "../../../../models/Mongo/job.models.js";
 
-export default function ValidateJobIsPostedWithinThreeDays(
+export default function ValidateJobIsPostedWithinSetDays(
   each: JOB_DETAILS,
 ): JOB_DETAILS | undefined {
   const jobAge = Number(
     String(each.footerPlaceholderLabel).split(" ")[0].replace("+", ""),
   );
 
-  if (jobAge <= 3) {
+  if (jobAge <= 1 || each.footerPlaceholderColor == "green") {
     const {
       title,
       jobId,
@@ -23,6 +23,7 @@ export default function ValidateJobIsPostedWithinThreeDays(
       maxExp,
       applyByTime,
       walkIn,
+      footerPlaceholderColor,
     } = each;
     return {
       title,
@@ -39,6 +40,7 @@ export default function ValidateJobIsPostedWithinThreeDays(
       maxExp,
       applyByTime,
       walkIn,
+      footerPlaceholderColor,
     } as JOB_DETAILS;
   }
   return undefined;

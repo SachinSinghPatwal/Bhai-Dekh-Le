@@ -9,6 +9,7 @@ export const JOB_SEARCH_URL = {
   query: {
     k: "react",
     nignbevent_src: "jobsearchDeskGNB",
+    sort:"f",
   },
 };
 

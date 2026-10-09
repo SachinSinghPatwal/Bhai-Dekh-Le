@@ -7,50 +7,60 @@ import { RateLimitError } from "../utility/playwright/RateLimitingError.js";
 import { setIterativePaginationParams } from "./setIterativePaginationParams.js";
 
 interface SCRAPPING_PAGINATED_JOBS extends Partial<RequestParams> {
-  unSortedJobs: JOB_DETAILS[];
-  currentPageNumber: number;
   workerId: string;
   endPage: number;
   initialPage: number;
+  initialJobs: JOB_DETAILS[];
 }
 
 export default async function ScrappingPaginatedJob({
   url,
   headers,
   request,
-  unSortedJobs,
-  currentPageNumber,
   workerId,
   initialPage,
+  initialJobs,
+  endPage,
 }: SCRAPPING_PAGINATED_JOBS): Promise<any> {
-  setIterativePaginationParams(url as URL, currentPageNumber);
+  let unSortedJobs = [];
 
-  const response = await GetAllJobs({
-    url,
-    headers,
-    request,
-  });
+  /*
+    Intial request interception provide body and no of total jobs exist
+    */
+  if (Array.isArray(initialJobs) && initialJobs.length > 0) {
+    unSortedJobs.push(...initialJobs);
+  }
 
-  if (response instanceof RateLimitError || response instanceof Error) {
-    log.debug("snapShotting the jobs before throwing error");
+  for (let i = initialPage; i < endPage; i++) {
+    setIterativePaginationParams(url as URL, i);
 
-    await saveSnapShots(unSortedJobs).catch((err) => {
-      throw new Error(
-        `[${workerId}] Error while saving snapshot before throwing error: ${err.message}`,
+    const response = (await GetAllJobs({
+      url,
+      headers,
+      request,
+    })) as JOB_DETAILS[];
+
+    if (response instanceof RateLimitError || response instanceof Error) {
+      log.debug("snapShotting the jobs before throwing error");
+
+      await saveSnapShots(unSortedJobs).catch((err) => {
+        throw new Error(
+          `[${workerId}] Error while saving snapshot before throwing error: ${err.message}`,
+        );
+      });
+
+      throw new RateLimitError(
+        `Error from [${workerId}] last page was [[${i}]] total pages completed ${i - initialPage} | Reason stopped: ${response.message}`,
+        i,
       );
-    });
-
-    throw new RateLimitError(
-      `Rate limited by Application [${workerId}] last page was [[${currentPageNumber}]] total pages completed ${currentPageNumber - initialPage} and retrying on last page | Reason: ${response.message}`,
-      currentPageNumber,
-    );
-  } else {
-    if (Array.isArray(response) && response.length > 0) {
-      unSortedJobs.push(...response);
-    } else {
+    } else if (response[1].footerPlaceholderLabel) {
+      return unSortedJobs;
+    } else if (!Array.isArray(response) || response.length == 0) {
       throw new Error(
         `[${workerId}] cannot iterate over the jobs , Jobs are not iteratable`,
       );
+    } else {
+      unSortedJobs.push(...response);
     }
   }
 }

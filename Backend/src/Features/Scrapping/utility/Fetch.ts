@@ -8,7 +8,7 @@ export default async function Fetch({
   url,
   request,
   headers,
-}: Partial<RequestParams>): Promise<JOB_DETAILS | undefined> {
+}: Partial<RequestParams>): Promise<JOB_DETAILS[]> {
   const MAX_RETRIES = 3;
   let attempt = 0;
 
@@ -22,17 +22,19 @@ export default async function Fetch({
       await ResponseValidation(response);
 
       const body = await response.json();
+      return bodyValidation(body);
+    } catch (error) {
+      attempt++;
 
-      const jobDetails = bodyValidation(body);
+      if (attempt >= MAX_RETRIES) {
+        throw error;
+      }
 
-      return jobDetails;
-    } catch (error: any) {
-      // If it's a hard recaptcha block, don't bother retrying with the same flagged session
-      log.debug(
-        `[Fetch] Attempt ${attempt} failed. Retrying in ${(attempt % 3) * 2}s... (${error.message})`,
-      );
-      await new Promise((resolve) => setTimeout(resolve, (attempt % 3) * 2000));
-      return error;
+      log.debug(`[Fetch] Attempt ${attempt} failed. Retrying...`);
+
+      await new Promise((resolve) => setTimeout(resolve, attempt * 2000));
     }
   }
+
+  throw new Error("Fetch failed after maximum retries");
 }

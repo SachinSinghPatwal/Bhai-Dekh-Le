@@ -2,20 +2,21 @@ import mongoose, { Document, Schema } from "mongoose";
 import { ApiResponse } from "../../utility/endpointWrapper/ApiResponse.js";
 
 export interface JOB_DETAILS extends Document {
-  title: string;
-  jobId: string;
-  footerPlaceholderLabel: string;
-  companyName: string;
-  tagsAndSkills: string[];
-  placeholders: Record<string, string>[];
-  jdURL: string;
-  JD: string;
-  createdDate: number;
-  salaryDetails: Record<string, unknown>;
-  minExp: string;
-  maxExp: string;
-  applyByTime: string;
-  walkIn: boolean;
+  readonly title: string;
+  readonly jobId: string;
+  readonly footerPlaceholderLabel: string;
+  readonly footerPlaceholderColor: string;
+  readonly companyName: string;
+  readonly tagsAndSkills: string[];
+  readonly placeholders: Record<string, string>[];
+  readonly jdURL: string;
+  readonly JD: string;
+  readonly createdDate: number;
+  readonly salaryDetails: Record<string, unknown>;
+  readonly minExp: string;
+  readonly maxExp: string;
+  readonly applyByTime: string;
+  readonly walkIn: boolean;
 }
 
 const jobSchema = new Schema<Required<JOB_DETAILS>>(
@@ -32,6 +33,10 @@ const jobSchema = new Schema<Required<JOB_DETAILS>>(
       unique: [true, "only Unique jobs should be saved"],
     },
     footerPlaceholderLabel: {
+      type: String,
+      required: true,
+    },
+    footerPlaceholderColor: {
       type: String,
       required: true,
     },

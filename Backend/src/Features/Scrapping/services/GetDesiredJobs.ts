@@ -9,19 +9,12 @@ export default async function getDesiredJobs({
   url,
   request,
   headers,
-  totalJobsAvailable ,
+  totalJobsAvailable,
   jobDetails,
   workerId,
   retryStartingPage,
 }: RequestParams): Promise<JOB_DETAILS[]> {
-  const unSortedJobs: JOB_DETAILS[] = [];
   let initialPage: number = 0;
-  /*
-    Intial request interception provide body and no of total jobs exist
-  */
-  if (Array.isArray(jobDetails) && jobDetails.length > 0) {
-    unSortedJobs.push(...jobDetails);
-  }
 
   try {
     const { startPage: expectedStartPage, endPage } =
@@ -38,21 +31,20 @@ export default async function getDesiredJobs({
     );
 
     console.log("going for work");
+    
+    const unSortedJobs = await ScrappingPaginatedJob({
+      url: new URL(url.toString()),
+      headers,
+      request,
+      initialPage,
+      initialJobs: jobDetails,
+      workerId,
+      endPage,
+    });
 
-    for (let i = initialPage; i < endPage; i++) {
-      await ScrappingPaginatedJob({
-        url: new URL(url.toString()),
-        headers,
-        request,
-        unSortedJobs, // pushing to this array sequentially is safe
-        currentPageNumber: i,
-        initialPage,
-        workerId,
-        endPage,
-      });
-    }
     const filteredRecentJob =
       sortingUnsortedJobBasedOnTimeCreated(unSortedJobs);
+      
     return filteredRecentJob as JOB_DETAILS[];
   } catch (error: unknown) {
     throw error;
