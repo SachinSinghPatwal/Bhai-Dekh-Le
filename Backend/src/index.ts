@@ -13,7 +13,6 @@ import {
   startDbWorkers,
   handleDbWorkerShutdown,
 } from "./Features/MessageQueues/utility/manager/DbWorkerManager.js";
-import { getAllSnapshotJobs } from "./helper/getAllSnapShots.js";
 import { ensureBasicUserInformation } from "./Features/UserInteractions/index.js";
 
 // 1. Ensure user resume & job preference profile exists before starting the server
@@ -22,10 +21,6 @@ await ensureBasicUserInformation();
 const port = Number(process.env.PORT) || 8000;
 
 let shuttingDown = false;
-
-const jobs = await getAllSnapshotJobs("./snapShots");
-
-console.log(jobs, "Total jobs:", jobs.length);
 
 app.listen(port, "0.0.0.0", () => {
   log.info(`Server is running on ${port}`);

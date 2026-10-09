@@ -17,7 +17,8 @@ export interface UserResumeProfile {
     fullName: string;
     email: string;
     phone?: string;
-    resumeLink: string;
+    resumePath?: string;
+    resumeLink?: string;
   };
   jobDetails: {
     role: string;
@@ -107,21 +108,21 @@ function note(lines: string[]): void {
 async function promptUserProfile(): Promise<UserResumeProfile> {
   const rl = createInterface({
     input: stdin,
-    output: stdout,
+    terminal: false,
   });
 
   const ask = async (question: string, defaultValue = "", required = true): Promise<string> => {
     while (true) {
-      const promptText = defaultValue
-        ? `  › ${question} ${DIM}[${defaultValue}]:${RESET} `
-        : `  › ${question} `;
-      const answer = (await rl.question(promptText)).trim();
+      stdout.write(`  › ${question} `);
+      const answer = await new Promise<string>((resolve) => {
+        rl.once("line", (line) => resolve(line.trim()));
+      });
 
       if (answer !== "") return answer;
       if (defaultValue) return defaultValue;
       if (!required) return "";
 
-      console.log(`  ${RED}✗${RESET} This field is required. Please provide a value.\n`);
+      console.log(`  ${RED}✗${RESET} This field is required. Please provide a value.`);
     }
   };
 
@@ -130,20 +131,17 @@ async function promptUserProfile(): Promise<UserResumeProfile> {
     note([
       "Welcome! This one-time setup collects your job details, skills, and preferences.",
       `Saved locally without encryption to: ${CYAN}data/personalDetails.personal.json${RESET}`,
-      `Press ${BOLD}${YELLOW}Enter${RESET} to accept the default shown in ${CYAN}[brackets]${RESET}.`,
     ]);
 
     // 1. Personal Details
-    section("STEP 1 / 4", "PERSONAL INFORMATION", "Identity and Resume");
+    section("STEP 1 / 4", "PERSONAL INFORMATION", "Identity and Contact");
+    note([
+      "For local / non-deployed versions, keep your resume file inside the 'data/' directory (e.g. data/resume.pdf).",
+    ]);
     const defaultEmail = process.env.NAUKRI_EMAIL ?? "user@example.com";
     const fullName = await ask("Full Name:", process.env.NAUKRI_NAME ?? "Job Seeker", true);
     const email = await ask("Email Address:", defaultEmail, true);
     const phone = await ask("Phone Number (optional):", "", false);
-    const resumeLink = await ask(
-      "Resume Link (Google Drive / Cloudinary / Portfolio):",
-      "https://example.com/resume.pdf",
-      false,
-    );
 
     // 2. Role and Experience
     section("STEP 2 / 4", "TARGET CAREER & EXPERIENCE", "What positions are you seeking?");
@@ -206,7 +204,7 @@ async function promptUserProfile(): Promise<UserResumeProfile> {
         fullName,
         email,
         phone: phone || undefined,
-        resumeLink,
+        resumePath: "data/resume.pdf",
       },
       jobDetails: {
         role,
@@ -253,37 +251,6 @@ export function getISTDateFormatted(date: Date = new Date()): string {
   return `${map.year}-${map.month}-${map.day}-${map.hour}${period}`;
 }
 
-/**
- * Creates default user profile fallback when running in a non-interactive environment (CI/Docker/Scripts)
- */
-function createDefaultFallbackProfile(): UserResumeProfile {
-  const now = getISTDateFormatted();
-  return {
-    personalDetails: {
-      fullName: process.env.NAUKRI_NAME ?? "Job Seeker",
-      email: process.env.NAUKRI_EMAIL ?? "user@example.com",
-      resumeLink: "https://example.com/resume.pdf",
-    },
-    jobDetails: {
-      role: "React Developer",
-      experience: "2 Years",
-      location: "Remote",
-      workMode: "Remote / Hybrid",
-      noticePeriod: "Immediate",
-    },
-    skills: {
-      primary: ["React", "JavaScript", "TypeScript"],
-      secondary: ["Node.js", "Express", "MongoDB", "Git"],
-    },
-    searchPreferences: {
-      keywords: ["react", "frontend developer"],
-      platforms: ["naukri", "linkedin"],
-    },
-    createdAt: now,
-    updatedAt: now,
-  };
-}
-
 /*
  * ─────────────────────────────────────────
  * MAIN EXPORT
@@ -312,21 +279,14 @@ export async function ensureBasicUserInformation(options?: {
     try {
       const content = await fs.readFile(filePath, "utf-8");
       const profile = JSON.parse(content) as UserResumeProfile;
-      log.info(`[User Profile] Found existing personal details at ${filePath}. Setup bypassed.`);
       return profile;
     } catch (readErr) {
       log.warn(`[User Profile] Existing profile at ${filePath} is unreadable. Recreating... (${readErr})`);
     }
   }
 
-  // 2. Collect details: interactive prompt if TTY is available, otherwise default fallback
-  let profile: UserResumeProfile;
-  if (stdin.isTTY) {
-    profile = await promptUserProfile();
-  } else {
-    log.info("[User Profile] Non-interactive environment detected. Initializing standard template profile.");
-    profile = createDefaultFallbackProfile();
-  }
+  // 2. Interactively prompt the user for their resume & job details
+  const profile = await promptUserProfile();
 
   // 3. Write unencrypted JSON to data/personalDetails.personal.json
   await fs.mkdir(path.dirname(filePath), { recursive: true });

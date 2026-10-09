@@ -41,3 +41,39 @@ Backend/src/Learn
 Backend/playwright-report
 Backend/src/Phase*
 test-results
+
+# Dependencies
+node_modules/
+dist/
+
+# Environment
+.env
+.env.local
+
+# Logs
+logs/
+*.log
+
+# Uploads
+uploads/
+
+# Playwright
+playwright/.auth/
+temp-state-*.json
+test-results/
+playwright-report/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+*.encrypted.json
+personalDetails.personal.json
+*.pdf
+
+# Testing
+coverage/
+Backend/data/personalDetails.personal.json
