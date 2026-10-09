@@ -114,11 +114,32 @@ async function start(): Promise<void> {
         throw new Error("RabbitMQ channel is not initialized");
       }
 
+      let isSettled = false;
+      const safeChannel = new Proxy(channel, {
+        get(target, prop, receiver) {
+          if (prop === "ack") {
+            return (msg: Message, allUpTo?: boolean) => {
+              if (isSettled) return;
+              isSettled = true;
+              return target.ack(msg, allUpTo);
+            };
+          }
+          if (prop === "nack") {
+            return (msg: Message, allUpTo?: boolean, requeue?: boolean) => {
+              if (isSettled) return;
+              isSettled = true;
+              return target.nack(msg, allUpTo, requeue);
+            };
+          }
+          return Reflect.get(target, prop, receiver);
+        },
+      }) as ConfirmChannel;
+
       await PlatformInitialization(
         workerId,
         totalNumberOfJobs,
         platform,
-        channel,
+        safeChannel,
         message,
       );
     } catch (error) {
@@ -128,10 +149,14 @@ async function start(): Promise<void> {
 
       /*
        * The original scrape task is returned
-       * to RabbitMQ.
+       * to RabbitMQ only if not already acknowledged.
        */
-      if (!shuttingDown) {
-        channel!.nack(message, false, true);
+      if (!shuttingDown && channel) {
+        try {
+          channel.nack(message, false, true);
+        } catch {
+          // Channel may already be closed or message already settled
+        }
       }
     }
   });

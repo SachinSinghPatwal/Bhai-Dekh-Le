@@ -40,6 +40,7 @@ export default async function ScrappingPaginatedJob({
       request,
     })) as JOB_DETAILS[];
 
+
     if (response instanceof RateLimitError || response instanceof Error) {
       log.debug("snapShotting the jobs before throwing error");
 
@@ -53,7 +54,7 @@ export default async function ScrappingPaginatedJob({
         `Error from [${workerId}] last page was [[${i}]] total pages completed ${i - initialPage} | Reason stopped: ${response.message}`,
         i,
       );
-    } else if (response[1].footerPlaceholderLabel) {
+    } else if (response[1].footerPlaceholderColor.toLowerCase() === "green") {
       return unSortedJobs;
     } else if (!Array.isArray(response) || response.length == 0) {
       throw new Error(

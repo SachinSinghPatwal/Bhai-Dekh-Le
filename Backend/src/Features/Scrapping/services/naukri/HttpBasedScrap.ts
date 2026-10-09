@@ -62,7 +62,7 @@ export default async function httpScrapping(
        */
 
       if (!Array.isArray(orderedJobs) || orderedJobs.length === 0) {
-        channel!.ack(message);
+        channel!.nack(message);
 
         log.info(`[${workerId}] No jobs found. Task acknowledged.`);
 
@@ -109,6 +109,8 @@ export default async function httpScrapping(
       log.success(
         `[${workerId}] Scrape result successfully handed to DB queue.`,
       );
+
+      return;
     } catch (error: unknown) {
       if (error instanceof RateLimitError) {
         lastPageCrashed = error.lastPage;
@@ -118,4 +120,8 @@ export default async function httpScrapping(
       attempt++;
     }
   }
+
+  throw new Error(
+    `[${workerId}] Max scrape retries (${customMaxRetries.times}) exhausted without completing scrape.`,
+  );
 }

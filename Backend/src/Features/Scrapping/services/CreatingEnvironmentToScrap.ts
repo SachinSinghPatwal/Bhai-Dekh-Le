@@ -60,8 +60,8 @@ export async function CreatingEnvironmentToScrap(
 
     // 2. Launch browser with stealth
     browser = await chromium.launch({
-      headless: false,
-      args: ["--no-sandbox"],
+      headless: true,
+      args: ["--no-sandbox", "--start-minimized"],
     });
 
     // 3. Create context (attaching storageState if authenticated session is present)

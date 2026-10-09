@@ -31,8 +31,8 @@ export default async function getDesiredJobs({
     );
 
     console.log("going for work");
-    
-    const unSortedJobs = await ScrappingPaginatedJob({
+
+    const jobs = await ScrappingPaginatedJob({
       url: new URL(url.toString()),
       headers,
       request,
@@ -42,9 +42,9 @@ export default async function getDesiredJobs({
       endPage,
     });
 
-    const filteredRecentJob =
-      sortingUnsortedJobBasedOnTimeCreated(unSortedJobs);
-      
+    console.log(jobs.length, jobs[jobs.length - 1].footerPlaceholderColor);
+    const filteredRecentJob = sortingUnsortedJobBasedOnTimeCreated(jobs);
+
     return filteredRecentJob as JOB_DETAILS[];
   } catch (error: unknown) {
     throw error;
