@@ -199,7 +199,7 @@ async function promptUserProfile(): Promise<UserResumeProfile> {
       .map((p) => p.trim().toLowerCase())
       .filter(Boolean);
 
-    const now = new Date().toISOString();
+    const now = getISTDateFormatted();
 
     const profile: UserResumeProfile = {
       personalDetails: {
@@ -234,10 +234,30 @@ async function promptUserProfile(): Promise<UserResumeProfile> {
 }
 
 /**
+ * Formats date in Indian Standard Time (IST) as yyyy-mm-dd-hh(12hr)
+ * Example: "2026-10-09-05pm"
+ */
+export function getISTDateFormatted(date: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat("en-IN", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hour12: true,
+  }).formatToParts(date);
+
+  const map = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+  const period = (map.dayPeriod ?? "").toLowerCase();
+
+  return `${map.year}-${map.month}-${map.day}-${map.hour}${period}`;
+}
+
+/**
  * Creates default user profile fallback when running in a non-interactive environment (CI/Docker/Scripts)
  */
 function createDefaultFallbackProfile(): UserResumeProfile {
-  const now = new Date().toISOString();
+  const now = getISTDateFormatted();
   return {
     personalDetails: {
       fullName: process.env.NAUKRI_NAME ?? "Job Seeker",
