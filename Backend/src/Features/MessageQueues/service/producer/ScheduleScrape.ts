@@ -1,16 +1,9 @@
 import amqp from "amqplib";
-
 import log from "../../../../utility/Logger.js";
-import {
-  CreatingEnvironmentToScrap,
-  SETUP_RETURNED_VALUES,
-} from "../../../Scrapping/services/CreatingEnvironmentToScrap.js";
-import ComposeUrl from "../../../Scrapping/utility/ComposeUrl.js";
-import { JOB_SEARCH_URL, ScheduleScrape } from "../../../../constants.js";
+import { ScheduleScrape } from "../../../../constants.js";
 
 export default async function ScheduleScrapping(): Promise<void> {
   const platform = "naukri";
-  const isScrappingWithBrowserDOM = process.env.USE_BROWSER_SCRAPING!;
   const connection = await amqp.connect(
     process.env.RABBITMQ_URL_WITH_CREDENTIALS!,
   );
@@ -27,29 +20,14 @@ export default async function ScheduleScrapping(): Promise<void> {
 
     const workerCount = Number(process.env.SCRAP_WORKER_COUNT ?? 4);
 
-    let totalJobsAvailable: number = 0;
-
-    if (isScrappingWithBrowserDOM == "HTTP") {
-      /**
-       * @deprecated this will be deprecated after login integration
-       * */
-      const env = (await CreatingEnvironmentToScrap({
-        navigateTo: ComposeUrl(JOB_SEARCH_URL.path, JOB_SEARCH_URL.query),
-        headless: true,
-        browserShutdownStatus: "kill",
-      })) as Pick<SETUP_RETURNED_VALUES, "totalJobsAvailable">;
-      totalJobsAvailable = env?.totalJobsAvailable;
-    }
-
     for (let i = 0; i < workerCount; i++) {
       channel.publish(
         ScheduleScrape,
         "Scrapper",
         Buffer.from(
           JSON.stringify({
-            isScrappingWithBrowserDOM,
             platform,
-            totalJobsAvailable,
+            totalNumberOfJobs: 0,
           }),
         ),
         {

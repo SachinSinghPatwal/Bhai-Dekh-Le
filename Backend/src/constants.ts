@@ -41,16 +41,16 @@ export const CLIENT_DATA_PATH = path.resolve(
   "src/Features/Scrapping/data/client.encrypted.json",
 );
 
-// selectores DONT CHANGE
-export const SELECTORS = {
-  searchExpand:
-    ".nI-gNb-sb__expand, .nI-gNb-sb__placeholder, #ni-gnb-searchbar, .nI-gNb-sb__main",
-  suggestorInput: ".suggestor-input",
-  searchSubmit: ".nI-gNb-sb__icon-wrapper, button[aria-label='Search']",
-  sortButton:
-    "#filter-sort, .styles_sort-droop-label__TxC3K, .styles_ss__menu-btn__4s9fF",
-  sortMenu:
-    "ul[data-filter-id='sort'], .styles_sort-droop-list__BmFFW, .styles_ss__menu_9TuCu",
-  dateSortOption:
-    "li.styles_ss__menu-item__T4rgB[title='Date'], a[data-id='filter-sort-f'], li[title='Date']",
+// Authentication and Account Creation Selectors
+export const AUTH_SELECTORS = {
+  usernameField: "#usernameField",
+  passwordField: "#passwordField",
+  loginSubmit: "button[type='submit']",
+
+  // Scope: Account Creation / Registration Selectors (for future registration workflow)
+  registerButton: "a[href*='register'], .register-btn",
+  nameField: "#name",
+  emailField: "#email",
+  mobileField: "#mobile",
+  registerSubmit: "button[type='submit']",
 } as const;

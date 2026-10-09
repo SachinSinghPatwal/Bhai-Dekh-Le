@@ -6,10 +6,7 @@ import {
   dbSaveExchange,
 } from "../../index.js";
 import { RateLimitError } from "../../../Scrapping/utility/playwright/RateLimitingError.js";
-import {
-  CreatingEnvironmentToScrap,
-  HTTP_SETUP_VALUES,
-} from "../CreatingEnvironmentToScrap.js";
+import { CreatingEnvironmentToScrap } from "../CreatingEnvironmentToScrap.js";
 import makeHttpRequestToGetAllDesiredJobs from "../../../Scrapping/services/GetDesiredJobs.js";
 
 import ComposeUrl from "../../utility/ComposeUrl.js";
@@ -26,16 +23,12 @@ export default async function httpScrapping(
   let orderedJobs;
   let initialTotalJobs = 0;
 
+  const composedURL = ComposeUrl(JOB_SEARCH_URL.path, JOB_SEARCH_URL.query);
+
+  const { totalJobsAvailable, url, headers, request, jobDetails } =
+    await CreatingEnvironmentToScrap(composedURL, workerId);
+
   while (attempt < customMaxRetries.times) {
-    const { url, request, headers, totalJobsAvailable, jobDetails } =
-      (await CreatingEnvironmentToScrap({
-        navigateTo: ComposeUrl(
-          ComposeUrl(JOB_SEARCH_URL.path, JOB_SEARCH_URL.query),
-        ),
-        headless: true,
-        browserShutdownStatus: "kill",
-        mode: "HTTP",
-      })) as Required<HTTP_SETUP_VALUES>;
     try {
       /**
        * @description Final Check on the Total pages from consumer to self

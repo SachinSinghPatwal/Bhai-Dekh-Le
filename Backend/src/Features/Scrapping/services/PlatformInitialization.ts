@@ -1,29 +1,19 @@
 import { ConfirmChannel, Message } from "amqplib";
-import domScrapping from "./naukri/DomBasedScrap.js";
 import httpScrapping from "./naukri/HttpBasedScrap.js";
 
 export default async function PlatformInitialization(
   workerId: string,
   totalNumberOfJobs: number,
   platform: string,
-  isScrappingWithBrowserDOM: boolean,
   channel: ConfirmChannel,
   message: Message,
 ) {
   if (platform === "naukri") {
-    /**
-     * @privatePlatform
-     * */
-    if (isScrappingWithBrowserDOM) {
-      await domScrapping(workerId, totalNumberOfJobs);
-      channel.ack(message);
-    } else {
-      await httpScrapping(workerId, totalNumberOfJobs, channel, message);
-    }
+    // HTTP-based scraping with automated session authentication
+    await httpScrapping(workerId, totalNumberOfJobs, channel, message);
   } else if (platform === "linkedIn") {
+    // Scope: LinkedIn scraping support
   } else {
-    /**
-     * @publicPlatforms
-     * */
+    // Scope: Public platforms support
   }
 }

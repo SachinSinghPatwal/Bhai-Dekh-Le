@@ -87,7 +87,6 @@ async function start(): Promise<void> {
        */
       let content: {
         platform?: string;
-        isScrappingWithBrowserDOM: boolean;
         totalNumberOfJobs?: number;
       };
       try {
@@ -100,10 +99,10 @@ async function start(): Promise<void> {
         return;
       }
 
-      const { platform, isScrappingWithBrowserDOM } = content;
-      if (!platform || !isScrappingWithBrowserDOM) {
+      const { platform } = content;
+      if (!platform) {
         log.error(
-          `[${workerId}] Discarding message with missing platform or type`,
+          `[${workerId}] Discarding message with missing platform`,
         );
         channel?.ack(message);
         return;
@@ -119,7 +118,6 @@ async function start(): Promise<void> {
         workerId,
         totalNumberOfJobs,
         platform,
-        isScrappingWithBrowserDOM,
         channel,
         message,
       );
