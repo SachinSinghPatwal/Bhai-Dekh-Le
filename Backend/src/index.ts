@@ -71,13 +71,18 @@ process.once("SIGUSR2", () => {
 });
 
 connectToMongoDb()
-  .then(async () => {
+  .then(async (connected) => {
     await startScrapConsumer();
 
-    await startDbWorkers();
-
-    log.debug("All Scrap workers started.");
+    if (connected && process.env.MONGO_URI) {
+      await startDbWorkers();
+      log.debug("All Scrap and DB workers started.");
+    } else {
+      log.warn(
+        "MONGO_URI is not defined. DB workers are suspended; scraper workers will persist snapshots locally.",
+      );
+    }
   })
   .catch((err: unknown) => {
-    log.error("MongoDB connection or worker startup failed:", err);
+    log.error("Worker startup failed:", err);
   });

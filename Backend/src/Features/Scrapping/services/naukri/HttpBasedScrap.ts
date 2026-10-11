@@ -10,6 +10,8 @@ import { CreatingEnvironmentToScrap } from "../CreatingEnvironmentToScrap.js";
 import makeHttpRequestToGetAllDesiredJobs from "../../../Scrapping/services/GetDesiredJobs.js";
 
 import ComposeUrl from "../../utility/ComposeUrl.js";
+import saveSnapShots from "../../../../helper/SaveSnapShots.js";
+import { cleanupStaleSnapshots } from "../../../../helper/cleanupStaleSnapshots.js";
 
 export default async function httpScrapping(
   workerId: string,
@@ -68,7 +70,31 @@ export default async function httpScrapping(
       }
       /*
        * =========================
-       * 3. PUBLISH TO DB QUEUE
+       * 3. MONGO_URI NOT DEFINED:
+       * STORE LOCALLY IN SNAPSHOTS
+       * & DO NOT FORWARD TO DB QUEUE
+       * =========================
+       */
+      if (!process.env.MONGO_URI || process.env.MONGO_URI.trim() === "") {
+        log.warn(
+          `[${workerId}] MONGO_URI is not defined. DB workers are suspended; saving ${orderedJobs.length} jobs to 'Backend/snapShots' and cleaning up stale snapshots.`,
+        );
+
+        await saveSnapShots(orderedJobs);
+        await cleanupStaleSnapshots();
+
+        channel!.ack(message);
+
+        log.success(
+          `[${workerId}] Scrape result persisted to local snapshots. Task acknowledged.`,
+        );
+
+        return;
+      }
+
+      /*
+       * =========================
+       * 4. PUBLISH TO DB QUEUE
        * =========================
        */
 
@@ -87,7 +113,7 @@ export default async function httpScrapping(
 
       /*
        * =========================
-       * 4. WAIT FOR BROKER CONFIRM
+       * 5. WAIT FOR BROKER CONFIRM
        * =========================
        *
        * Do NOT ACK the original scrape task
@@ -98,7 +124,7 @@ export default async function httpScrapping(
 
       /*
        * =========================
-       * 5. ACK SCRAPE TASK
+       * 6. ACK SCRAPE TASK
        * =========================
        */
 

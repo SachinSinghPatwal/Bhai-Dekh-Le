@@ -47,6 +47,11 @@ export const PERSONAL_DETAILS_PATH = path.resolve(
   "data/personalDetails.personal.json",
 );
 
+export const USER_DETAILS_PATH = path.resolve(
+  process.cwd(),
+  "data/userDetails.personal.json",
+);
+
 // Authentication and Account Creation Selectors
 export const AUTH_SELECTORS = {
   usernameField: "#usernameField",

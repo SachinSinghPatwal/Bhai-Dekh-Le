@@ -20,6 +20,10 @@ let dbWorkers: ChildProcess[] = [];
 let shuttingDown = false;
 
 export async function startDbWorkers(): Promise<void> {
+  if (!process.env.MONGO_URI || process.env.MONGO_URI.trim() === "") {
+    log.warn("[DB Worker Manager] MONGO_URI is not defined. DB workers are suspended.");
+    return;
+  }
   /*
    * Defensive cleanup if this function
    * is called more than once.

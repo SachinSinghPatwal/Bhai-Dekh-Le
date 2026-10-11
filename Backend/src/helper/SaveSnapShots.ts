@@ -5,11 +5,15 @@ import { JOB_DETAILS } from "../models/Mongo/job.models.js";
 import { getFileFolderNamingConvention } from "./SnapShotsFileNamingConvention.js";
 import { encrypt } from "../utility/crypto/encryption.js";
 import { getAllSnapshotJobs } from "./getAllSnapShots.js";
+import { cleanupStaleSnapshots } from "./cleanupStaleSnapshots.js";
 
 export default async function saveSnapShots(scrapedJobs: JOB_DETAILS[]) {
   if (scrapedJobs.length === 0) {
     return;
   }
+
+  // Check and clean up any stale snapshots older than 1 day
+  await cleanupStaleSnapshots();
 
   const previousJobs = await getAllSnapshotJobs("./snapShots");
   const existingIds = new Set(previousJobs.map((job) => job.jobId));

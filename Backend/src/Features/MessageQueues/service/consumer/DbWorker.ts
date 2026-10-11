@@ -17,6 +17,14 @@ let channel: Awaited<
 let shuttingDown = false;
 
 async function start(): Promise<void> {
+  if (!process.env.MONGO_URI || process.env.MONGO_URI.trim() === "") {
+    log.warn("[DB Worker] MONGO_URI is not defined. DbWorker is suspended.");
+    if (process.send) {
+      process.send({ status: "ready" });
+    }
+    return;
+  }
+
   /*
    * =========================
    * MONGODB
