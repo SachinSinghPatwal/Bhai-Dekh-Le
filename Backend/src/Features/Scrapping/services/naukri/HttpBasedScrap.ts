@@ -28,8 +28,6 @@ export default async function httpScrapping(
   const { totalJobsAvailable, url, headers, request, jobDetails } =
     await CreatingEnvironmentToScrap(composedURL, workerId);
 
-  console.log("url", url);
-
   while (attempt < customMaxRetries.times) {
     try {
       /**

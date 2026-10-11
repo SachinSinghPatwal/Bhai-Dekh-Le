@@ -30,7 +30,6 @@ export default async function getDesiredJobs({
       `[${workerId}] Starting scraping work size: ${endPage - initialPage + 1} pages (from ${initialPage} to ${endPage})`,
     );
 
-    console.log("going for work");
 
     const jobs = await ScrappingPaginatedJob({
       url: new URL(url.toString()),

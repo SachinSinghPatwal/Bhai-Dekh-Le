@@ -32,7 +32,7 @@ export default async function loginToNaukri(
 
   if (hasSavedSession) {
     log.info(
-      `[${workerId}] Authenticated session file found at ${CLIENT_DATA_PATH}. Session is active.`,
+      `[${workerId}] Authenticated session file found , Session is active.`,
     );
     return;
   }

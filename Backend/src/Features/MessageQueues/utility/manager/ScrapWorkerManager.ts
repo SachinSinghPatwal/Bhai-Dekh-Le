@@ -61,8 +61,6 @@ export async function startScrapConsumer(): Promise<void> {
   }
 
   await Promise.all(readyPromises);
-
-  log.success(`All ${workerCount} scraper workers are listening.`);
 }
 
 export async function handleShutdown(): Promise<void> {

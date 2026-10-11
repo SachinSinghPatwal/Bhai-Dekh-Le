@@ -25,8 +25,6 @@ async function start(): Promise<void> {
   // from utiltiy as the exit 1 code is handled by the lifecycle
   await connectToMongoDb();
 
-  log.success(`[DB Worker] MongoDB connected`);
-
   /*
    * =========================
    * RABBITMQ
@@ -135,7 +133,29 @@ async function start(): Promise<void> {
         return;
       }
       throw new Error("Something went wrong while inserting in the db");
-    } catch (error) {
+    } catch (error: any) {
+      const writeErrors = error?.writeErrors;
+      const hasOnlyDuplicateErrors =
+        Array.isArray(writeErrors) &&
+        writeErrors.length > 0 &&
+        writeErrors.every((we: any) => we.code === 11000);
+
+      const isDuplicateKey =
+        hasOnlyDuplicateErrors ||
+        error?.code === 11000 ||
+        (String(error?.message || "").includes("E11000 duplicate key") &&
+          (!Array.isArray(writeErrors) ||
+            writeErrors.every((we: any) => we.code === 11000)));
+
+      if (isDuplicateKey) {
+        const insertedCount = error?.result?.insertedCount ?? 0;
+        log.debug(
+          `[DB Worker] Duplicate job key (${error?.message || "E11000"}). Existing jobs skipped (inserted ${insertedCount} new). ACK.`,
+        );
+        channel!.ack(message);
+        return;
+      }
+
       log.error(`[DB Worker] DB write failed: ${error}`);
 
       /*
@@ -151,8 +171,6 @@ async function start(): Promise<void> {
       }
     }
   });
-
-  log.debug(`[DB Worker] Ready.`);
 
   /*
    * Tell WorkerManager that this worker is

@@ -80,7 +80,6 @@ export async function CreatingEnvironmentToScrap(
     const capturedResponse = eventCapturing<Response>(page, "response");
 
     // 6. Navigate to the intended path requested by caller
-    log.info(`[${workerId}] Navigating to intended path: ${navigateTo}`);
     await page.goto(navigateTo, {
       waitUntil: "domcontentloaded",
     });

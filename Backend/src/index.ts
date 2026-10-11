@@ -72,13 +72,11 @@ process.once("SIGUSR2", () => {
 
 connectToMongoDb()
   .then(async () => {
-    log.success("MongoDB connected");
-
     await startScrapConsumer();
 
     await startDbWorkers();
 
-    log.debug("All workers started.");
+    log.debug("All Scrap workers started.");
   })
   .catch((err: unknown) => {
     log.error("MongoDB connection or worker startup failed:", err);

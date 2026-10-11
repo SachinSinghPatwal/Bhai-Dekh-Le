@@ -61,7 +61,7 @@ export async function startDbWorkers(): Promise<void> {
 
   await Promise.all(readyPromises);
 
-  log.success(`All ${workerCount} DB workers are listening.`);
+  log.debug(`All DB workers are listening.`);
 }
 
 export async function handleDbWorkerShutdown(): Promise<void> {
