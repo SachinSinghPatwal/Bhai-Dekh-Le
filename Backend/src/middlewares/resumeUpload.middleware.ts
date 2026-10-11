@@ -2,7 +2,7 @@ import multer, { type FileFilterCallback } from "multer";
 import path from "node:path";
 import type { Request } from "express";
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 
 const ALLOWED_MIME_TYPES = new Set([
   "application/pdf",
