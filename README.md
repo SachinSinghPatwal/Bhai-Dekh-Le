@@ -1,7 +1,7 @@
 # BhaiDekhLe — Distributed Naukri Job Scraper & Ingestion Pipeline
 
-> **Version:** `1.2.0`  
-> **Status:** Production-Ready Distributed Micro-Worker Architecture  
+> **Version:** `1.3.0`  
+> **Status:** Production-Ready Distributed Micro-Worker Architecture & Automation Pipeline  
 > **Runtime:** Node.js (ESM) + TypeScript + Express 5 + RabbitMQ + Playwright Stealth + MongoDB
 
 BhaiDekhLe is an enterprise-grade, distributed scraping and ingestion pipeline designed to scrape, filter, and persist tech job listings from [Naukri.com](https://www.naukri.com) at scale. It circumvents bot detection (Cloudflare / reCAPTCHA) with stealth browser automation and coordinates workloads through a decoupled, multi-tier RabbitMQ worker architecture with automated crash detection, self-healing respawns, and graceful teardowns.
@@ -13,10 +13,13 @@ BhaiDekhLe is an enterprise-grade, distributed scraping and ingestion pipeline d
 - **Decoupled Two-Tier Queue Pipeline:** Separates CPU/network-intensive scraping from I/O-bound database persistence via dedicated RabbitMQ queues (`TimedScrapping` and `db_save`).
 - **Autonomous Worker Supervision:** Child workers spawned via Node.js `child_process.fork()` with IPC readiness handshakes, exit-code monitoring, 3-second crash backoff, and automatic respawning.
 - **Ordered Two-Phase Graceful Teardown:** Centralized shutdown protocol that drains and terminates scrapers first before stopping database ingestion workers, preventing data loss.
-- **Stealth Browser Session Interception:** Headless Chromium automated via `playwright-extra` and `puppeteer-extra-plugin-stealth` to bypass Cloudflare/Naukri bot protection, capturing authentic session tokens and search headers.
+- **Stealth Browser Session Interception & Auth:** Headless Chromium automated via `playwright-extra` and `puppeteer-extra-plugin-stealth` with automated login support (`Login.ts`) to bypass Cloudflare/Naukri bot protection, capturing authentic session tokens and search headers.
+- **Interactive User Profile Onboarding:** Pre-boot interactive terminal CLI (`basicUserInformation.ts`) configuring candidate details, skills, target roles, experience levels, and search filters before workers initialize.
 - **Deterministic Load Distribution:** Partitions pagination across active scraper processes using mathematical range splitting (`DistributingWork.ts`).
+- **Encrypted Local Snapshot Resilience:** Scraped data caching with AES-256-CBC encryption (`.encrypted.json`) and authenticated decryption for reliable replay and offline tolerance.
 - **Lightweight Paginated HTTP Ingestion:** After single-shot browser session extraction, workers switch to high-speed HTTP fetching, sanitizing HTTP/2 pseudo-headers and streaming 20 jobs per page.
-- **Atomic Bulk Persistence:** Dedicated database workers consume job batches and execute upserts via MongoDB `JobModel.bulkWrite()` with indexed `jobId` deduplication.
+- **Atomic Bulk Persistence & Duplicate Handling:** Dedicated database workers consume job batches and execute unordered `insertOne` operations via MongoDB `JobModel.bulkWrite()`, gracefully handling duplicate key collisions (`E11000`) and expiring stale jobs with a 24-hour TTL index.
+- **Structured Observability & Fast Tooling:** Centralized Winston structured logging across all processes, backed by high-speed Rust-based Oxlint static analysis.
 
 ---
 
@@ -510,25 +513,28 @@ curl -X GET http://localhost:8000/api/v1/test
 ## 📋 Database Schema (`JobModel`)
 
 ```typescript
-interface JOB_DETAILS {
-  title: string;                  // e.g., "Senior React Developer"
-  jobId: string;                  // Unique Naukri job identifier (Unique Index)
-  footerPlaceholderLabel: string; // e.g., "1 Day Ago"
-  companyName: string;            // e.g., "Tech Corp"
-  tagsAndSkills: string[];        // e.g., ["React.js", "TypeScript", "Redux"]
-  placeholders: Record<string, string>[]; // Experience, Salary, Location
-  jdURL: string;                  // Direct URL to job details page
-  JD: string;                     // Full job description HTML/text
-  createdDate: number;            // Unix timestamp
-  salaryDetails: Record<string, unknown>;
-  minExp: string;                 // Minimum required experience in years
-  maxExp: string;                 // Maximum experience in years
-  applyByTime: string;            // Application deadline
-  walkIn: boolean;                // Walk-in interview indicator
-  createdAt: Date;                // Auto-managed Mongoose timestamp
-  updatedAt: Date;                // Auto-managed Mongoose timestamp
+interface JOB_DETAILS extends Document {
+  readonly title: string;                  // e.g., "Senior React Developer"
+  readonly jobId: string;                  // Unique Naukri job identifier (Unique Index)
+  readonly footerPlaceholderLabel: string; // e.g., "1 Day Ago"
+  readonly footerPlaceholderColor: string; // e.g., "#00a152"
+  readonly companyName: string;            // e.g., "Tech Corp"
+  readonly tagsAndSkills: string[];        // e.g., ["React.js", "TypeScript", "Redux"]
+  readonly placeholders: Record<string, string>[]; // Experience, Salary, Location
+  readonly jdURL: string;                  // Direct URL to job details page
+  readonly JD: string;                     // Full job description HTML/text
+  readonly createdDate: number;            // Unix timestamp
+  readonly salaryDetails: Record<string, unknown>;
+  readonly minExp: string;                 // Minimum required experience in years
+  readonly maxExp: string;                 // Maximum experience in years
+  readonly applyByTime: string;            // Application deadline
+  readonly walkIn: boolean;                // Walk-in interview indicator
+  readonly createdAt: Date;                // Auto-managed Mongoose timestamp (TTL Index: 24h auto-expiry)
+  readonly updatedAt: Date;                // Auto-managed Mongoose timestamp
 }
 ```
+
+> **Automated Data Lifecycle:** Includes a MongoDB TTL (Time-To-Live) index on `createdAt` (`expireAfterSeconds: 86400`) that automatically cleans up job listings 24 hours after persistence.
 
 ---
 
@@ -540,12 +546,37 @@ interface JOB_DETAILS {
 | `npm run build` | Compiles TypeScript into JavaScript inside `dist/` |
 | `npm start` | Runs compiled production server from `dist/index.js` |
 | `npm run playwright:install` | Downloads Chromium browser binary for Playwright |
+| `npm run lint` | Runs ultra-fast static code linting via Oxlint |
+| `npm run lint:fix` | Automatically fixes code style and lint issues using Oxlint |
 
 ---
 
 ## 🏷️ Version Changelog
 
-### Version `1.2.0` (Current)
+### Version `1.3.0` (Current)
+- **Interactive User Profile Onboarding & Setup (`basicUserInformation.ts`):**
+  - Integrated interactive CLI onboarding prompt prior to server startup to configure applicant details (full name, email, phone, resume location/link), target job roles, years of experience, work mode, and search keyword preferences.
+  - Automatically verifies and persists profile data to `data/personalDetails.personal.json` with secure schema typing and terminal styling.
+- **Encrypted Job Snapshots & Offline Resilience (`crypto/` & `snapShots/`):**
+  - Implemented AES-256-CBC authenticated encryption (`.encrypted.json`) with cipher initialization vectors (IVs) and auth tags for raw job payloads.
+  - Added robust decryption and fallback parsing for offline replay and resilience against Naukri gateway throttling.
+- **Naukri Authentication & Session Automation (`Login.ts`):**
+  - Added dedicated Playwright stealth login automation for portal authentication.
+  - Centralized authentication selectors and credential dispatch flows in `constants.ts`.
+- **Optimized Unordered Bulk Ingestion & Duplicate Handling (`DbWorker.ts`):**
+  - Refactored `JobModel.bulkWrite()` to execute unordered `insertOne` documents (`ordered: false`).
+  - Added smart duplicate key handling (`E11000` / code 11000) that seamlessly logs and skips pre-existing jobs while committing new listings without nacking messages or blocking the pipeline.
+- **Job Schema Enhancements & 24-Hour TTL Auto-Expiry (`job.models.ts`):**
+  - Added `footerPlaceholderColor` property mapping.
+  - Configured 24-hour TTL index (`expireAfterSeconds: 86400`) on `createdAt` for automated database garbage collection.
+  - Implemented Mongoose post-save validation hooks with formatted `ApiError` reporting.
+- **Unified Winston Structured Logging:**
+  - Migrated logging across all worker consumers, worker managers, and scraping services to a unified Winston logger (`Logger.ts`) with structured levels (`info`, `debug`, `error`, `warn`, `success`).
+- **Modernized Tooling & Linting:**
+  - Integrated Oxlint (`oxlint`, `oxlint --fix`) for lightning-fast Rust-based static linting.
+  - Updated dependencies to Node.js type definitions `^26.6.4` and TypeScript `^7.0.2`.
+
+### Version `1.2.0`
 - **Decoupled Two-Tier Queue Architecture:** Separated scraper tasks (`TimedScrapping`) from database writes (`db_save`), preventing database latency from stalling browser/HTTP pipelines.
 - **Dedicated Worker Managers:** Introduced `ScrapWorkerManager` and `DbWorkerManager` to orchestrate scraper and database child processes independently.
 - **Robust Worker Lifecycle Engine:**
