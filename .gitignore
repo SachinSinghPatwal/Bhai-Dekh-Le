@@ -76,4 +76,4 @@ personalDetails.personal.json
 
 # Testing
 coverage/
-Backend/data/personalDetails.personal.json
+Backend/data
