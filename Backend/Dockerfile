@@ -16,4 +16,6 @@ COPY . .
 
 RUN npm run build
 
+ENV NODE_ENV=production
+
 CMD ["sh", "-c", "echo '=== CONTAINER STARTED ==='; which xvfb-run; which node; node --version; echo \"PORT=$PORT\"; xvfb-run -a --server-args='-screen 0 1920x1080x24' node dist/index.js"]

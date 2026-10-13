@@ -253,6 +253,75 @@ export function getISTDateFormatted(date: Date = new Date()): string {
 
 /*
  * ─────────────────────────────────────────
+ * ENVIRONMENT & DEFAULTS
+ * ─────────────────────────────────────────
+ */
+
+/**
+ * Determines whether the process is running in development mode
+ * where interactive CLI prompts are permitted.
+ *
+ * User interaction is disabled if:
+ * 1. NODE_ENV is 'production', 'deployment', 'staging', or 'prod'
+ * 2. DEPLOYMENT_MODE, DEPLOYMENT, or CI environment variables are 'true'
+ * 3. stdin is not a TTY (no interactive terminal attached)
+ */
+export function isDevelopmentMode(): boolean {
+  const env = (process.env.NODE_ENV || "").trim().toLowerCase();
+  if (env === "production" || env === "deployment" || env === "staging" || env === "prod") {
+    return false;
+  }
+  if (
+    process.env.DEPLOYMENT_MODE === "true" ||
+    process.env.DEPLOYMENT === "true" ||
+    process.env.CI === "true"
+  ) {
+    return false;
+  }
+  // User interaction via stdin requires an interactive terminal
+  if (!stdin.isTTY) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Generates a default profile from environment variables or fallback values.
+ * Used during non-interactive / deployment mode to prevent hanging on CLI prompts.
+ */
+export function getDefaultUserProfile(): UserResumeProfile {
+  const defaultEmail = process.env.NAUKRI_EMAIL ?? "user@example.com";
+  const fullName = process.env.NAUKRI_NAME ?? "Job Seeker";
+  const now = getISTDateFormatted();
+
+  return {
+    personalDetails: {
+      fullName,
+      email: defaultEmail,
+      resumePath: "data/resume.pdf",
+    },
+    jobDetails: {
+      role: process.env.TARGET_ROLE ?? "React Developer",
+      experience: process.env.TARGET_EXPERIENCE ?? "2 Years",
+      location: process.env.TARGET_LOCATION,
+      workMode: "Remote / Hybrid",
+      noticePeriod: "Immediate",
+    },
+    skills: {
+      primary: ["React", "JavaScript", "TypeScript", "Next.js"],
+      secondary: ["Node.js", "Express", "MongoDB", "Tailwind CSS", "Git"],
+    },
+    searchPreferences: {
+      keywords: ["react developer", "frontend engineer", "full stack developer"],
+      platforms: ["naukri", "linkedin"],
+    },
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+/*
+ * ─────────────────────────────────────────
  * MAIN EXPORT
  * ─────────────────────────────────────────
  */
@@ -260,17 +329,19 @@ export function getISTDateFormatted(date: Date = new Date()): string {
 /**
  * Ensures user personal details and resume profile exists before the server starts.
  *
- * If `data/personalDetails.personal.json` already exists:
- *   - Skips prompt and loads the existing unencrypted profile immediately.
+ * - If `data/personalDetails.personal.json` already exists:
+ *   Loads the existing profile immediately.
+ * - If it does not exist and running in DEVELOPMENT mode (interactive terminal):
+ *   Interactively queries the user via the terminal questionnaire.
+ * - If it does not exist and running in DEPLOYMENT / non-interactive mode:
+ *   Creates a default profile using environment variables without prompting.
  *
- * If it does not exist:
- *   - Interactively queries the user in the terminal (or applies fallback in non-TTY mode).
- *   - Saves the collected resume profile as plain JSON to `data/personalDetails.personal.json`.
- *
- * @param options.force - If true, re-prompts even if the file exists
+ * @param options.force - If true, re-generates profile even if the file exists
+ * @param options.interactive - Explicitly control whether to run interactive prompts
  */
 export async function ensureBasicUserInformation(options?: {
   force?: boolean;
+  interactive?: boolean;
 }): Promise<UserResumeProfile> {
   const filePath = PERSONAL_DETAILS_PATH;
 
@@ -285,10 +356,25 @@ export async function ensureBasicUserInformation(options?: {
     }
   }
 
-  // 2. Interactively prompt the user for their resume & job details
+  // 2. Determine whether interactive CLI prompts are allowed
+  const allowInteraction = options?.interactive ?? isDevelopmentMode();
+
+  if (!allowInteraction) {
+    log.info(
+      `[User Profile] Deployment / non-interactive mode active (NODE_ENV="${process.env.NODE_ENV || "development"}", isTTY=${Boolean(stdin.isTTY)}). Skipping terminal questionnaire.`,
+    );
+
+    const fallbackProfile = getDefaultUserProfile();
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
+    await fs.writeFile(filePath, JSON.stringify(fallbackProfile, null, 2), "utf-8");
+    log.info(`[User Profile] Initialized default user profile at ${filePath}`);
+    return fallbackProfile;
+  }
+
+  // 3. In development mode with TTY: interactively prompt the user
   const profile = await promptUserProfile();
 
-  // 3. Write unencrypted JSON to data/personalDetails.personal.json
+  // 4. Write unencrypted JSON to data/personalDetails.personal.json
   await fs.mkdir(path.dirname(filePath), { recursive: true });
   await fs.writeFile(filePath, JSON.stringify(profile, null, 2), "utf-8");
 
