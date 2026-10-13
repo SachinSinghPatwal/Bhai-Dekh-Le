@@ -2,7 +2,7 @@ import { JOB_DETAILS } from "../../../../models/Mongo/job.models.js";
 
 export default function ValidateJobIsPostedWithinSetDays(
   each: any,
-): JOB_DETAILS | undefined {
+): JOB_DETAILS {
   const jobAge = Number(
     String(each.footerPlaceholderLabel).split(" ")[0].replace("+", ""),
   );
@@ -43,5 +43,5 @@ export default function ValidateJobIsPostedWithinSetDays(
       footerPlaceholderColor,
     } as JOB_DETAILS;
   }
-  return undefined;
+  throw new Error("Something went wrong while extracting props form job");
 }
