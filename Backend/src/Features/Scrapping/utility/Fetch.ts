@@ -2,7 +2,7 @@ import { JOB_DETAILS } from "../../../models/Mongo/job.models.js";
 import { RequestParams } from "../../../types.js";
 import log from "../../../utility/Logger.js";
 import bodyValidation from "../helpers/naukri/bodyValidation.js";
-import ResponseValidation from "./playwright/ResponseValidation.js";
+import ResponseValidation from "./playwright/responseValidation.js";
 
 export default async function Fetch({
   url,
