@@ -6,8 +6,14 @@ export function sortingUnsortedJobBasedOnTimeCreated(
 ) {
   return unSortedJobs
     .filter((job) => {
-      const title = String(job.title ?? "").toLowerCase();
-      return title.includes("react") || title.includes("javascript");
+      const title = String(job.title).toLowerCase();
+      return (
+        title.includes("react") ||
+        title.includes("javascript") ||
+        title.includes("web") || 
+        title.includes("frontend") ||
+        title.includes("mern") 
+      );
     })
     .map((job) => ValidateJobIsPostedWithinSetDays(job))
     .filter(Boolean)

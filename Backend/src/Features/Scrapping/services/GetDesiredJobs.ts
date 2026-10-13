@@ -39,10 +39,12 @@ export default async function getDesiredJobs({
       workerId,
       endPage,
     });
-
-    console.log(jobs.length, jobs[jobs.length - 1].footerPlaceholderColor);
     const filteredRecentJob = sortingUnsortedJobBasedOnTimeCreated(jobs);
-
+    console.log(
+      filteredRecentJob.map(({ title, footerPlaceholderLabel }: any) => ({
+        title,footerPlaceholderLabel,
+      })),
+    );
     return filteredRecentJob as JOB_DETAILS[];
   } catch (error: unknown) {
     throw error;

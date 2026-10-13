@@ -32,36 +32,76 @@ export default async function ScrappingPaginatedJob({
   }
 
   for (let i = initialPage; i < endPage; i++) {
+    // Pattern-based adaptive jitter:
+    if (i > initialPage) {
+      // Periodic breather every 15 pages to reset Naukri's sliding rate-limit counter
+      if ((i - initialPage) % 15 === 0) {
+        const breather = Math.floor(Math.random() * 5000) + 8000; // 8.0s - 13.0s
+        log.info(
+          `[${workerId}] Periodic breather: Waiting ${(breather / 1000).toFixed(1)}s after 15 pages to allow rate-limit window to decay...`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, breather));
+      }
+
+      // Adaptive jitter: 3.5s - 6.0s early on, 4s - 7.0s after page 10
+      const baseJitter = i > initialPage + 8 ? 4000 : 3000;
+      const pageJitter = Math.floor(Math.random() * 2500) + baseJitter;
+      log.debug(
+        `[${workerId}] Waiting ${(pageJitter / 1000).toFixed(1)}s before scraping page ${i}...`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, pageJitter));
+    }
+
     setIterativePaginationParams(url as URL, i);
+    log.info(`[${workerId}] Scraping page ${i}...`);
 
-    const response = (await GetAllJobs({
-      url,
-      headers,
-      request,
-    })) as JOB_DETAILS[];
-
-
-    if (response instanceof RateLimitError || response instanceof Error) {
+    let response: JOB_DETAILS[];
+    try {
+      response = (await GetAllJobs({
+        url,
+        headers,
+        request,
+      })) as JOB_DETAILS[];
+    } catch (fetchError: any) {
       log.debug("snapShotting the jobs before throwing error");
 
-      await saveSnapShots(unSortedJobs).catch((err) => {
-        throw new Error(
-          `[${workerId}] Error while saving snapshot before throwing error: ${err.message}`,
-        );
-      });
+      if (unSortedJobs.length > 0) {
+        await saveSnapShots(unSortedJobs).catch((err) => {
+          log.error(
+            `[${workerId}] Error while saving snapshot before throwing error: ${err.message}`,
+          );
+        });
+      }
 
       throw new RateLimitError(
-        `Error from [${workerId}] last page was [[${i}]] total pages completed ${i - initialPage} | Reason stopped: ${response.message}`,
+        `Error from [${workerId}] last page was [[${i}]] total pages completed ${i - initialPage} | Reason stopped: ${fetchError.message}`,
         i,
       );
-    } else if (response[1].footerPlaceholderColor.toLowerCase() === "green") {
-      return unSortedJobs;
-    } else if (!Array.isArray(response) || response.length == 0) {
+    }
+
+    if (!Array.isArray(response) || response.length === 0) {
       throw new Error(
         `[${workerId}] cannot iterate over the jobs , Jobs are not iteratable`,
       );
-    } else {
-      unSortedJobs.push(...response);
     }
+    // Checking early once we reach jobs older than 1 day
+    const jobAge = Number(
+      String(response[0]?.footerPlaceholderLabel ?? "")
+        .split(" ")[0]
+        .replace("+", ""),
+    );
+
+    const isOlderThanLimit = !isNaN(jobAge) && jobAge > 1;
+
+    if (isOlderThanLimit) {
+      log.info(
+        `[${workerId}] Reached end of fresh jobs at page ${i}. Stopping Scrapping and returning Data.`,
+      );
+      return unSortedJobs;
+    }
+
+    unSortedJobs.push(...response);
   }
+
+  return unSortedJobs;
 }

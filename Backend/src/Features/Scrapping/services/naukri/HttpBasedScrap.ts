@@ -27,7 +27,7 @@ export default async function httpScrapping(
 
   const composedURL = ComposeUrl(JOB_SEARCH_URL.path, JOB_SEARCH_URL.query);
 
-  const { totalJobsAvailable, url, headers, request, jobDetails } =
+  let { totalJobsAvailable, url, headers, request, jobDetails } =
     await CreatingEnvironmentToScrap(composedURL, workerId);
 
   while (attempt < customMaxRetries.times) {
@@ -136,12 +136,44 @@ export default async function httpScrapping(
 
       return;
     } catch (error: unknown) {
+      const errorMessage = (error as Error)?.message ?? String(error);
+      const isRecaptcha = errorMessage.includes("RECAPTCHA_BLOCK");
+
       if (error instanceof RateLimitError) {
         lastPageCrashed = error.lastPage;
         log.warn(error.message);
+      } else {
+        log.warn(
+          `[${workerId}] Scrape error occurred: ${errorMessage}`,
+        );
       }
 
       attempt++;
+
+      if (attempt < customMaxRetries.times) {
+        const cooldownMs = isRecaptcha ? 20000 : 15000;
+        log.warn(
+          `[${workerId}] Scrape attempt ${attempt} failed. Cooling down for ${cooldownMs / 1000}s before retrying...`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, cooldownMs));
+
+        if (isRecaptcha) {
+          log.info(
+            `[${workerId}] Detected dead session (RECAPTCHA_BLOCK). Renewing stealth browser session...`,
+          );
+          try {
+            const freshEnv = await CreatingEnvironmentToScrap(composedURL, workerId);
+            headers = freshEnv.headers;
+            url = freshEnv.url;
+            request = freshEnv.request;
+            log.success(
+              `[${workerId}] Fresh session tokens obtained. Resuming scrape from page ${lastPageCrashed ?? "initial"}.`,
+            );
+          } catch (renewErr) {
+            log.error(`[${workerId}] Failed to renew session tokens: ${renewErr}`);
+          }
+        }
+      }
     }
   }
 

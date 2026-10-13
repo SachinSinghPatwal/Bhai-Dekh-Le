@@ -62,6 +62,9 @@ export async function CreatingEnvironmentToScrap(
     browser = await chromium.launch({
       headless: true,
       args: ["--no-sandbox", "--start-minimized"],
+      // proxy: {
+      //   server: "http://13.127.222.175:443",
+      // },
     });
 
     // 3. Create context (attaching storageState if authenticated session is present)
@@ -92,7 +95,9 @@ export async function CreatingEnvironmentToScrap(
     const response = await RaceForResponseOrTimeOut<Response>(capturedResponse);
 
     if (request instanceof TimeoutError || response instanceof TimeoutError) {
-      throw new Error("Request or Response timed out while intercepting search API");
+      throw new Error(
+        "Request or Response timed out while intercepting search API",
+      );
     }
 
     const url = new URL(request.url());
@@ -119,9 +124,6 @@ export async function CreatingEnvironmentToScrap(
       await browser.close();
       browser = null;
     }
-    throw new Error(
-      "Something Went Wrong While Creating the Environment to Scrap",
-      { cause: error },
-    );
+    throw error;
   }
 }
