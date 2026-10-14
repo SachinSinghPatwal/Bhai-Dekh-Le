@@ -21,6 +21,8 @@ export const JOB_AUTH_URL = {
 export const ScheduleScrape = "TimedScrapping";
 export const dbSaveExchange = "db_save_exchange";
 export const dbSave = "db_save";
+export const jdScrapeExchange = "jd_scrape_exchange";
+export const jdScrape = "jd_scrape";
 
 // URL Constants
 export const MatchedURLOfSearch = "/jobapi/v3/search";

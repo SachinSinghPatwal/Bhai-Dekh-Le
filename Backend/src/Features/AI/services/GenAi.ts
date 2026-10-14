@@ -36,7 +36,10 @@ export async function getResumeLink(): Promise<string | null> {
 /**
  * Retrieves full user profile information from MongoDB or local userDetails JSON.
  */
-export async function getUserProfileData(): Promise<Record<string, any> | null> {
+export async function getUserProfileData(): Promise<Record<
+  string,
+  any
+> | null> {
   if (mongoose.connection.readyState === 1) {
     try {
       const dbUser = await User.findOne();
@@ -60,7 +63,7 @@ export async function analyzeResumePdf(
   const ai = getAiClient();
 
   const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
+    model: "gemini-3.8-flash",
     contents: [
       {
         role: "user",
@@ -131,7 +134,10 @@ export async function analyzeResumeFromStoredLink(
 
   if (targetUrl.startsWith("https://res.cloudinary.com")) {
     buffer = await fetchCloudinaryPdf(targetUrl);
-  } else if (targetUrl.startsWith("http://") || targetUrl.startsWith("https://")) {
+  } else if (
+    targetUrl.startsWith("http://") ||
+    targetUrl.startsWith("https://")
+  ) {
     const res = await fetch(targetUrl);
     if (!res.ok) {
       throw new Error(`Failed to fetch resume from remote URL (${res.status})`);
@@ -202,7 +208,7 @@ export async function reviewResumeBullets(
   `;
 
   const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
+    model: "gemini-3.8-flash",
     contents: promptText,
     config: {
       responseMimeType: "application/json",
@@ -247,4 +253,3 @@ export async function reviewResumeBullets(
 
   return BulletReviewSchema.parse(JSON.parse(response.text));
 }
-

@@ -1,23 +1,34 @@
-# BhaiDekhLe — Distributed Naukri Job Scraper & Ingestion Pipeline
+# BhaiDekhLe — Distributed Naukri Job Scraper, JD Ingestion & AI Resume Evaluation Pipeline
 
-> **Version:** `1.3.0`  
+> **Version:** `1.4.0`  
 > **Status:** Production-Ready Distributed Micro-Worker Architecture & Automation Pipeline  
-> **Runtime:** Node.js (ESM) + TypeScript + Express 5 + RabbitMQ + Playwright Stealth + MongoDB
+> **Runtime:** Node.js (ESM) + TypeScript + Express 5 + RabbitMQ + Playwright Stealth + MongoDB + Google Gemini GenAI
 
-BhaiDekhLe is an enterprise-grade, distributed scraping and ingestion pipeline designed to scrape, filter, and persist tech job listings from [Naukri.com](https://www.naukri.com) at scale. It circumvents bot detection (Cloudflare / reCAPTCHA) with stealth browser automation and coordinates workloads through a decoupled, multi-tier RabbitMQ worker architecture with automated crash detection, self-healing respawns, and graceful teardowns.
+BhaiDekhLe is an enterprise-grade, distributed scraping, ingestion, and AI evaluation pipeline designed to scrape, filter, persist, and semantically score tech job listings from [Naukri.com](https://www.naukri.com) against candidate resumes. It circumvents anti-bot detection (Cloudflare / reCAPTCHA) with stealth browser automation and coordinates workloads through a decoupled, multi-tier RabbitMQ worker architecture with automated crash detection, self-healing respawns, unordered bulk database ingestion, and deep-page Job Description (JD) analysis powered by Google Gemini GenAI.
 
 ---
 
 ## 🚀 Key Highlights
 
-- **Decoupled Two-Tier Queue Pipeline:** Separates CPU/network-intensive scraping from I/O-bound database persistence via dedicated RabbitMQ queues (`TimedScrapping` and `db_save`).
+- **Decoupled Three-Phase Pipeline:**
+  1. **Phase 1 (Search Scraping):** Scrapes, intercepts tokens, partitions pagination, and filters job listings via RabbitMQ (`TimedScrapping`).
+  2. **Phase 2 (Persistence & Deduplication):** Dedicated database workers consume job batches via RabbitMQ (`db_save`) and execute unordered `bulkWrite()` in MongoDB, bypassing duplicate collisions (`E11000`).
+  3. **Phase 3 (Deep JD Scraping & Gemini AI Evaluation):** Automatically triggered post-persistence or on-demand via queue. Navigates to individual job detail pages via stealth Playwright sessions, parses full Job Descriptions (JDs), saves them to disk (`jobId.json`), and feeds them alongside the candidate resume to Google Gemini GenAI for scoring.
+- **AI-Powered Candidate-to-Job Fit Evaluation:**
+  - Evaluates candidate resumes against extracted JDs using Google Gemini GenAI (`@google/genai`).
+  - Strict runtime schema validation via **Zod** (`JobRatingSchema` & `BatchJobRatingSchema`).
+  - Computes `matchScore` (0–100), `fitVerdict` (*Strong Match*, *Moderate Match*, *Low Match*, *Not a Fit*), highlights `matchingSkills` vs. `missingSkills`, and generates tailored recommendations.
+  - Renders a formatted visual dashboard report directly in the backend terminal.
+- **Resilient Local-First Resume Loader:**
+  - **Local First:** Checks `Backend/data/*.pdf` unconditionally before any remote network call.
+  - **Remote Soft-Fail:** Cloudinary URL / database profile link acts as a non-blocking fallback that absorbs 401/unauthorized errors without crashing the pipeline.
+  - **Graceful Degradation:** Skips AI rating cleanly if no resume is found while allowing scraping and database persistence to succeed uninterrupted.
 - **Autonomous Worker Supervision:** Child workers spawned via Node.js `child_process.fork()` with IPC readiness handshakes, exit-code monitoring, 3-second crash backoff, and automatic respawning.
-- **Ordered Two-Phase Graceful Teardown:** Centralized shutdown protocol that drains and terminates scrapers first before stopping database ingestion workers, preventing data loss.
+- **Ordered Two-Phase Graceful Teardown:** Centralized shutdown protocol that drains and terminates scrapers first before stopping database ingestion workers, preventing in-flight data loss.
 - **Stealth Browser Session Interception & Auth:** Headless Chromium automated via `playwright-extra` and `puppeteer-extra-plugin-stealth` with automated login support (`Login.ts`) to bypass Cloudflare/Naukri bot protection, capturing authentic session tokens and search headers.
 - **Interactive User Profile Onboarding:** Pre-boot interactive terminal CLI (`basicUserInformation.ts`) configuring candidate details, skills, target roles, experience levels, and search filters before workers initialize.
 - **Deterministic Load Distribution:** Partitions pagination across active scraper processes using mathematical range splitting (`DistributingWork.ts`).
 - **Encrypted Local Snapshot Resilience:** Scraped data caching with AES-256-CBC encryption (`.encrypted.json`) and authenticated decryption for reliable replay and offline tolerance.
-- **Lightweight Paginated HTTP Ingestion:** After single-shot browser session extraction, workers switch to high-speed HTTP fetching, sanitizing HTTP/2 pseudo-headers and streaming 20 jobs per page.
 - **Atomic Bulk Persistence & Duplicate Handling:** Dedicated database workers consume job batches and execute unordered `insertOne` operations via MongoDB `JobModel.bulkWrite()`, gracefully handling duplicate key collisions (`E11000`) and expiring stale jobs with a 24-hour TTL index.
 - **Structured Observability & Fast Tooling:** Centralized Winston structured logging across all processes, backed by high-speed Rust-based Oxlint static analysis.
 
@@ -30,139 +41,273 @@ BhaiDekhLe is an enterprise-grade, distributed scraping and ingestion pipeline d
                                   |   HTTP Client / API   |
                                   +-----------+-----------+
                                               |
-                                     GET /api/v1/job/getAll
-                                              |
+                   +--------------------------+--------------------------+
+                   |                                                     |
+          GET /api/v1/job/getAll                              POST /api/v1/job/scrap-jd
+                   |                                                     |
+                   v                                                     v
+       +-----------------------+                             +-----------------------+
+       |   job.controller.ts   |                             |   job.controller.ts   |
+       |  ScheduleScrapping()  |                             |   ScheduleJdScrape()  |
+       +-----------+-----------+                             +-----------+-----------+
+                   |                                                     |
+                   | (Confirm Channel Publish)                           | (Confirm Channel Publish)
+                   v                                                     v
+       +-----------------------------------------------------------------------------+
+       |                         Exchange: "TimedScrapping"                          | (Direct, Durable)
+       +-----------------------------------------------------------------------------+
+                                              | Routing Key: "Scrapper"
                                               v
-                               +---------------+---------------+
-                               |      job.controller.ts        |
-                               |      ScheduleScrapping()      |
-                               +---------------+---------------+
-                                              |
-                                              v (Confirm Channel Publish)
-                               +---------------+---------------+
-                               |  Exchange: "TimedScrapping"   |  (Direct, Durable)
-                               +---------------+---------------+
-                                              |
-                                              v Routing Key: "Scrapper"
-                               +---------------+---------------+
-                               |    Queue: "TimedScrapping"    |
-                               +---------------+---------------+
-                                        |             |
-                         prefetch(1)    |             |    prefetch(1)
-                                        v             v
-                               +--------+----+   +----+--------+
-                               |  Scraper-1  |   |  Scraper-2  |   (ScrapWorkerManager.ts)
-                               +--------+----+   +----+--------+
-                                        |             |
-                 +----------------------+-------------+-----------------------+
-                 |                                                            |
-                 v (Phase 1: Stealth Session)                                 v (Phase 2: Partitioned Pagination)
-     +----------------------------------+                         +-----------------------------------+
-     | CreatingEnviromentToScrap.ts     |                         | GetDesiredJobs.ts                 |
-     | - Playwright Stealth Chromium    |                         | - DistributingWork.ts partitions  |
-     | - Intercepts /jobapi/v3/search   |                         | - Fetch.ts (HTTP / 429 detection) |
-     | - Extracts tokens & totalJobs    |                         | - Random jitter (1.5s - 3.5s)     |
-     | - Closes browser instance        |                         +-----------------+-----------------+
-     +----------------------------------+                                           |
-                                                                                    v (Phase 3: Filter & Format)
-                                                                  +-----------------------------------+
-                                                                  | sortingJobBasedOnCreated.ts       |
-                                                                  | - Keyword: "React" | "Javascript" |
-                                                                  | - Recency: <= 3 Days              |
-                                                                  +-----------------+-----------------+
-                                                                                    |
-                                                                                    v (Confirm Channel Publish)
-                                                                  +-----------------------------------+
-                                                                  |   Exchange: "db_save_exchange"    | (Direct, Durable)
-                                                                  +-----------------+-----------------+
-                                                                                    |
-                                                                                    v Routing Key: "Save"
-                                                                  +-----------------------------------+
-                                                                  |         Queue: "db_save"          |
-                                                                  +-----------------+-----------------+
-                                                                           |                 |
-                                                            prefetch(1)    |                 |    prefetch(1)
-                                                                           v                 v
-                                                                  +--------+----+   +--------+----+
-                                                                  | DB-Worker-1 |   | DB-Worker-2 | (DbWorkerManager.ts)
-                                                                  +--------+----+   +--------+----+
-                                                                           |                 |
-                                                                           +--------+--------+
-                                                                                    | (Phase 4: Bulk Ingestion)
-                                                                                    v
-                                                                  +-----------------------------------+
-                                                                  | MongoDB (JobModel.bulkWrite)      |
-                                                                  | - Operation: insertOne (unordered)|
-                                                                  | - Deduplication: E11000 bypass    |
-                                                                  | - TTL auto-cleanup: 24h index     |
-                                                                  +-----------------------------------+
+       +-----------------------------------------------------------------------------+
+       |                           Queue: "TimedScrapping"                           |
+       +-----------------------------------------------------------------------------+
+                                       |             |
+                        prefetch(1)    |             |    prefetch(1)
+                                       v             v
+                              +--------+----+   +----+--------+
+                              |  Scraper-1  |   |  Scraper-2  | (ScrapWorkerManager.ts)
+                              +--------+----+   +----+--------+
+                                       |             |
+                +----------------------+-------------+-----------------------+
+                |                                                            |
+                v (Phase 1A: Search Listings Scraping)                       v (Phase 1B: Standalone JD Task)
+    +--------------------------------------+                     +-----------------------------------+
+    | PlatformInitialization ("naukri")    |                     | PlatformInitialization("naukri-jd")|
+    | - Playwright Stealth Session         |                     | - Directly launches               |
+    | - Intercepts /jobapi/v3/search       |                     |   naukriJDScrap()                 |
+    | - Partitioned Pagination (HTTP)      |                     +-----------------+-----------------+
+    | - Filter: Recency <= 3d & Skills     |                                       |
+    +------------------+-------------------+                                       |
+                       |                                                           |
+                       v (Confirm Channel Publish)                                 |
+    +--------------------------------------+                                       |
+    |     Exchange: "db_save_exchange"     | (Direct, Durable)                     |
+    +------------------+-------------------+                                       |
+                       | Routing Key: "Save"                                       |
+                       v                                                           |
+    +--------------------------------------+                                       |
+    |           Queue: "db_save"           |                                       |
+    +------------------+-------------------+                                       |
+             |                 |                                                   |
+ prefetch(1) |                 | prefetch(1)                                       |
+             v                 v                                                   |
+    +--------+----+   +--------+----+                                              |
+    | DB-Worker-1 |   | DB-Worker-2 | (DbWorkerManager.ts)                         |
+    +--------+----+   +--------+----+                                              |
+             |                 |                                                   |
+             +--------+--------+                                                   |
+                      | (Phase 2: Bulk Ingestion)                                  |
+                      v                                                            |
+    +--------------------------------------+                                       |
+    | MongoDB (JobModel.bulkWrite)         |                                       |
+    | - Operation: insertOne (unordered)   |                                       |
+    | - Deduplication: E11000 bypass       |                                       |
+    | - TTL auto-cleanup: 24h index        |                                       |
+    +------------------+-------------------+                                       |
+                       |                                                           |
+                       v (Phase 3: Immediate JD Scraping & AI Rating)              |
+    +------------------------------------------------------------------------------+
+    |                         naukriJDScrap(jobs, workerId)                        |
+    +------------------------------------------------------------------------------+
+                                       |
+        +------------------------------+------------------------------+
+        |                                                             |
+        v                                                             v
++-----------------------------------+             +-----------------------------------+
+| 1. Playwright JD Scraping         |             | 2. Candidate Resume Loading       |
+| - createScrapingSession()         |             | - 1st: Backend/data/*.pdf (LOCAL) |
+| - Navigates to each job.jdURL     |             | - 2nd: Cloudinary URL (soft-fail) |
+| - Resilient container selectors   |             | - 3rd: personalDetails.json       |
+| - Saves individual jobId.json &   |             | - Fallback: Graceful null return  |
+|   allJdDescriptions.json          |             +-----------------+-----------------+
++-----------------+-----------------+                               |
+                  |                                                 |
+                  +-----------------------+-------------------------+
+                                          |
+                                          v (Phase 4: Gemini AI Semantic Evaluation)
+                      +---------------------------------------+
+                      | Google Gemini GenAI (@google/genai)   |
+                      | - System prompt with candidate resume |
+                      | - Structured JSON output (Zod schema) |
+                      | - Match score (0-100) & fit verdicts  |
+                      | - Matching & gap skills breakdown     |
+                      +-------------------+-------------------+
+                                          |
+                                          v
+                      +---------------------------------------+
+                      | Visual Terminal Dashboard & Summary   |
+                      +---------------------------------------+
 ```
 
 ---
 
-## 🔄 Two-Tier Queue & Worker Architecture (`Queue + Worker + Work`)
+## 🔄 Multi-Tier Queue & Worker Architecture (`Queue + Worker + Work`)
 
-The system separates scraping from database writes into two distinct operational tiers to guarantee non-blocking execution, backpressure isolation, and fault tolerance:
+The system decouples scraping, database persistence, and deep AI evaluation across dedicated tiers to guarantee non-blocking execution, backpressure isolation, and fault tolerance:
 
 ### Tier Overview
 
-| Component | Tier 1: Scraper Queue | Tier 2: Database Persistence Queue |
-| :--- | :--- | :--- |
-| **Exchange** | `TimedScrapping` (Direct, Durable) | `db_save_exchange` (Direct, Durable) |
-| **Queue Name** | `TimedScrapping` | `db_save` |
-| **Routing Key** | `Scrapper` | `Save` |
-| **Producer** | `ScheduleScrape.ts` (`ScheduleScrapping()`) | `ScheduleScrapWorker.ts` (Scraper Child Process) |
-| **Consumer** | `ScheduleScrapWorker.ts` (Scraper Child Process) | `DbWorker.ts` (DB Child Process) |
-| **Supervising Manager** | `ScrapWorkerManager.ts` | `DbWorkerManager.ts` |
-| **Worker Concurrency** | Configured via `SCRAP_WORKER_COUNT` (default: `4`) | Configured via `DB_WORKER_COUNT` (default: `2`) |
-| **Channel QoS** | `channel.prefetch(1)` | `channel.prefetch(1)` |
-| **Payload Structure** | Task trigger string (e.g., `scrapping task 1`) | `{ jobs: JOB_DETAILS[] }` (JSON) |
-| **Acknowledgment** | ACKs **only** after DB queue confirms receipt | ACKs **only** after `bulkWrite()` succeeds in Mongo |
+| Component | Tier 1: Scraper Queue | Tier 2: Database Persistence Queue | Stage 3: JD Scraping & AI Evaluation |
+| :--- | :--- | :--- | :--- |
+| **Exchange** | `TimedScrapping` (Direct, Durable) | `db_save_exchange` (Direct, Durable) | Invoked post-DB save or via `TimedScrapping` |
+| **Queue Name** | `TimedScrapping` | `db_save` | N/A (Direct or task routing) |
+| **Routing Key** | `Scrapper` | `Save` | `Scrapper` (when enqueued) |
+| **Producer** | `ScheduleScrape.ts` / `ScheduleJdScrape.ts` | `ScheduleScrapWorker.ts` | `DbWorker.ts` / `ScheduleJdScrape.ts` |
+| **Consumer** | `ScheduleScrapWorker.ts` (Scraper Child) | `DbWorker.ts` (DB Child Process) | `naukriJDScrap.ts` (Worker runtime) |
+| **Supervising Manager** | `ScrapWorkerManager.ts` | `DbWorkerManager.ts` | Supervised within worker process pool |
+| **Concurrency** | `SCRAP_WORKER_COUNT` (default: `4`) | `DB_WORKER_COUNT` (default: `2`) | Runs in context of active worker |
+| **Channel QoS** | `channel.prefetch(1)` | `channel.prefetch(1)` | Isolated Playwright stealth instance |
+| **Payload Structure** | `{ platform: "naukri" \| "naukri-jd", totalNumberOfJobs }` | `{ jobs: JOB_DETAILS[] }` | `jobs: JOB_DETAILS[]` + Resume PDF Buffer |
+| **Acknowledgment** | ACKs after DB queue confirms receipt | ACKs after `bulkWrite()` resolves | Self-contained completion & logging |
 
 ---
 
 ### Work Breakdown Across Tiers
 
-#### 1. Scraping Tier (`ScheduleScrapWorker.ts`)
-- **Work Performed:**
-  1. Receives a scraping trigger message from the `TimedScrapping` queue.
-  2. Spawns an ephemeral stealth Playwright Chromium instance via `CreatingEnviromentToScrap.ts`.
-  3. Intercepts the Naukri search API call to extract the request endpoint, dynamic auth cookies, and headers.
-  4. Calculates page ranges via `DistributingWork.ts` based on its assigned `workerId` (e.g., `worker-1` vs `worker-2`).
-  5. Iterates through paginated endpoints using raw HTTP requests (`Fetch.ts`) with anti-bot randomized jitter.
-  6. On rate-limit or captcha challenges (`RateLimitError`), the worker refreshes its browser session and seamlessly resumes from `lastPageCrashed`.
-  7. Filters extracted jobs by target skills (e.g. React, JavaScript) and recency (`<= 3 days`).
-  8. **The Handoff:**
-     - **Connected Mode (Default):** Publishes the filtered job batch `{ jobs: scrapedJobs }` to `db_save_exchange` with routing key `Save` and `persistent: true`. Awaits RabbitMQ confirmation via `channel.waitForConfirms()`. Once confirmed, acknowledges the original scrape task via `channel.ack(message)`.
-     - **Offline / Local Mode (`MONGO_URI` undefined):** Automatically bypasses the DB queue, encrypts and persists jobs to `Backend/snapShots`, executes automated 24-hour stale snapshot cleanup, and acknowledges the message.
+#### 1. Search Scraping Tier (`ScheduleScrapWorker.ts`)
+1. Receives a scraping trigger message from the `TimedScrapping` queue.
+2. If `platform === "naukri"`:
+   - Spawns an ephemeral stealth Playwright Chromium instance via `CreatingEnvironmentToScrap.ts`.
+   - Intercepts the Naukri search API call to extract the request endpoint, dynamic auth cookies, and headers.
+   - Calculates page ranges via `DistributingWork.ts` based on its assigned `workerId`.
+   - Iterates through paginated endpoints using raw HTTP requests (`Fetch.ts`) with anti-bot randomized jitter.
+   - Filters extracted jobs by target skills (e.g. React, JavaScript) and recency (`<= 3 days`).
+   - Publishes `{ jobs: scrapedJobs }` to `db_save_exchange` (routing key `Save`).
+3. If `platform === "naukri-jd"`:
+   - Dispatches directly to `naukriJDScrap()` and ACKs the message upon completion.
 
 #### 2. Database Persistence Tier (`DbWorker.ts`)
-- **Work Performed:**
-  1. Runs as an independent child process with its own isolated connection to MongoDB (`connectToDb.ts`) and RabbitMQ. Suspended automatically if `MONGO_URI` is omitted.
-  2. Consumes batches from the `db_save` queue with `prefetch(1)`.
-  3. Parses the incoming payload `{ jobs: [...] }`.
-  4. Executes high-performance unordered batch insertions using Mongoose:
-     ```typescript
-     await JobModel.bulkWrite(
-       jobs.map((job) => ({
-         insertOne: {
-           document: job,
-         },
-       })),
-       {
-         ordered: false,
+1. Runs as an independent child process with its own isolated connection to MongoDB (`connectToDb.ts`) and RabbitMQ. Suspended automatically if `MONGO_URI` is omitted.
+2. Consumes batches from the `db_save` queue with `prefetch(1)`.
+3. Executes high-performance unordered batch insertions using Mongoose:
+   ```typescript
+   await JobModel.bulkWrite(
+     jobs.map((job) => ({
+       insertOne: {
+         document: job,
        },
-     );
-     ```
-  5. Gracefully absorbs duplicate key collisions (`E11000`), allowing new jobs to persist while skipping existing records without failing.
-  6. Acknowledges the message (`channel.ack(message)`) only after the bulk write operation resolves.
-  7. On unexpected failures, nacks the message (`channel.nack(message, false, true)`) to trigger retry handling without crashing the scraper pool.
+     })),
+     { ordered: false },
+   );
+   ```
+4. Gracefully absorbs duplicate key collisions (`E11000`), allowing new jobs to persist while skipping existing records without failing.
+5. Acknowledges the message (`channel.ack(message)`).
+6. **Immediate Handoff:** Instantly executes `naukriJDScrap(jobs, workerId)` on the processed batch to begin JD scraping and AI evaluation.
+
+#### 3. Deep JD Scraping & Gemini AI Evaluation (`naukriJDScrap.ts`)
+1. **Target Identification:** Resolves jobs from the incoming batch, MongoDB, or decrypted snapshots fallback (`getAllSnapshotJobs`).
+2. **Playwright JD Scraping:**
+   - Launches a stealth Playwright Chromium browser session via `createScrapingSession()`.
+   - Visits each job's `jdURL` with randomized delay and interaction readiness checks (`waitForPageReady`).
+   - Queries resilient DOM selectors (`.styles_JDC__dang-inner-html`, `section.job-desc-container`, etc.) with body-text fallback.
+   - Saves structured JSON for each job to `Backend/src/Features/Scrapping/data/${jobId}.json`.
+   - Consolidates all scraped descriptions into `Backend/src/Features/Scrapping/data/allJdDescriptions.json`.
+3. **Candidate Resume Resolution:**
+   - **Priority 1 (Local):** Scans `Backend/data/` for any `*.pdf` file. If found, reads it into a buffer immediately.
+   - **Priority 2 (Remote / Cloudinary):** If no local file exists, attempts fetching the candidate's Cloudinary resume. Soft-fails with a warning on 401 or network issues.
+   - **Priority 3 (Config):** Reads resume link from `data/personalDetails.personal.json` or `data/userDetails.personal.json`.
+   - If no resume is available, logs a helpful warning and skips AI rating without crashing the DB worker.
+4. **Gemini GenAI Evaluation:**
+   - Ingests the candidate resume PDF buffer as inline data (`application/pdf`) and passes the scraped JDs.
+   - Requests structured JSON validated against `BatchJobRatingSchema` using `@google/genai`.
+   - Returns per-job fit scores (0–100), verdict categories, skill matches, skill gaps, and strategic advice.
+5. **Dashboard Rendering:** Prints a visual ASCII dashboard report directly in the server terminal.
+
+---
+
+## 🤖 Deep JD Scraping & AI Resume Evaluation Subsystem
+
+### Resume Resolution Hierarchy
+
+```
++-----------------------------------------------------------------------------------+
+|                        Candidate Resume Loading Hierarchy                         |
++-----------------------------------------------------------------------------------+
+
+     [loadResumeBuffer()]
+             |
+             v
+     [Check Backend/data/*.pdf] ────── (File exists?) ──────> [Load Local PDF Buffer] ✅
+             | No                                                    (Priority 1)
+             v
+     [Check MongoDB / Profile URL] ─── (Valid URL?)
+             |                                |
+             |                                v
+             |                   [fetchCloudinaryPdf() / fetch()]
+             |                                |
+             |                      (200 OK?) ─── Yes ──────> [Load Remote Buffer]    ✅
+             |                                |                      (Priority 2)
+             |                                v (401 / Network Error)
+             |                   [Log warning & soft-fail]
+             v                                |
+     [Check personalDetails.json] <───────────+
+             |
+             v
+      (Path/URL valid?) ───────────── Yes ──────────────────> [Load Config Buffer]    ✅
+             | No                                                    (Priority 3)
+             v
+     [Return null & warn: "Drop PDF into Backend/data/"] ────> [Skip AI Rating Gracefully] ⚠️
+```
+
+### Zod AI Evaluation Schema
+
+```typescript
+export const JobRatingSchema = z.object({
+  jobId: z.string(),
+  title: z.string(),
+  companyName: z.string(),
+  matchScore: z.number().min(0).max(100),
+  fitVerdict: z.enum([
+    "Strong Match",
+    "Moderate Match",
+    "Low Match",
+    "Not a Fit",
+  ]),
+  matchingSkills: z.array(z.string()),
+  missingSkills: z.array(z.string()),
+  summary: z.string(),
+  recommendation: z.string(),
+});
+
+export const BatchJobRatingSchema = z.object({
+  overallSummary: z.string(),
+  ratedJobs: z.array(JobRatingSchema),
+});
+```
+
+### Terminal Rating Report Preview
+
+```text
+=====================================================================================
+🎯  GEMINI AI RESUME vs NAUKRI JOB DESCRIPTIONS RATING REPORT
+=====================================================================================
+📄 Candidate Resume Source: local_file:Backend/data/my-resume.pdf
+📊 Total Opportunities Evaluated: 25
+💡 Profile Summary: Strong full-stack profile with deep React, Node.js, and TypeScript skills.
+-------------------------------------------------------------------------------------
+
+[#1] Senior Frontend Developer | Tech Corp (Job ID: 141026001234)
+    🟢 Match Score: 88/100 [Strong Match]
+    ✅ Matching Skills: React.js, TypeScript, Redux Toolkit, Tailwind CSS, REST APIs
+    ⚠️  Missing / Gap Skills: Next.js App Router, GraphQL
+    📝 Analysis: Candidate aligns closely with senior frontend engineering expectations.
+    💡 Advice: Highlight production state management and component optimization in interview.
+
+[#2] Full Stack Engineer | Cloud Solutions (Job ID: 141026005678)
+    🟡 Match Score: 68/100 [Moderate Match]
+    ✅ Matching Skills: Node.js, Express, MongoDB, TypeScript
+    ⚠️  Missing / Gap Skills: Kubernetes, AWS Lambda, Microservices
+    📝 Analysis: Backend competencies match, but DevOps requirements require upskilling.
+    💡 Advice: Emphasize containerization experience and willingness to learn AWS primitives.
+
+=====================================================================================
+```
 
 ---
 
 ## 💀 Worker Death, Crash Detection & Respawn Supervision
 
-Child workers operate under supervisor control. The supervisor isolates crashes, monitors OS process events, and executes automatic self-healing respawns without impacting the parent API server or other workers.
+Child workers operate under supervisor control (`ScrapWorkerManager.ts` & `DbWorkerManager.ts`). The supervisor isolates crashes, monitors OS process events, and executes automatic self-healing respawns without impacting the parent API server or other workers.
 
 ```
 +-----------------------------------------------------------------------------------+
@@ -170,114 +315,47 @@ Child workers operate under supervisor control. The supervisor isolates crashes,
 +-----------------------------------------------------------------------------------+
 
      [spawnWorker()]
-            |
-            v
+             |
+             v
      +--------------+      IPC: { type: "ready" }       +---------------+
      |  fork() Child +---------------------------------->| Active Worker |
      +------+-------+                                   +-------+-------+
-            |                                                   |
-   Timeout / Startup Error                               Crash / Exit Event
-            |                                                   |
-            v                                                   v
+             |                                                   |
+    Timeout / Startup Error                               Crash / Exit Event
+             |                                                   |
+             v                                                   v
      [worker.kill(SIGTERM)]                            [worker.once("exit")]
-            |                                                   |
-            v                                                   v
+             |                                                   |
+             v                                                   v
      [Throw startup error]                             Remove from workers[]
-                                                                |
-                                             +------------------+------------------+
-                                             |                                     |
-                                   isShuttingDown() === true                 code === 0
-                                             |                                     |
-                                             v                                     v
-                                      [Do Not Respawn]                     [Do Not Respawn]
-                                             |
-                                  code !== 0 / Fatal Crash
-                                             |
-                                             v
-                              Wait WORKER_RESTART_DELAY (3s)
-                                             |
-                                  isShuttingDown() === false
-                                             |
-                                             v
-                               [spawnWorker() Recurse]
+                                                                 |
+                                              +------------------+------------------+
+                                              |                                     |
+                                    isShuttingDown() === true                 code === 0
+                                              |                                     |
+                                              v                                     v
+                                       [Do Not Respawn]                     [Do Not Respawn]
+                                              |
+                                   code !== 0 / Fatal Crash
+                                              |
+                                              v
+                                Wait WORKER_RESTART_DELAY (3s)
+                                              |
+                                   isShuttingDown() === false
+                                              |
+                                              v
+                                [spawnWorker() Recurse]
 ```
 
-### 1. Process Spawning & Isolation (`spawn.ts`)
-- Child workers are spawned using Node.js `child_process.fork()` with ESM runtime flags:
-  ```typescript
-  fork(workerPath, {
-    execArgv: ["--import", "tsx"],
-    env: { ...process.env, WORKER_ID: workerId },
-  });
-  ```
-- Each child process receives its own dedicated process identifier (`PID`), separate V8 heap, and isolated event loop.
-
-### 2. Readiness Handshake (`readyStatus.ts`)
-- After being spawned, the worker establishes its RabbitMQ channel, asserts exchanges/queues, and configures prefetch.
-- Once ready to consume messages, the child sends an IPC signal to the parent:
-  ```typescript
-  process.send({ type: "ready" });
-  ```
-- The parent supervisor waits up to `WORKER_READY_TIMEOUT = 30_000` (30 seconds) for this signal.
-- If the worker fails to send the ready signal within 30 seconds or terminates prematurely, the supervisor sends `SIGTERM` to clean up and throws a startup exception.
-
-### 3. Crash Detection (`worker.once("exit")`)
-The parent supervisor binds an `exit` listener to every spawned child process:
-
-```typescript
-worker.once("exit", (code, signal) => {
-  console.log(`[${workerId}] exited. code=${code}, signal=${signal}`);
-
-  // 1. Instantly remove dead process from the active pool
-  const index = workers.indexOf(worker);
-  if (index !== -1) {
-    workers.splice(index, 1);
-  }
-
-  // 2. Suppress restart if manager is in shutdown mode
-  if (isShuttingDown()) {
-    return;
-  }
-
-  // 3. Normal exit (exit code 0) is not considered a crash
-  if (code === 0) {
-    return;
-  }
-
-  // 4. Abnormal exit: schedule delayed respawn
-  console.log(`[${workerId}] crashed. Restarting in 3s...`);
-
-  setTimeout(async () => {
-    if (isShuttingDown()) return;
-
-    try {
-      const respawned = await spawnWorker({
-        workerId,
-        workerPath,
-        workers,
-        isShuttingDown,
-      });
-      console.log(`[${workerId}] restarted. PID=${respawned.pid}`);
-    } catch (error) {
-      console.error(`[${workerId}] failed to restart:`, error);
-    }
-  }, WORKER_RESTART_DELAY); // 3,000 ms
-});
-```
-
-### 4. Decision Matrix: When Workers Respawn vs. Stay Dead
-
-| Condition | Action | Reason |
-| :--- | :--- | :--- |
-| `isShuttingDown() === true` | **No Respawn** | Manager is intentionally shutting down the application. |
-| `code === 0` | **No Respawn** | Worker exited cleanly without errors. |
-| `code !== 0` (e.g. `1`, unhandled exception) | **Respawn after 3s** | Worker crashed due to an application or runtime error. |
-| Killed by OS signal (e.g., `SIGKILL`, OOM) | **Respawn after 3s** | Worker was killed unexpectedly by the environment or OS. |
-| Startup timeout (> 30s before `ready`) | **Termination** | Process failed initialization; parent aborts bootstrap. |
+### Process Spawning & Readiness
+- Spawned using Node.js `child_process.fork()` with ESM flags (`--import tsx`) and dedicated `WORKER_ID`.
+- Handshake via IPC: `process.send({ type: "ready" })`.
+- Startup timeout: `WORKER_READY_TIMEOUT = 30_000` (30 seconds).
+- Exit monitoring: abnormal exit (`code !== 0`) triggers delayed respawn after 3 seconds.
 
 ---
 
-## 🛑 Coordinated Two-Phase Graceful Shutdown (`shutdown.ts` & `index.ts`)
+## 🛑 Coordinated Two-Phase Graceful Shutdown
 
 When an exit signal (`SIGINT`, `SIGTERM`, `SIGUSR2`) is captured, the application executes a sequential two-phase teardown to prevent in-flight data corruption:
 
@@ -307,17 +385,14 @@ When an exit signal (`SIGINT`, `SIGTERM`, `SIGUSR2`) is captured, the applicatio
 [Process Exit: code 0]
 ```
 
-### Force Kill Fallback (`WORKER_SHUTDOWN_TIMEOUT`)
-- The supervisor gives every worker **10 seconds** (`WORKER_SHUTDOWN_TIMEOUT = 10_000`) to finish its current job, close its AMQP channel, close database connections, and exit cleanly.
-- If a child process fails to exit within 10 seconds, the supervisor issues `worker.kill("SIGKILL")` to enforce termination without hanging the parent process.
-
 ---
 
 ## 📂 Repository Structure
 
 ```
 Backend/
-├── data/                                     # Local candidate profile data (gitignored)
+├── data/                                     # Local candidate profile & resume store (gitignored)
+│   ├── my-resume.pdf                         # Optional: Local candidate resume (Priority 1 for AI rating)
 │   ├── personalDetails.personal.json         # Terminal-configured candidate information
 │   └── userDetails.personal.json             # Synced user preferences and resume links
 │
@@ -334,7 +409,7 @@ Backend/
 │   │   └── load-env.ts                       # Path-independent environment variable bootstrap
 │   │
 │   ├── controllers/
-│   │   ├── job.controller.ts                 # Job scraping dispatch handler (getAllJobs)
+│   │   ├── job.controller.ts                 # Job scraping & JD evaluation handlers (getAllJobs, triggerJdScrape)
 │   │   └── user.controller.ts                # Resume uploads, profile retrieval, profile updates
 │   │
 │   ├── db/
@@ -357,34 +432,42 @@ Backend/
 │   │   └── user.models.ts                    # User schema for authentication & resume storage
 │   │
 │   ├── routes/
-│   │   ├── job.routes.ts                     # /api/v1/job routes (equipped with jobMiddleware)
+│   │   ├── job.routes.ts                     # /api/v1/job routes (getAll, scrap-jd)
 │   │   └── user.routes.ts                    # /api/v1/user routes (resume upload & profile)
 │   │
 │   ├── Features/
 │   │   ├── AI/
 │   │   │   └── services/
 │   │   │       ├── Cloudincary.ts            # Validates and downloads remote Cloudinary PDF buffers
-│   │   │       └── GenAi.ts                  # Google Gemini GenAI candidate resume analyzer
+│   │   │       └── GenAi.ts                  # Google Gemini GenAI candidate resume semantic analyzer
+│   │   │
 │   │   ├── MessageQueues/
 │   │   │   ├── service/
 │   │   │   │   ├── consumer/
-│   │   │   │   │   ├── DbWorker.ts           # DB persistence consumer executing bulkWrite
+│   │   │   │   │   ├── DbWorker.ts           # DB persistence consumer executing bulkWrite & JD trigger
 │   │   │   │   │   └── ScheduleScrapWorker.ts# Scraper consumer managing browser & HTTP tasks
 │   │   │   │   └── producer/
-│   │   │   │       └── ScheduleScrape.ts     # Publishes scraping tasks to RabbitMQ
+│   │   │   │       ├── ScheduleScrape.ts     # Publishes search scraping tasks to RabbitMQ
+│   │   │   │       └── ScheduleJdScrape.ts   # Enqueues dedicated JD scraping & AI evaluation task
 │   │   │   └── utility/manager/
-│   │   │       ├── DbWorkerManager.ts        # Supervisor for DB persistence workers (auto-suspended if offline)
+│   │   │       ├── DbWorkerManager.ts        # Supervisor for DB persistence workers
 │   │   │       └── ScrapWorkerManager.ts     # Supervisor for scraper child processes
+│   │   │
 │   │   ├── Scrapping/
+│   │   │   ├── data/                         # Persisted Job Descriptions (gitignored)
+│   │   │   │   ├── [jobId].json              # Individual parsed Job Description JSON files
+│   │   │   │   └── allJdDescriptions.json    # Consolidated batch of scraped JDs
 │   │   │   ├── services/
 │   │   │   │   ├── CreatingEnvironmentToScrap.ts # Stealth Playwright browser session interceptor
 │   │   │   │   ├── GetDesiredJobs.ts         # Multi-page paginated extraction runner
-│   │   │   │   ├── PlatformInitialization.ts # Platform-specific browser context builder
+│   │   │   │   ├── PlatformInitialization.ts # Multi-platform dispatcher (naukri, naukri-jd)
 │   │   │   │   └── naukri/
 │   │   │   │       ├── HttpBasedScrap.ts     # High-speed HTTP ingestion & offline snapshot fallback
+│   │   │   │       ├── naukriJDScrap.ts      # Stealth JD page scraper, resume loader & Gemini evaluator
 │   │   │   │       └── naukriAuth/Login.ts   # Automated stealth portal authentication
 │   │   │   ├── helpers/                      # Pagination runners & recency processors
 │   │   │   └── utility/                      # URL builder, HTTP fetcher, rate-limit error handlers
+│   │   │
 │   │   ├── UserInteractions/
 │   │   │   └── utility/
 │   │   │       └── basicUserInformation.ts   # Interactive terminal CLI onboarding prompt
@@ -410,16 +493,17 @@ Backend/
 | **Language** | TypeScript | `^7.0.2` | Type safety and modern ECMAScript features |
 | **Runtime** | Node.js | `>= 18` (ESM) | Process execution & native `child_process.fork()` |
 | **Framework** | Express | `5.2.1` | REST API routing and middleware |
-| **Cloud Storage** | Cloudinary | `^2.5.1` | Secure cloud storage for applicant resume files |
-| **File Processing** | Multer | `^1.4.5-lts.1` | Multipart form-data parser with filetype & size filtering |
-| **Generative AI** | Google GenAI SDK | `^2.28.0` (`@google/genai`) | Gemini AI for candidate resume semantic parsing |
-| **Validation** | Zod | `^4.6.5` | Type-safe runtime schema parsing |
+| **Generative AI** | Google GenAI SDK | `^2.28.0` (`@google/genai`) | Gemini AI for candidate resume semantic scoring against JDs |
+| **Validation** | Zod | `^4.6.5` | Type-safe runtime schema parsing for AI outputs |
+| **Cloud Storage** | Cloudinary | `^2.11.0` | Cloud storage for applicant resume files |
+| **File Processing** | Multer | `^2.4.0` | Multipart form-data parser with filetype & size filtering |
+| **PDF Extraction** | pdf-parse | `^1.1.1` | Local PDF buffer text parsing |
 | **Message Broker** | RabbitMQ (`amqplib`) | `^2.0.1` | Asynchronous task queues, confirm channels, prefetch |
-| **Automation** | Playwright + Playwright Extra | `^1.62.1` | Chromium automation for session cookie/header extraction |
+| **Automation** | Playwright + Playwright Extra | `^1.62.1` | Chromium automation for stealth search & JD extraction |
 | **Anti-Bot Stealth** | `puppeteer-extra-plugin-stealth` | `^2.11.2` | Bypasses Cloudflare and Naukri bot detection |
 | **Database** | MongoDB + Mongoose | `^9.9.5` | Document persistence, unique indices & bulk writes |
 | **Execution** | tsx + nodemon | `^4.20.6` / `^3.1.14` | Hot-reloading TypeScript ESM execution |
-| **Logging** | Winston | `^3.19.0` | Multi-transport production logging |
+| **Logging** | Winston | `^3.19.0` | Multi-transport structured production logging |
 | **Linting** | Oxlint | `^1.83.0` | Ultra-fast Rust-based static code analysis |
 
 ---
@@ -448,7 +532,7 @@ WORKER_ID="worker-1"
 # Frontend / CORS
 FRONTEND_URL=http://localhost:5173
 
-# AI Integration
+# Google Gemini AI Integration (Required for JD Resume Scoring)
 GEMINI_API_KEY=your_gemini_api_key_here
 
 # Cloudinary Storage
@@ -457,7 +541,7 @@ CLOUDINARY_API_KEY=your_cloudinary_api_key
 CLOUDINARY_API_SECRET=your_cloudinary_api_secret
 ```
 
-> **Offline / Snapshot Mode:** If `MONGO_URI` is not defined in `.env`, the database connection and `DbWorker` processes are suspended automatically. Scraped jobs are encrypted and stored in `Backend/snapShots/DD-MM-YYYY/`, and stale snapshot folders from prior days are automatically cleaned up while preserving critical user profiles and encrypted client tokens.
+> **Local Resume Tip:** To test AI resume rating without configuring Cloudinary, simply drop any PDF resume file directly into `Backend/data/` (e.g. `Backend/data/resume.pdf`). The system will detect it automatically.
 
 ---
 
@@ -467,7 +551,7 @@ CLOUDINARY_API_SECRET=your_cloudinary_api_secret
 - **Node.js**: `v18.x` or higher
 - **MongoDB**: Local instance or MongoDB Atlas (optional)
 - **RabbitMQ**: Local broker or CloudAMQP instance
-- **Cloudinary Account**: For candidate resume document uploads
+- **Google Gemini API Key**: For AI resume-to-JD evaluation
 
 ### 2. Install Dependencies & Playwright Browsers
 
@@ -507,13 +591,16 @@ All 2 DB workers are listening.
 All workers started.
 ```
 
-### 4. Trigger Scraping Pipeline
+### 4. Trigger Scraping & Evaluation
 
 ```bash
-# Trigger distributed scraping
+# 1. Trigger Full Search Scraping -> Persistence -> Automatic JD Scraping & AI Rating
 curl -X GET http://localhost:8000/api/v1/job/getAll
 
-# Check server health
+# 2. Trigger Standalone JD Scraping & AI Rating on existing jobs
+curl -X POST http://localhost:8000/api/v1/job/scrap-jd
+
+# 3. Check server health
 curl -X GET http://localhost:8000/api/v1/test
 ```
 
@@ -525,7 +612,8 @@ curl -X GET http://localhost:8000/api/v1/test
 
 | Method | Endpoint | Description | Response |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/api/v1/job/getAll` | Executes `jobMiddleware` (attaches candidate resume & profile) and publishes scraping tasks | `{ success: true }` |
+| `GET` | `/api/v1/job/getAll` | Executes `jobMiddleware`, attaches user profile context, and publishes search scraping tasks to RabbitMQ. Post-persistence automatically triggers JD scraping and AI evaluation. | `{ success: true, statusCode: 202, message: "Job scraping scheduled successfully" }` |
+| `POST` / `GET` | `/api/v1/job/scrap-jd` | Directly enqueues a dedicated JD scraping and Gemini AI resume evaluation task to RabbitMQ (`TimedScrapping` queue with `platform: "naukri-jd"`). | `{ success: true, statusCode: 202, message: "Job Description scraping and AI rating scheduled to messaging queue successfully" }` |
 
 ### User & Resume Profile API
 
@@ -569,8 +657,6 @@ interface JOB_DETAILS extends Document {
 }
 ```
 
-> **Automated Data Lifecycle:** Includes a MongoDB TTL (Time-To-Live) index on `createdAt` (`expireAfterSeconds: 86400`) that automatically cleans up job listings 24 hours after persistence.
-
 ### `UserModel`
 
 ```typescript
@@ -610,40 +696,50 @@ interface User extends Document {
 
 ## 🏷️ Version Changelog
 
-### Version `1.3.0` (Current)
+### Version `1.4.0` (Current)
+- **Deep Job Description (JD) Scraping Subsystem (`naukriJDScrap.ts`):**
+  - Spawns Playwright stealth browser sessions to navigate directly to each job's `jdURL`.
+  - Extracts comprehensive description HTML and text using responsive selector fallbacks (`.styles_JDC__dang-inner-html`, `section.job-desc-container`, `article`, etc.).
+  - Persists structured JSON files to `Backend/src/Features/Scrapping/data/${jobId}.json` and consolidates them into `allJdDescriptions.json`.
+- **Google Gemini GenAI Resume-to-JD Evaluation:**
+  - Evaluates candidate resumes against scraped JDs using Google Gemini GenAI (`@google/genai`).
+  - Runtime output validation with **Zod** (`BatchJobRatingSchema`, `JobRatingSchema`).
+  - Computes match scores (0–100), categorization verdicts (*Strong Match*, *Moderate Match*, *Low Match*, *Not a Fit*), matching skills, gap skills, and tailored advice.
+  - Generates an ASCII visual dashboard report in the terminal.
+- **Local-First Resume Loading Strategy:**
+  - Hard-prioritizes local candidate resumes from `Backend/data/*.pdf`.
+  - Soft-fails on remote Cloudinary URLs when facing 401 or network authentication issues without crashing the worker pipeline.
+  - Gracefully skips AI rating with a descriptive warning when no resume is present.
+- **Automated Ingestion Pipeline Triggering:**
+  - Seamlessly invokes `naukriJDScrap` immediately after `DbWorker` completes bulk writes or duplicate key skips.
+  - Added dedicated producer `ScheduleJdScrape.ts` and API endpoints (`POST` and `GET` `/api/v1/job/scrap-jd`) for on-demand JD scraping and evaluation.
+- **Platform Initialization Router (`PlatformInitialization.ts`):**
+  - Added multi-platform dispatching for `naukri-jd` and `jdScrap` tasks via RabbitMQ.
+
+### Version `1.3.0`
 - **Interactive User Profile Onboarding & Setup (`basicUserInformation.ts`):**
-  - Integrated interactive CLI onboarding prompt prior to server startup to configure applicant details (full name, email, phone, resume location/link), target job roles, years of experience, work mode, and search keyword preferences.
-  - Automatically verifies and persists profile data to `data/personalDetails.personal.json` with secure schema typing and terminal styling.
+  - Integrated interactive CLI onboarding prompt prior to server startup to configure applicant details, target job roles, years of experience, and keywords.
+  - Automatically verifies and persists profile data to `data/personalDetails.personal.json`.
 - **Encrypted Job Snapshots & Offline Resilience (`crypto/` & `snapShots/`):**
-  - Implemented AES-256-CBC authenticated encryption (`.encrypted.json`) with cipher initialization vectors (IVs) and auth tags for raw job payloads.
-  - Added robust decryption and fallback parsing for offline replay and resilience against Naukri gateway throttling.
+  - Implemented AES-256-CBC authenticated encryption (`.encrypted.json`) with IVs and auth tags.
+  - Added robust decryption and fallback parsing for offline replay.
 - **Naukri Authentication & Session Automation (`Login.ts`):**
   - Added dedicated Playwright stealth login automation for portal authentication.
-  - Centralized authentication selectors and credential dispatch flows in `constants.ts`.
 - **Optimized Unordered Bulk Ingestion & Duplicate Handling (`DbWorker.ts`):**
   - Refactored `JobModel.bulkWrite()` to execute unordered `insertOne` documents (`ordered: false`).
-  - Added smart duplicate key handling (`E11000` / code 11000) that seamlessly logs and skips pre-existing jobs while committing new listings without nacking messages or blocking the pipeline.
+  - Added duplicate key handling (`E11000` / code 11000) that skips pre-existing jobs without nacking.
 - **Job Schema Enhancements & 24-Hour TTL Auto-Expiry (`job.models.ts`):**
-  - Added `footerPlaceholderColor` property mapping.
-  - Configured 24-hour TTL index (`expireAfterSeconds: 86400`) on `createdAt` for automated database garbage collection.
-  - Implemented Mongoose post-save validation hooks with formatted `ApiError` reporting.
-- **Unified Winston Structured Logging:**
-  - Migrated logging across all worker consumers, worker managers, and scraping services to a unified Winston logger (`Logger.ts`) with structured levels (`info`, `debug`, `error`, `warn`, `success`).
-- **Modernized Tooling & Linting:**
-  - Integrated Oxlint (`oxlint`, `oxlint --fix`) for lightning-fast Rust-based static linting.
-  - Updated dependencies to Node.js type definitions `^26.6.4` and TypeScript `^7.0.2`.
+  - Configured 24-hour TTL index (`expireAfterSeconds: 86400`) on `createdAt`.
+- **Unified Winston Structured Logging & Oxlint:**
+  - Migrated logging across all worker consumers and managers to Winston (`Logger.ts`).
+  - Integrated Oxlint for Rust-based static linting.
 
 ### Version `1.2.0`
-- **Decoupled Two-Tier Queue Architecture:** Separated scraper tasks (`TimedScrapping`) from database writes (`db_save`), preventing database latency from stalling browser/HTTP pipelines.
-- **Dedicated Worker Managers:** Introduced `ScrapWorkerManager` and `DbWorkerManager` to orchestrate scraper and database child processes independently.
-- **Robust Worker Lifecycle Engine:**
-  - Standardized `spawnWorker` utility with automatic restart backoff (3s) on abnormal exits (`code !== 0` or kill signals).
-  - Implemented IPC readiness handshake (`readyStatus.ts`) with a 30s startup timeout.
-  - Spliced dead processes out of active worker collections upon exit.
-  - Prevented respawns during intentional shutdowns (`isShuttingDown()` state check).
-- **Two-Phase Graceful Teardown:** Coordinated shutdown in `index.ts` that terminates scraper workers first (cutting off new jobs) before shutting down database persistence workers.
-- **Publisher Confirms for Scrapers:** `ScheduleScrapWorker` now uses RabbitMQ confirm channels (`waitForConfirms()`) before ACKing the original scrape message.
-- **Bulk Database Ingestion:** `DbWorker` executes high-throughput upserts via Mongoose `JobModel.bulkWrite()`.
+- **Decoupled Two-Tier Queue Architecture:** Separated scraper tasks (`TimedScrapping`) from database writes (`db_save`).
+- **Dedicated Worker Managers:** Introduced `ScrapWorkerManager` and `DbWorkerManager`.
+- **Worker Lifecycle Engine:** Standardized `spawnWorker` utility with automatic restart backoff (3s) and IPC readiness handshakes.
+- **Two-Phase Graceful Teardown:** Coordinated shutdown terminating scrapers before database persistence workers.
+- **Publisher Confirms for Scrapers:** `ScheduleScrapWorker` uses RabbitMQ confirm channels before ACKing.
 
 ### Version `1.1.0`
 - RabbitMQ worker cluster with Playwright stealth session discovery.
