@@ -100,7 +100,7 @@ const jobSchema = new Schema<Required<JOB_DETAILS>>(
 jobSchema.index(
   { createdAt: 1 },
   {
-    expireAfterSeconds: 24 * 60 * 60, //after 24 hours it dissapears
+    expireAfterSeconds: 3 * 60 * 60, //after 3 hours it dissapears
   },
 );
 

@@ -118,8 +118,8 @@ BhaiDekhLe is an enterprise-grade, distributed scraping, ingestion, and AI evalu
 | - createScrapingSession()         |             | - 1st: Backend/data/*.pdf (LOCAL) |
 | - Navigates to each job.jdURL     |             | - 2nd: Cloudinary URL (soft-fail) |
 | - Resilient container selectors   |             | - 3rd: personalDetails.json       |
-| - Saves individual jobId.json &   |             | - Fallback: Graceful null return  |
-|   allJdDescriptions.json          |             +-----------------+-----------------+
+| - Saves consolidated batch to     |             | - Fallback: Graceful null return  |
+|   allJdDescriptions.private.json  |             +-----------------+-----------------+
 +-----------------+-----------------+                               |
                   |                                                 |
                   +-----------------------+-------------------------+
@@ -200,8 +200,7 @@ The system decouples scraping, database persistence, and deep AI evaluation acro
    - Launches a stealth Playwright Chromium browser session via `createScrapingSession()`.
    - Visits each job's `jdURL` with randomized delay and interaction readiness checks (`waitForPageReady`).
    - Queries resilient DOM selectors (`.styles_JDC__dang-inner-html`, `section.job-desc-container`, etc.) with body-text fallback.
-   - Saves structured JSON for each job to `Backend/src/Features/Scrapping/data/${jobId}.json`.
-   - Consolidates all scraped descriptions into `Backend/src/Features/Scrapping/data/allJdDescriptions.json`.
+   - Consolidates all scraped descriptions into `Backend/src/Features/Scrapping/data/allJdDescriptions.private.json`.
 3. **Candidate Resume Resolution:**
    - **Priority 1 (Local):** Scans `Backend/data/` for any `*.pdf` file. If found, reads it into a buffer immediately.
    - **Priority 2 (Remote / Cloudinary):** If no local file exists, attempts fetching the candidate's Cloudinary resume. Soft-fails with a warning on 401 or network issues.
@@ -455,8 +454,7 @@ Backend/
 │   │   │
 │   │   ├── Scrapping/
 │   │   │   ├── data/                         # Persisted Job Descriptions (gitignored)
-│   │   │   │   ├── [jobId].json              # Individual parsed Job Description JSON files
-│   │   │   │   └── allJdDescriptions.json    # Consolidated batch of scraped JDs
+│   │   │   │   └── allJdDescriptions.private.json    # Consolidated batch of scraped JDs
 │   │   │   ├── services/
 │   │   │   │   ├── CreatingEnvironmentToScrap.ts # Stealth Playwright browser session interceptor
 │   │   │   │   ├── GetDesiredJobs.ts         # Multi-page paginated extraction runner
@@ -700,7 +698,7 @@ interface User extends Document {
 - **Deep Job Description (JD) Scraping Subsystem (`naukriJDScrap.ts`):**
   - Spawns Playwright stealth browser sessions to navigate directly to each job's `jdURL`.
   - Extracts comprehensive description HTML and text using responsive selector fallbacks (`.styles_JDC__dang-inner-html`, `section.job-desc-container`, `article`, etc.).
-  - Persists structured JSON files to `Backend/src/Features/Scrapping/data/${jobId}.json` and consolidates them into `allJdDescriptions.json`.
+  - Consolidates and persists structured JSON directly to `Backend/src/Features/Scrapping/data/allJdDescriptions.private.json`.
 - **Google Gemini GenAI Resume-to-JD Evaluation:**
   - Evaluates candidate resumes against scraped JDs using Google Gemini GenAI (`@google/genai`).
   - Runtime output validation with **Zod** (`BatchJobRatingSchema`, `JobRatingSchema`).

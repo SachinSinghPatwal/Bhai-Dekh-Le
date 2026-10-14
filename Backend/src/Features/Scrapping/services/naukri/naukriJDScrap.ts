@@ -261,7 +261,7 @@ export async function loadResumeBuffer(): Promise<{
 
 /**
  * 3. Scrapes full Job Descriptions using Playwright stealth session
- *    and saves each as Backend/src/Features/Scrapping/data/[jobId].json
+ *    and saves consolidated results to Backend/src/Features/Scrapping/data/allJdDescriptions.private.json
  */
 export async function scrapeJobDescriptions(
   jobs: JOB_DETAILS[],
@@ -290,7 +290,6 @@ export async function scrapeJobDescriptions(
   try {
     for (let i = 0; i < validJobs.length; i++) {
       const job = validJobs[i];
-      const targetFile = path.join(dataDir, `${job.jobId}.json`);
 
       // Normalize JD URL
       const fullUrl = job.jdURL.startsWith("http")
@@ -345,17 +344,10 @@ export async function scrapeJobDescriptions(
           scrapedAt: new Date().toISOString(),
         };
 
-        // Save individual jobId.json in Backend/src/Features/Scrapping/data
-        await fs.writeFile(
-          targetFile,
-          JSON.stringify(jdRecord, null, 2),
-          "utf-8",
-        );
-
         scrapedJds.push(jdRecord);
 
         log.success(
-          `[${workerId}] Saved JD for ${job.jobId} (${containerText.length} chars) to ${CLIENT_DATA_FOLDER_NAME}/${job.jobId}.json`,
+          `[${workerId}] Scraped JD for ${job.jobId} (${containerText.length} chars)`,
         );
 
         // Friendly jitter delay between navigations (1.5s - 3s)
@@ -381,24 +373,19 @@ export async function scrapeJobDescriptions(
           scrapedAt: new Date().toISOString(),
         };
 
-        await fs.writeFile(
-          targetFile,
-          JSON.stringify(fallbackJdRecord, null, 2),
-          "utf-8",
-        );
         scrapedJds.push(fallbackJdRecord);
       }
     }
 
-    // Also persist consolidated batch file in Backend/src/Features/Scrapping/data
-    const batchFilePath = path.join(dataDir, "allJdDescriptions.json");
+    // Persist consolidated batch file in Backend/src/Features/Scrapping/data
+    const batchFilePath = path.join(dataDir, "allJdDescriptions.private.json");
     await fs.writeFile(
       batchFilePath,
       JSON.stringify(scrapedJds, null, 2),
       "utf-8",
     );
     log.info(
-      `[${workerId}] Consolidated ${scrapedJds.length} JDs saved to ${CLIENT_DATA_FOLDER_NAME}/allJdDescriptions.json`,
+      `[${workerId}] Consolidated ${scrapedJds.length} JDs saved to ${CLIENT_DATA_FOLDER_NAME}/allJdDescriptions.private.json`,
     );
   } finally {
     await browser.close().catch(() => {});
@@ -578,7 +565,7 @@ export function displayRatingReportOnTerminal(
  * 1. Called immediately after DB workers store data in MongoDB.
  * 2. Gets all jobs from backend and extracts jdURL.
  * 3. Launches Playwright via abstract createScrapingSession.
- * 4. Navigates to each JD page, extracts container content, and saves as jobId.json in Backend/src/Features/Scrapping/data.
+ * 4. Navigates to each JD page, extracts container content, and saves to Backend/src/Features/Scrapping/data/allJdDescriptions.private.json.
  * 5. Loads resume from Backend/data or Cloudinary.
  * 6. Prompts Gemini AI to rate resume against all JDs.
  * 7. Prints detailed rating list on terminal and returns the result.
@@ -604,7 +591,7 @@ export default async function naukriJDScrap(
 
     log.info(`[${workerId}] Processing ${jobs.length} jobs for JD scraping.`);
 
-    // 2. Scrape JD pages and save to Backend/src/Features/Scrapping/data/[jobId].json
+    // 2. Scrape JD pages and save consolidated to Backend/src/Features/Scrapping/data/allJdDescriptions.private.json
     const scrapedJds = await scrapeJobDescriptions(jobs, workerId);
     if (scrapedJds.length === 0) {
       log.warn(`[${workerId}] No job descriptions could be scraped.`);
