@@ -7,6 +7,7 @@ import { dbSave, dbSaveExchange } from "../../../../constants.js";
 
 import connectToMongoDb from "../../../Workers/utility/connectToDb.js";
 import log from "../../../../utility/Logger.js";
+import naukriJDScrap from "../../../Scrapping/services/naukri/naukriJDScrap.js";
 
 let rabbitConnection: Awaited<ReturnType<typeof amqp.connect>> | null = null;
 
@@ -79,10 +80,12 @@ async function start(): Promise<void> {
       return;
     }
 
+    let jobs: any[] = [];
+
     try {
       const payload = JSON.parse(message.content.toString());
 
-      const jobs = payload.jobs;
+      jobs = payload.jobs;
 
       if (!Array.isArray(jobs) || jobs.length === 0) {
         channel!.ack(message);
@@ -138,6 +141,16 @@ async function start(): Promise<void> {
         log.success(
           `[DB Worker] Saved ${response.insertedCount} new jobs in MongoDB (received: ${jobs.length}).`,
         );
+
+        // Immediately trigger JD scraping and AI rating
+        try {
+          await naukriJDScrap(jobs, process.env.WORKER_ID ?? "db-worker");
+        } catch (jdErr: any) {
+          log.error(
+            `[DB Worker] naukriJDScrap execution error: ${jdErr?.message ?? jdErr}`,
+          );
+        }
+
         return;
       }
       throw new Error("Something went wrong while inserting in the db");
@@ -161,6 +174,15 @@ async function start(): Promise<void> {
           `[DB Worker] Duplicate job key (${error?.message || "E11000"}). Existing jobs skipped (inserted ${insertedCount} new). ACK.`,
         );
         channel!.ack(message);
+
+        // Immediately trigger JD scraping and AI rating on the jobs
+        try {
+          await naukriJDScrap(jobs, process.env.WORKER_ID ?? "db-worker");
+        } catch (jdErr: any) {
+          log.error(
+            `[DB Worker] naukriJDScrap execution error: ${jdErr?.message ?? jdErr}`,
+          );
+        }
         return;
       }
 

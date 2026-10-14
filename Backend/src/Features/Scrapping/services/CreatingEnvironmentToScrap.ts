@@ -1,4 +1,4 @@
-import { Browser, BrowserContext, Request, Response } from "playwright";
+import { Browser, BrowserContext, Page, Request, Response } from "playwright";
 import { chromium } from "playwright-extra";
 import stealth from "puppeteer-extra-plugin-stealth";
 import { sanitizeCaptureHeaderUrl } from "../helpers/sanitizeCaptureHeaderUrl.js";
@@ -24,22 +24,24 @@ export interface SETUP_VALUES {
 
 export type SETUP_RETURNED_VALUES = SETUP_VALUES;
 
+export interface ScrapingSession {
+  browser: Browser;
+  context: BrowserContext;
+  page: Page;
+}
+
 /**
- * Creates and initializes the scraping environment:
+ * Abstract environment initializer for Playwright scraping.
  * 1. Checks and loads encrypted session state if available.
- * 2. Launches browser and creates context.
- * 3. Executes `loginToNaukri` (which checks data, navigates to login first if needed,
- *    and handles login/account-creation scope before the search path).
- * 4. Navigates to the intended destination URL (`navigateTo`).
- * 5. Intercepts HTTP network communications to retrieve API headers, request, and job data.
+ * 2. Launches browser with stealth plugins.
+ * 3. Creates browser context with storage state if present.
+ * 4. Ensures authenticated session via loginToNaukri.
  *
- * @param navigateTo - The target search/job listing URL to navigate to
- * @param workerId   - The worker ID running this scrape environment
+ * @param workerId - The worker ID running this session
  */
-export async function CreatingEnvironmentToScrap(
-  navigateTo: string,
+export async function createScrapingSession(
   workerId: string = "scraper-worker",
-): Promise<SETUP_VALUES> {
+): Promise<ScrapingSession> {
   let browser: Browser | null = null;
   let context: BrowserContext | null = null;
   let state: any = undefined;
@@ -62,9 +64,6 @@ export async function CreatingEnvironmentToScrap(
     browser = await chromium.launch({
       headless: true,
       args: ["--no-sandbox", "--start-minimized"],
-      // proxy: {
-      //   server: "http://13.127.222.175:443",
-      // },
     });
 
     // 3. Create context (attaching storageState if authenticated session is present)
@@ -74,20 +73,44 @@ export async function CreatingEnvironmentToScrap(
 
     const page = await context.newPage();
 
-    // 4. Authenticate: loginToNaukri checks data, goes to login first if needed,
-    //    and leaves account creation scope ready.
+    // 4. Authenticate: loginToNaukri checks data, goes to login first if needed
     await loginToNaukri(page, context, workerId);
 
-    // 5. Setup event capturing for HTTP API interception before navigation
+    return { browser, context, page };
+  } catch (error) {
+    if (browser) {
+      await browser.close().catch(() => {});
+    }
+    throw error;
+  }
+}
+
+/**
+ * Creates and initializes the scraping environment:
+ * 1. Calls abstract `createScrapingSession` to initialize browser and session.
+ * 2. Navigates to the intended destination URL (`navigateTo`).
+ * 3. Intercepts HTTP network communications to retrieve API headers, request, and job data.
+ *
+ * @param navigateTo - The target search/job listing URL to navigate to
+ * @param workerId   - The worker ID running this scrape environment
+ */
+export async function CreatingEnvironmentToScrap(
+  navigateTo: string,
+  workerId: string = "scraper-worker",
+): Promise<SETUP_VALUES> {
+  const { browser, page } = await createScrapingSession(workerId);
+
+  try {
+    // Setup event capturing for HTTP API interception before navigation
     const capturedRequest = eventCapturing<Request>(page, "request");
     const capturedResponse = eventCapturing<Response>(page, "response");
 
-    // 6. Navigate to the intended path requested by caller
+    // Navigate to the intended path requested by caller
     await page.goto(navigateTo, {
       waitUntil: "domcontentloaded",
     });
 
-    // 7. Await intercepted search API request and response
+    // Await intercepted search API request and response
     const request = await RaceForResponseOrTimeOut<Request>(
       capturedRequest as Promise<Request>,
     );
@@ -110,7 +133,6 @@ export async function CreatingEnvironmentToScrap(
     const method = request.method();
 
     await browser.close();
-    browser = null;
 
     return {
       url,
@@ -120,10 +142,8 @@ export async function CreatingEnvironmentToScrap(
       jobDetails,
     };
   } catch (error: unknown) {
-    if (browser) {
-      await browser.close();
-      browser = null;
-    }
+    await browser.close().catch(() => {});
     throw error;
   }
 }
+

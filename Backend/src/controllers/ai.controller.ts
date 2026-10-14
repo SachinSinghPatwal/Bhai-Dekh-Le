@@ -18,7 +18,7 @@ export async function getAiStatusController(
   res.status(200).json({
     success: true,
     configured,
-    model: "gemini-2.5-flash",
+    model: "gemini-3.8-flash",
     message: configured
       ? "Gemini AI is configured and ready."
       : "GEMINI_API_KEY is missing from environment variables.",
@@ -40,7 +40,8 @@ export async function analyzeResumeController(
     if (!isAiConfigured()) {
       res.status(503).json({
         success: false,
-        message: "Gemini AI is not configured. Please set GEMINI_API_KEY in .env.",
+        message:
+          "Gemini AI is not configured. Please set GEMINI_API_KEY in .env.",
       });
       return;
     }
@@ -102,7 +103,8 @@ export async function reviewBulletsController(
     if (!isAiConfigured()) {
       res.status(503).json({
         success: false,
-        message: "Gemini AI is not configured. Please set GEMINI_API_KEY in .env.",
+        message:
+          "Gemini AI is not configured. Please set GEMINI_API_KEY in .env.",
       });
       return;
     }
@@ -118,7 +120,9 @@ export async function reviewBulletsController(
       return;
     }
 
-    const stringBullets = bullets.filter((b) => typeof b === "string" && b.trim().length > 0);
+    const stringBullets = bullets.filter(
+      (b) => typeof b === "string" && b.trim().length > 0,
+    );
     if (stringBullets.length === 0) {
       res.status(400).json({
         success: false,
@@ -127,9 +131,15 @@ export async function reviewBulletsController(
       return;
     }
 
-    log.info(`[GenAi Controller] Reviewing ${stringBullets.length} resume bullet points`);
+    log.info(
+      `[GenAi Controller] Reviewing ${stringBullets.length} resume bullet points`,
+    );
 
-    const result = await reviewResumeBullets(stringBullets, targetRole, context);
+    const result = await reviewResumeBullets(
+      stringBullets,
+      targetRole,
+      context,
+    );
 
     res.status(200).json({
       success: true,
