@@ -14,9 +14,14 @@ import {
   handleDbWorkerShutdown,
 } from "./Features/MessageQueues/utility/manager/DbWorkerManager.js";
 import { ensureBasicUserInformation } from "./Features/UserInteractions/index.js";
+import cleanupStaleSnapshots from "./helper/cleanupStaleSnapshots.js";
 
 // 1. Ensure user resume & job preference profile exists before starting the server
 await ensureBasicUserInformation();
+
+
+await cleanupStaleSnapshots();
+
 
 const port = Number(process.env.PORT) || 8000;
 
