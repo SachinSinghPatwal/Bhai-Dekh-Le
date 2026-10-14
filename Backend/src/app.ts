@@ -13,10 +13,13 @@ app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 
 import jobRoutes from "./routes/job.routes.js";
 import userRoutes from "./routes/user.routes.js";
+import aiRoutes from "./routes/ai.routes.js";
 // import { errorHandler, notFoundHandler } from "./middlewares/error.middleware.js";
 
 app.use("/api/v1/job", jobRoutes);
 app.use("/api/v1/user", userRoutes);
+app.use("/api/v1/ai", aiRoutes);
+
 
 // Liveness probe — deliberately unauthenticated.
 app.get("/api/v1/test", async (_req, res) => {

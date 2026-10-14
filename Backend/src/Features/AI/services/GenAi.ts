@@ -144,3 +144,107 @@ export async function analyzeResumeFromStoredLink(
 
   return analyzeResumePdf(buffer);
 }
+
+export function isAiConfigured(): boolean {
+  return Boolean(process.env.GEMINI_API_KEY);
+}
+
+export const BulletReviewSchema = z.object({
+  overallFeedback: z.string(),
+  bulletReviews: z.array(
+    z.object({
+      originalBullet: z.string(),
+      score: z.number().min(0).max(10),
+      reason: z.string(),
+      suggestions: z.array(
+        z.object({
+          option: z.string(),
+          rewritten: z.string(),
+          emphasis: z.string(),
+          whyPick: z.string(),
+        }),
+      ),
+    }),
+  ),
+});
+
+export type BulletReviewResult = z.infer<typeof BulletReviewSchema>;
+
+/**
+ * Reviews resume bullet points against recruiter readability and keyword matching criteria.
+ */
+export async function reviewResumeBullets(
+  bullets: string[],
+  targetRole?: string,
+  context?: string,
+): Promise<BulletReviewResult> {
+  const ai = getAiClient();
+
+  const promptText = `
+    You are an expert technical resume editor. Resumes are screened first by non-technical recruiters matching keywords, then by senior engineering leads.
+    
+    Target Role / Niche: ${targetRole || "Software Engineer / Web Developer"}
+    Additional Context: ${context || "None provided"}
+
+    Bullet Principles:
+    1. WHAT was done
+    2. HOW it was done (preserve tools/tech stack keywords)
+    3. WHERE (project/product/context)
+    4. WHY it mattered to the business in plain, understandable language without inventing fake metrics.
+
+    Bullets to review:
+    ${bullets.map((b, i) => `${i + 1}. ${b}`).join("\n")}
+
+    For each bullet:
+    - Score out of 10 against the principles with a clear one-line reason.
+    - Provide 3 strong alternative rewrites (Option A, B, C) emphasizing different strengths (e.g. leadership/scale, technical depth, business impact) and explain why to pick each.
+    Provide an overall summary feedback of the candidate's bullets.
+  `;
+
+  const response = await ai.models.generateContent({
+    model: "gemini-2.5-flash",
+    contents: promptText,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: "OBJECT",
+        properties: {
+          overallFeedback: { type: "STRING" },
+          bulletReviews: {
+            type: "ARRAY",
+            items: {
+              type: "OBJECT",
+              properties: {
+                originalBullet: { type: "STRING" },
+                score: { type: "NUMBER" },
+                reason: { type: "STRING" },
+                suggestions: {
+                  type: "ARRAY",
+                  items: {
+                    type: "OBJECT",
+                    properties: {
+                      option: { type: "STRING" },
+                      rewritten: { type: "STRING" },
+                      emphasis: { type: "STRING" },
+                      whyPick: { type: "STRING" },
+                    },
+                    required: ["option", "rewritten", "emphasis", "whyPick"],
+                  },
+                },
+              },
+              required: ["originalBullet", "score", "reason", "suggestions"],
+            },
+          },
+        },
+        required: ["overallFeedback", "bulletReviews"],
+      },
+    },
+  });
+
+  if (!response.text) {
+    throw new Error("Gemini returned an empty response");
+  }
+
+  return BulletReviewSchema.parse(JSON.parse(response.text));
+}
+
