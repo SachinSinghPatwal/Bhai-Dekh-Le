@@ -9,7 +9,7 @@ import { cleanupStaleSnapshots } from "./cleanupStaleSnapshots.js";
 
 export default async function saveSnapShots(scrapedJobs: JOB_DETAILS[]) {
   if (scrapedJobs.length === 0) {
-    return;
+    throw new Error ("No jobs for snapshoting");
   }
 
   // Check and clean up any stale snapshots older than 1 day
@@ -33,6 +33,10 @@ export default async function saveSnapShots(scrapedJobs: JOB_DETAILS[]) {
 
     existingIds.add(job.jobId);
     newJobs.push(job);
+  }
+
+  if (newJobs.length == 0) {
+    throw new Error("Jobs already exist on previous snapshot");
   }
 
   const { dateFolder, fileName } = getFileFolderNamingConvention(
