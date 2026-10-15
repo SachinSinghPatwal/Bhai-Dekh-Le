@@ -36,7 +36,7 @@ export default async function saveSnapShots(scrapedJobs: JOB_DETAILS[]) {
   }
 
   if (newJobs.length == 0) {
-    throw new Error("Jobs already exist on previous snapshot");
+    throw new Error("NO unique jobs");
   }
 
   const { dateFolder, fileName } = getFileFolderNamingConvention(

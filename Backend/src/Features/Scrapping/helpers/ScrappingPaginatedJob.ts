@@ -69,7 +69,7 @@ export default async function ScrappingPaginatedJob({
       if (unSortedJobs.length > 0) {
         await saveSnapShots(unSortedJobs).catch((err) => {
           log.error(
-            `[${workerId}] Error while saving snapshot before throwing error: ${err.message}`,
+            `[${workerId}] Error while saving snapshot Reason: ${err.message}`,
           );
         });
       }

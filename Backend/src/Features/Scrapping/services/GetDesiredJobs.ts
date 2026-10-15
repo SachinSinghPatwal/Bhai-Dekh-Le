@@ -5,6 +5,7 @@ import { sortingUnsortedJobBasedOnTimeCreated } from "../utility/sortingJobBased
 import fs from "node:fs/promises";
 import DistributingLoadWithWorkers from "../../MessageQueues/helpers/DistributingWork.js";
 import log from "../../../utility/Logger.js";
+import path from "node:path";
 
 export default async function getDesiredJobs({
   url,
@@ -45,10 +46,22 @@ export default async function getDesiredJobs({
       footerPlaceholderLabel,
     })),
   );
-  await fs.rm("./snapshots", {
-    recursive: true,
-    force: true,
-  });
-  
+  const snapshotDir = path.resolve(`./${process.env.SNAPSHOT_FOLDER_NAME!}`);
+
+  const entries = await fs.readdir(snapshotDir);
+
+  console.log(entries)
+
+  await Promise.all(
+    entries
+      .filter((entry) => entry !== ".gitkeep")
+      .map((entry) =>
+        fs.rm(path.join(snapshotDir, entry), {
+          recursive: true,
+          force: true,
+        }),
+      ),
+  );
+
   return filteredRecentJob as JOB_DETAILS[];
 }
