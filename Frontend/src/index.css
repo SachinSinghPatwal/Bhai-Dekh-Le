@@ -1,5 +1,18 @@
 @import "tailwindcss";
 
+@theme {
+  --radius-xs: 2px;
+  --radius-sm: 2px;
+  --radius: 3px;
+  --radius-md: 4px;
+  --radius-lg: 4px;
+  --radius-xl: 6px;
+  --radius-2xl: 6px;
+  --radius-3xl: 8px;
+  --radius-4xl: 8px;
+  --text-xs: 0.8125rem; /* 13px minimum */
+}
+
 :root {
   /* Global Typography System Tokens (Synchronized across Form, Cards & Subsections) */
   --font-page-title: clamp(1.75rem, 2.2vw, 2.25rem); /* 28px - 36px */
@@ -8,8 +21,8 @@
   --font-label: 0.875rem;                             /* 14px */
   --font-input: 0.875rem;                             /* 14px */
   --font-body: 0.875rem;                              /* 14px */
-  --font-sub: 0.75rem;                                /* 12px */
-  --font-caption: 0.6875rem;                          /* 11px */
+  --font-sub: 0.8125rem;                              /* 13px min */
+  --font-caption: 0.8125rem;                          /* 13px min */
   --font-stat: clamp(1.75rem, 2vw, 2rem);             /* 28px - 32px */
 }
 
@@ -33,17 +46,16 @@
 .app-card-title {
   font-size: var(--font-card-header);
   font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: #e4e4e7;
+  letter-spacing: 0.04em;
+  color: #f4f4f5;
   line-height: 1.4;
 }
 
 .app-label {
   font-size: var(--font-label);
   font-weight: 500;
-  letter-spacing: 0.025em;
-  color: #e4e4e7;
+  letter-spacing: 0.02em;
+  color: #d4d4d8;
   line-height: 1.4;
 }
 
@@ -57,7 +69,7 @@
 .app-body {
   font-size: var(--font-body);
   font-weight: 400;
-  color: #f4f4f5;
+  color: #d4d4d8;
   line-height: 1.5;
 }
 
@@ -65,19 +77,19 @@
   font-size: var(--font-sub);
   font-weight: 400;
   color: #a1a1aa;
-  line-height: 1.4;
+  line-height: 1.5;
 }
 
 .app-caption {
   font-size: var(--font-caption);
   font-weight: 400;
-  color: #71717a;
-  line-height: 1.35;
+  color: #a1a1aa;
+  line-height: 1.4;
 }
 
 .app-stat {
   font-size: var(--font-stat);
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: -0.025em;
   color: #f4f4f5;
   line-height: 1.1;
@@ -94,6 +106,17 @@
     color: #f4f4f5;
     min-height: 100vh;
     overflow-x: hidden;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    color: #f4f4f5;
+    font-weight: 600;
+  }
+
+  p {
+    color: #a1a1aa;
+    font-size: 0.8125rem;
+    line-height: 1.5;
   }
 }
 
@@ -116,12 +139,13 @@
   background: rgba(255, 255, 255, 0.22);
 }
 
-/* Glassmorphism helpers */
+/* Glassmorphism helpers - subtle narrow border-radius */
 .glass-panel {
   background: rgba(18, 18, 22, 0.65);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
 }
 
 .glass-panel-subtle {
@@ -129,12 +153,14 @@
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
 }
 
 .glass-input {
   background: rgba(24, 24, 27, 0.55);
   backdrop-filter: blur(8px);
   border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 4px;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -179,8 +205,6 @@
   top: 18%;
   bottom: 18%;
   width: 3.5px;
-  border-top-right-radius: 4px;
-  border-bottom-right-radius: 4px;
   background-color: #f4f4f5;
   box-shadow: 0 0 10px rgba(255, 255, 255, 0.7);
 }

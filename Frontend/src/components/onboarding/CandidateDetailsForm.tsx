@@ -11,9 +11,11 @@ import {
 } from "../../schema/candidateSchema";
 import { useCandidateStore } from "../../store/useCandidateStore";
 import { notifyError, notifySuccess, notifyInfo } from "../../utils/toast";
+import { useNavigate } from "react-router-dom";
+import { FiArrowLeft } from "react-icons/fi";
 
 const INPUT_CLASS =
-  "w-full h-10 px-3.5 app-input rounded-xl glass-input placeholder-zinc-500 transition-all";
+  "w-full h-10 px-3.5 app-input rounded glass-input placeholder-zinc-500 transition-all";
 const LABEL_CLASS = "block app-label";
 
 // Reusable Form Field Component (DRY)
@@ -93,7 +95,7 @@ const TagInputGroup: React.FC<TagInputGroupProps> = ({
         <button
           type="button"
           onClick={() => handleCommit()}
-          className="h-10 px-3.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-zinc-200 text-xs font-medium transition-colors cursor-pointer shrink-0"
+          className="h-10 px-3.5 bg-zinc-800 hover:bg-zinc-700 rounded text-zinc-200 text-xs font-medium transition-colors cursor-pointer shrink-0"
         >
           Add
         </button>
@@ -101,11 +103,11 @@ const TagInputGroup: React.FC<TagInputGroupProps> = ({
 
       {/* Tag container is only mounted when tags length > 0 */}
       {tags.length > 0 && (
-        <div className="flex flex-wrap gap-2 p-2.5 rounded-xl bg-zinc-900/50 border border-white/[0.06]">
+        <div className="flex flex-wrap gap-2 p-2.5 rounded bg-zinc-900/50 border border-white/[0.06]">
           {tags.map((tag) => (
             <span
               key={tag}
-              className="h-8 px-3 rounded-lg text-xs font-medium inline-flex items-center gap-2 bg-zinc-800/90 text-zinc-200 border border-white/10"
+              className="h-8 px-3 rounded text-xs font-medium inline-flex items-center gap-2 bg-zinc-800/90 text-zinc-200 border border-white/10"
             >
               <span>{tag}</span>
               <button
@@ -128,7 +130,7 @@ interface CandidateDetailsFormProps {
 }
 
 const SLIDE_STEPS = [
-  { id: 0, title: "Personal & Resume" },
+  { id: 0, title: "Personal" },
   { id: 1, title: "Skills & Keywords" },
   { id: 2, title: "Education" },
   { id: 3, title: "Projects" },
@@ -137,6 +139,7 @@ const SLIDE_STEPS = [
 export const CandidateDetailsForm: React.FC<CandidateDetailsFormProps> = ({
   onCompleted,
 }) => {
+  const navigate = useNavigate();
   const { profile, setProfile } = useCandidateStore();
   const [currentSlide, setCurrentSlide] = useState(0);
   const [attemptedSteps, setAttemptedSteps] = useState<Record<number, boolean>>({});
@@ -430,6 +433,20 @@ export const CandidateDetailsForm: React.FC<CandidateDetailsFormProps> = ({
 
   return (
     <div className="max-w-[560px] mx-auto space-y-6 pb-24">
+      {/* Return to Dashboard if user is editing an existing profile */}
+      {profile?.fullName && (
+        <div className="flex justify-start">
+          <button
+            type="button"
+            onClick={() => navigate("/dashboard")}
+            className="inline-flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+          >
+            <FiArrowLeft className="text-xs" />
+            <span>Back to Dashboard</span>
+          </button>
+        </div>
+      )}
+
       {/* Centered Page Header */}
       <div className="text-center space-y-3 pt-2">
         <h1 className="app-heading-page">
@@ -438,10 +455,10 @@ export const CandidateDetailsForm: React.FC<CandidateDetailsFormProps> = ({
       </div>
 
       {/* Slidable Carousel Step Indicators with Status Dots & Sliding Active Background */}
-      <div className="relative grid grid-cols-4 p-1 rounded-xl bg-zinc-900/60 border border-white/[0.06] overflow-hidden">
+      <div className="relative grid grid-cols-4 p-1 rounded bg-zinc-900/60 border border-white/[0.06] overflow-hidden">
         {/* Animated sliding active indicator pill transitioning between steps */}
         <div
-          className="absolute top-1 bottom-1 rounded-lg bg-zinc-800 border border-white/15 shadow-sm transition-transform duration-300 ease-out pointer-events-none z-0"
+          className="absolute top-1 bottom-1 rounded bg-zinc-800 border border-white/15 shadow-sm transition-transform duration-300 ease-out pointer-events-none z-0"
           style={{
             left: "4px",
             width: "calc((100% - 8px) / 4)",
@@ -460,7 +477,7 @@ export const CandidateDetailsForm: React.FC<CandidateDetailsFormProps> = ({
               key={step.id}
               type="button"
               onClick={() => handleStepClick(step.id)}
-              className={`relative z-10 py-2 px-1 sm:px-2 rounded-lg text-xs font-medium transition-colors cursor-pointer truncate text-center flex items-center justify-center gap-1.5 ${
+              className={`relative z-10 py-2 px-1 sm:px-2 rounded text-xs font-medium transition-colors cursor-pointer truncate text-center flex items-center justify-center gap-1.5 ${
                 isActive
                   ? "text-zinc-100 font-semibold"
                   : isPassed
@@ -503,9 +520,9 @@ export const CandidateDetailsForm: React.FC<CandidateDetailsFormProps> = ({
           {/* Slide 1: Personal Details & Send Resume */}
           <div className={currentSlide === 0 ? "block slide-content-active space-y-5" : "hidden"}>
             {/* Send Resume Card */}
-            <div className="glass-panel rounded-2xl p-5 border border-white/[0.08] space-y-3">
+            <div className="glass-panel p-5 border border-white/[0.08] space-y-3">
               <div className="pt-1">
-                <label className="cursor-pointer h-9 px-4 w-full rounded-lg bg-zinc-800/90 hover:bg-zinc-700/90 text-zinc-200 border border-white/10 text-xs font-medium flex items-center justify-center transition-all shadow-sm">
+                <label className="cursor-pointer h-9 px-4 w-full rounded bg-zinc-800/90 hover:bg-zinc-700/90 text-zinc-200 border border-white/10 text-xs font-medium flex items-center justify-center transition-all shadow-sm">
                   <span className="truncate">
                     {uploadedFileName
                       ? "Change Resume File"
@@ -547,7 +564,7 @@ export const CandidateDetailsForm: React.FC<CandidateDetailsFormProps> = ({
             </div>
 
             {/* Personal Details Card */}
-            <div className="glass-panel rounded-2xl p-5 sm:p-6 space-y-4">
+            <div className="glass-panel p-5 sm:p-6 space-y-4">
               <h2 className="app-card-title">
                 1. Personal & Target Role
               </h2>
@@ -588,7 +605,7 @@ export const CandidateDetailsForm: React.FC<CandidateDetailsFormProps> = ({
 
           {/* Slide 2: Skills & Portal Keywords */}
           <div className={currentSlide === 1 ? "block slide-content-active space-y-5" : "hidden"}>
-            <div className="glass-panel rounded-2xl p-5 sm:p-6 space-y-5">
+            <div className="glass-panel p-5 sm:p-6 space-y-5">
               <h2 className="app-card-title">
                 2. Skills & Portal Search Keywords
               </h2>
@@ -623,7 +640,7 @@ export const CandidateDetailsForm: React.FC<CandidateDetailsFormProps> = ({
 
           {/* Slide 3: Education & Degree Credentials */}
           <div className={currentSlide === 2 ? "block slide-content-active space-y-5" : "hidden"}>
-            <div className="glass-panel rounded-2xl p-5 sm:p-6 space-y-5">
+            <div className="glass-panel p-5 sm:p-6 space-y-5">
               <h2 className="app-card-title">
                 3. Education & Degree Credentials
               </h2>
@@ -658,7 +675,7 @@ export const CandidateDetailsForm: React.FC<CandidateDetailsFormProps> = ({
                             shouldValidate: true,
                           })
                         }
-                        className={`flex items-center justify-center text-center p-3 rounded-xl border text-xs font-medium cursor-pointer transition-all ${
+                        className={`flex items-center justify-center text-center p-3 rounded border text-xs font-medium cursor-pointer transition-all ${
                           graduationStatus === opt.id
                             ? "bg-zinc-800 text-zinc-100 border-white/20 shadow-sm ring-1 ring-white/10"
                             : "bg-zinc-900/50 text-zinc-400 border-white/5 hover:border-white/10 hover:text-zinc-200"
@@ -682,7 +699,7 @@ export const CandidateDetailsForm: React.FC<CandidateDetailsFormProps> = ({
 
           {/* Slide 4: Projects */}
           <div className={currentSlide === 3 ? "block slide-content-active space-y-5" : "hidden"}>
-            <div className="glass-panel rounded-2xl p-5 sm:p-6 space-y-5">
+            <div className="glass-panel p-5 sm:p-6 space-y-5">
               <div className="flex items-center justify-between">
                 <h2 className="app-card-title">
                   4. Key Projects ({projectFields.length}) *
@@ -699,7 +716,7 @@ export const CandidateDetailsForm: React.FC<CandidateDetailsFormProps> = ({
                       link: "",
                     })
                   }
-                  className="h-8 px-3 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-white/10 text-xs font-medium cursor-pointer transition-colors"
+                  className="h-8 px-3 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-white/10 text-xs font-medium cursor-pointer transition-colors"
                 >
                   + Add Project
                 </button>
@@ -709,7 +726,7 @@ export const CandidateDetailsForm: React.FC<CandidateDetailsFormProps> = ({
                 {projectFields.map((field, index) => (
                   <div
                     key={field.id}
-                    className="p-4 rounded-xl bg-zinc-900/50 border border-white/[0.06] space-y-3 relative"
+                    className="p-4 rounded bg-zinc-900/50 border border-white/[0.06] space-y-3 relative"
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-semibold text-zinc-300">
@@ -761,7 +778,7 @@ export const CandidateDetailsForm: React.FC<CandidateDetailsFormProps> = ({
                             `projects.${index}.description` as const,
                           )}
                           placeholder="Summary of the problem solved and core features..."
-                          className="w-full px-3 py-2 text-sm rounded-lg glass-input text-zinc-100 placeholder-zinc-500 resize-none"
+                          className="w-full px-3 py-2 text-sm rounded glass-input text-zinc-100 placeholder-zinc-500 resize-none"
                         />
                       </div>
 
@@ -787,7 +804,7 @@ export const CandidateDetailsForm: React.FC<CandidateDetailsFormProps> = ({
             <button
               type="button"
               onClick={prevSlide}
-              className="h-9 px-4 rounded-lg bg-zinc-800/80 hover:bg-zinc-700/80 text-zinc-300 border border-white/10 text-xs font-medium cursor-pointer transition-colors"
+              className="h-9 px-4 rounded bg-zinc-800/80 hover:bg-zinc-700/80 text-zinc-300 border border-white/10 text-xs font-medium cursor-pointer transition-colors"
             >
               Previous
             </button>
@@ -799,7 +816,7 @@ export const CandidateDetailsForm: React.FC<CandidateDetailsFormProps> = ({
             <button
               type="button"
               onClick={nextSlide}
-              className="h-9 px-5 rounded-lg bg-zinc-100 hover:bg-white text-zinc-950 text-xs font-medium cursor-pointer transition-colors shadow-sm active:scale-[0.99] ml-auto"
+              className="h-9 px-5 rounded bg-zinc-100 hover:bg-white text-zinc-950 text-xs font-medium cursor-pointer transition-colors shadow-sm active:scale-[0.99] ml-auto"
             >
               Next Step
             </button>
@@ -808,7 +825,7 @@ export const CandidateDetailsForm: React.FC<CandidateDetailsFormProps> = ({
               <button
                 type="submit"
                 disabled={!isAllValid}
-                className={`h-9 px-5 rounded-lg text-xs font-medium transition-all shadow-sm ${
+                className={`h-9 px-5 rounded text-xs font-medium transition-all shadow-sm ${
                   isAllValid
                     ? "bg-zinc-100 hover:bg-white text-zinc-950 cursor-pointer active:scale-[0.99]"
                     : "bg-zinc-800/60 text-zinc-500 border border-white/5 cursor-not-allowed opacity-50 shadow-none"

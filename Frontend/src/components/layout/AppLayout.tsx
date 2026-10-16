@@ -1,11 +1,21 @@
 import React from "react";
+import { useLocation } from "react-router-dom";
 import { RightSidebar } from "./RightSidebar";
+import { useCandidateStore } from "../../store/useCandidateStore";
 
 interface AppLayoutProps {
   children: React.ReactNode;
 }
 
 export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
+  const location = useLocation();
+  const { isFormFilled, profile } = useCandidateStore();
+  const hasFilled = Boolean(isFormFilled || (profile && profile.fullName));
+
+  // Hide sidebar on the candidate details form (/details or / when onboarding)
+  const isDetailsForm =
+    location.pathname === "/details" || (!hasFilled && location.pathname === "/");
+
   return (
     <div className="min-h-screen bg-[#09090b] text-zinc-100 flex relative overflow-x-hidden selection:bg-zinc-800 selection:text-zinc-200">
       {/* Background ambient subtle neutral gradients */}
@@ -22,11 +32,15 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         />
       </div>
 
-      {/* Permanent Left-Side Navigation Sidebar */}
-      <RightSidebar />
+      {/* Left-Side Navigation Sidebar - hidden behind/for the user details form */}
+      {!isDetailsForm && <RightSidebar />}
 
-      {/* Main Content Area - with left margin to clear the left sidebar dock */}
-      <main className="flex-1 transition-all duration-300 relative z-10 px-6 sm:px-10 md:px-14 py-8 lg:py-12 ml-16">
+      {/* Main Content Area - with left margin to clear the sidebar dock only when visible */}
+      <main
+        className={`flex-1 transition-all duration-300 relative z-10 px-6 sm:px-10 md:px-14 py-8 lg:py-12 ${
+          isDetailsForm ? "ml-0" : "ml-16"
+        }`}
+      >
         <div className="w-full max-w-7xl mx-auto">
           {children}
         </div>
