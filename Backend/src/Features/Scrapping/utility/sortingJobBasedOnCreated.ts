@@ -1,7 +1,6 @@
-import { JOB_DETAILS } from "../../../models/Mongo/job.models.js";
-import ValidateJobIsPostedWithinSetDays from "./playwright/ValidatingProp.js";
+import { JOB_DETAILS, ValidatingProp } from "../index.js";
 
-export function sortingUnsortedJobBasedOnTimeCreated(
+export function sortingJobBasedOnCreated(
   unSortedJobs: JOB_DETAILS[],
 ) {
   return unSortedJobs
@@ -15,7 +14,11 @@ export function sortingUnsortedJobBasedOnTimeCreated(
         title.includes("mern") 
       );
     })
-    .map((job) => ValidateJobIsPostedWithinSetDays(job))
+    .map((job) => ValidatingProp(job))
     .filter(Boolean)
     .sort((a: any, b: any) => b.createdDate - a.createdDate);
 }
+
+const sortingUnsortedJobBasedOnTimeCreated = sortingJobBasedOnCreated;
+export { sortingUnsortedJobBasedOnTimeCreated };
+export default sortingJobBasedOnCreated;

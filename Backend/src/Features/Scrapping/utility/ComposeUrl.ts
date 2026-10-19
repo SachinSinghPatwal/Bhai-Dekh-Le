@@ -1,4 +1,4 @@
-import { NAUKRI_BASE_URL } from "../../../constants.js";
+import { NAUKRI_BASE_URL } from "../index.js";
 
 export default function ComposeUrl(
   path: string,

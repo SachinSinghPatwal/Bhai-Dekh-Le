@@ -1,6 +1,6 @@
-import { JOB_DETAILS } from "../../../../models/Mongo/job.models.js";
+import { JOB_DETAILS } from "../../index.js";
 
-export default function ValidateJobIsPostedWithinSetDays(
+export default function ValidatingProp(
   each: any,
 ): JOB_DETAILS | undefined {
   const jobAge = Number(
@@ -45,3 +45,6 @@ export default function ValidateJobIsPostedWithinSetDays(
   }
   return undefined;
 }
+
+const ValidateJobIsPostedWithinSetDays = ValidatingProp;
+export { ValidateJobIsPostedWithinSetDays };

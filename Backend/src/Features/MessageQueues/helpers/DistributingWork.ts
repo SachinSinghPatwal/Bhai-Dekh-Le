@@ -1,4 +1,4 @@
-export default async function DistributingLoadWithWorkers(
+export default async function DistributingWork(
   totalJobsAvailable: number,
   workerId: string,
 ) {
@@ -20,3 +20,6 @@ export default async function DistributingLoadWithWorkers(
 
   return { startPage, endPage };
 }
+
+const DistributingLoadWithWorkers = DistributingWork;
+export { DistributingLoadWithWorkers };

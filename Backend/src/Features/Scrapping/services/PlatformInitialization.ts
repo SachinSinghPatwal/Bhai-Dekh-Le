@@ -1,6 +1,5 @@
 import { ConfirmChannel, Message } from "amqplib";
-import httpScrapping from "./naukri/HttpBasedScrap.js";
-import naukriJDScrap from "./naukri/naukriJDScrap.js";
+import { HttpBasedScrap, naukriJDScrap } from "../index.js";
 
 export default async function PlatformInitialization(
   workerId: string,
@@ -11,7 +10,7 @@ export default async function PlatformInitialization(
 ) {
   if (platform === "naukri") {
     // HTTP-based scraping with automated session authentication
-    await httpScrapping(workerId, totalNumberOfJobs, channel, message);
+    await HttpBasedScrap(workerId, totalNumberOfJobs, channel, message);
   } else if (platform === "naukri-jd" || platform === "jdScrap") {
     // Playwright JD scraping and Gemini AI resume evaluation
     await naukriJDScrap(undefined, workerId);

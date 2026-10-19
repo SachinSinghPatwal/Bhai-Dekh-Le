@@ -5,19 +5,25 @@ import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 import mongoose from "mongoose";
 
-import log from "../../../../utility/Logger.js";
-import { createScrapingSession } from "../CreatingEnvironmentToScrap.js";
-import { waitForPageReady } from "../../utility/playwright/interactions/index.js";
-import { JOB_DETAILS, JobModel } from "../../../../models/Mongo/job.models.js";
 import {
+  Logger,
+  createScrapingSession,
+  waitForPageReady,
+  JOB_DETAILS,
+  JobModel,
   NAUKRI_BASE_URL,
   CLIENT_DATA_FOLDER_NAME,
   GENERAL_TIMEOUT,
-} from "../../../../constants.js";
-import { fetchCloudinaryPdf } from "../../../AI/services/Cloudinary.js";
-import { retrieveUserResumeLink } from "../../../../middlewares/job.middleware.js";
-import { getUserDataFromFile } from "../../../../helper/userDataHelper.js";
-import { getAllSnapshotJobs } from "../../../../helper/getAllSnapShots.js";
+  Cloudinary,
+  retrieveUserResumeLink,
+  userDataHelper,
+  getAllSnapShots,
+} from "../../index.js";
+
+const log = Logger;
+const fetchCloudinaryPdf = Cloudinary;
+const getUserDataFromFile = userDataHelper;
+const getAllSnapshotJobs = getAllSnapShots;
 
 /**
  * Parsed and structured Job Description schema

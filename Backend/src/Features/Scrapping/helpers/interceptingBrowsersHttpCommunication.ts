@@ -1,7 +1,7 @@
 // interceptingBrowsersHttpCommunication.ts
 
 import { Page, Request, Response } from "playwright";
-import { MatchedURLOfSearch } from "../../../constants.js";
+import { MatchedURLOfSearch } from "../index.js";
 
 type Communication = Request | Response;
 

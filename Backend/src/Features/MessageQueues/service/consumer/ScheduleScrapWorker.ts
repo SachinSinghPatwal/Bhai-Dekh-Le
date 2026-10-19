@@ -4,9 +4,11 @@ import {
   dbSave,
   dbSaveExchange,
   ScheduleScrape,
-} from "../../../../constants.js";
-import log from "../../../../utility/Logger.js";
-import PlatformInitialization from "../../../Scrapping/services/PlatformInitialization.js"; 
+  Logger,
+  PlatformInitialization,
+} from "../../index.js";
+
+const log = Logger; 
 
 const workerId = process.env.WORKER_ID ?? "worker-unknown";
 

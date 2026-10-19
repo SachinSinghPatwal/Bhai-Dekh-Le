@@ -41,3 +41,7 @@ export async function fetchCloudinaryPdf(
 
   return bytes;
 }
+
+const Cloudinary = fetchCloudinaryPdf;
+export { Cloudinary };
+export default fetchCloudinaryPdf;

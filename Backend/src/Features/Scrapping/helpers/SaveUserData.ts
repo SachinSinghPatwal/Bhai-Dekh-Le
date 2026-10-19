@@ -1,16 +1,18 @@
 import path from "node:path";
-import { CLIENT_DATA_FOLDER_NAME } from "../../../constants.js";
-import { getFileFolderNamingConvention } from "../index.js";
+import {
+  CLIENT_DATA_FOLDER_NAME,
+  SnapShotsFileNamingConvention,
+  encryption,
+} from "../index.js";
 import fs from "node:fs/promises";
-import { encrypt } from "../../../utility/crypto/encryption.js";
 
 interface CLIENT_DETAILS {
   username: string;
   password: string;
 }
 
-export default async function saveSnapShots(data: CLIENT_DETAILS) {
-  const { dateFolder } = getFileFolderNamingConvention();
+export default async function SaveUserData(data: CLIENT_DETAILS) {
+  const { dateFolder } = SnapShotsFileNamingConvention();
 
   const dateDir = path.join(CLIENT_DATA_FOLDER_NAME, dateFolder);
 
@@ -18,7 +20,7 @@ export default async function saveSnapShots(data: CLIENT_DETAILS) {
 
   const filePath = path.join(dateDir, "personalDetails.json.encrypted");
 
-  const encryptedSnapshot = encrypt(data);
+  const encryptedSnapshot = encryption(data);
 
   await fs.writeFile(
     filePath,
@@ -26,3 +28,6 @@ export default async function saveSnapShots(data: CLIENT_DETAILS) {
     "utf-8",
   );
 }
+
+const saveSnapShots = SaveUserData;
+export { saveSnapShots };

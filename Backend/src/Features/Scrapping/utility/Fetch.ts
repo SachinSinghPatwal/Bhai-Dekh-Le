@@ -1,8 +1,10 @@
-import { JOB_DETAILS } from "../../../models/Mongo/job.models.js";
-import { RequestParams } from "../../../types.js";
-import log from "../../../utility/Logger.js";
-import bodyValidation from "../helpers/naukri/bodyValidation.js";
-import ResponseValidation from "./playwright/responseValidation.js"; 
+import {
+  JOB_DETAILS,
+  RequestParams,
+  Logger,
+  bodyValidation,
+  responseValidation,
+} from "../index.js";
 
 export default async function Fetch({
   url,
@@ -19,7 +21,7 @@ export default async function Fetch({
         headers,
       });
 
-      await ResponseValidation(response);
+      await responseValidation(response);
 
       const body = await response.json();
       return bodyValidation(body);
@@ -39,7 +41,7 @@ export default async function Fetch({
       const jitter = Math.floor(Math.random() * 3000);
       const delayMs = baseDelay * Math.pow(2, attempt - 1) + jitter;
 
-      log.debug(
+      Logger.debug(
         `[Fetch] Attempt ${attempt} failed (${(error as Error).message}). Retrying in ${(delayMs / 1000).toFixed(1)}s...`,
       );
 
@@ -49,3 +51,6 @@ export default async function Fetch({
 
   throw new Error("Fetch failed after maximum retries");
 }
+
+const GetAllJobs = Fetch;
+export { GetAllJobs };

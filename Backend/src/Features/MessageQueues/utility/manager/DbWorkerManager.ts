@@ -1,9 +1,10 @@
 import { ChildProcess } from "node:child_process";
 import path from "node:path";
 
-import { shutdown } from "../../../Workers/utility/shutdown.js";
-import spawnWorker from "../../../Workers/utility/spawn.js";
-import log from "../../../../utility/Logger.js";
+import { shutdown, spawn, Logger } from "../../index.js";
+
+const spawnWorker = spawn;
+const log = Logger;
 
 const dbWorkerPath = path.resolve(
   process.cwd(),
@@ -83,3 +84,10 @@ export async function handleDbWorkerShutdown(): Promise<void> {
 
   log.debug("DB worker manager shutdown complete.");
 }
+
+const DbWorkerManager = {
+  startDbWorkers,
+  handleDbWorkerShutdown,
+};
+
+export default DbWorkerManager;

@@ -1,13 +1,15 @@
-import { JOB_DETAILS } from "../../../models/Mongo/job.models.js";
-import { RequestParams } from "../../../types.js";
-import ScrappingPaginatedJob from "../helpers/ScrappingPaginatedJob.js";
-import { sortingUnsortedJobBasedOnTimeCreated } from "../utility/sortingJobBasedOnCreated.js";
+import {
+  JOB_DETAILS,
+  RequestParams,
+  ScrappingPaginatedJob,
+  sortingJobBasedOnCreated,
+  DistributingWork,
+  Logger,
+} from "../index.js";
 import fs from "node:fs/promises";
-import DistributingLoadWithWorkers from "../../MessageQueues/helpers/DistributingWork.js";
-import log from "../../../utility/Logger.js";
 import path from "node:path";
 
-export default async function getDesiredJobs({
+export default async function GetDesiredJobs({
   url,
   request,
   headers,
@@ -18,7 +20,7 @@ export default async function getDesiredJobs({
 }: RequestParams): Promise<JOB_DETAILS[]> {
   let initialPage: number = 0;
   const { startPage: expectedStartPage, endPage } =
-    await DistributingLoadWithWorkers(totalJobsAvailable as number, workerId);
+    await DistributingWork(totalJobsAvailable as number, workerId);
 
   if (!retryStartingPage) {
     initialPage = expectedStartPage;
@@ -26,7 +28,7 @@ export default async function getDesiredJobs({
     initialPage = retryStartingPage as number;
   }
 
-  log.info(
+  Logger.info(
     `[${workerId}] Starting scraping work size: ${endPage - initialPage + 1} pages (from ${initialPage} to ${endPage})`,
   );
 
@@ -39,7 +41,7 @@ export default async function getDesiredJobs({
     workerId,
     endPage,
   });
-  const filteredRecentJob = sortingUnsortedJobBasedOnTimeCreated(jobs);
+  const filteredRecentJob = sortingJobBasedOnCreated(jobs);
   console.log(
     filteredRecentJob.map(({ title, footerPlaceholderLabel }: any) => ({
       title,
@@ -62,3 +64,6 @@ export default async function getDesiredJobs({
 
   return filteredRecentJob as JOB_DETAILS[];
 }
+
+const getDesiredJobs = GetDesiredJobs;
+export { getDesiredJobs };

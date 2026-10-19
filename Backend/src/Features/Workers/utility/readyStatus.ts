@@ -1,7 +1,7 @@
 import { ChildProcess } from "node:child_process";
-import log from "../../../utility/Logger.js";
+import { Logger } from "../index.js";
 
-export default function waitForWorkerReady(
+export default function readyStatus(
   worker: ChildProcess,
   workerId: string,
 ): Promise<void> {
@@ -60,3 +60,6 @@ export default function waitForWorkerReady(
     });
   });
 }
+
+const waitForWorkerReady = readyStatus;
+export { waitForWorkerReady };

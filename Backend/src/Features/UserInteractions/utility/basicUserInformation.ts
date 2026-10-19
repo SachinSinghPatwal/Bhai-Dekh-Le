@@ -3,8 +3,9 @@ import { stdin, stdout } from "node:process";
 import fs from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { PERSONAL_DETAILS_PATH } from "../../../constants.js";
-import log from "../../../utility/Logger.js";
+import { PERSONAL_DETAILS_PATH, Logger } from "../index.js";
+
+const log = Logger;
 
 /*
  * ─────────────────────────────────────────

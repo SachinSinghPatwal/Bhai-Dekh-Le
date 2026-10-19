@@ -2,12 +2,19 @@ import { BrowserContext, Page } from "playwright";
 import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { typeIntoField } from "../../../utility/playwright/interactions/typeIntoField.js";
-import { clickButton } from "../../../utility/playwright/interactions/clickButton.js";
-import { CLIENT_DATA_PATH, JOB_AUTH_URL, AUTH_SELECTORS } from "../../../../../constants.js";
-import ComposeUrl from "../../../utility/ComposeUrl.js";
-import { encrypt } from "../../../../../utility/crypto/encryption.js";
-import log from "../../../../../utility/Logger.js";
+import {
+  typeIntoField,
+  clickButton,
+  CLIENT_DATA_PATH,
+  JOB_AUTH_URL,
+  AUTH_SELECTORS,
+  ComposeUrl,
+  encryption,
+  Logger,
+} from "../../../index.js";
+
+const log = Logger;
+const encrypt = encryption;
 
 /**
  * Handles Naukri authentication lifecycle:
@@ -141,3 +148,7 @@ export default async function loginToNaukri(
     throw new Error(`Something went wrong while logging in: ${(error as Error)?.message ?? error}`);
   }
 }
+
+const Login = loginToNaukri;
+export { Login };
+

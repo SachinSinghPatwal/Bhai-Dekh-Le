@@ -1,13 +1,19 @@
 import "../../../../config/load-env.js";
 
-import amqp, { type Message } from "amqplib";
+import amqp from "amqplib";
 import mongoose from "mongoose";
-import { JobModel } from "../../../../models/Mongo/job.models.js";
-import { dbSave, dbSaveExchange } from "../../../../constants.js";
+import {
+  type Message,
+  JobModel,
+  dbSave,
+  dbSaveExchange,
+  connectToDb,
+  Logger,
+  naukriJDScrap,
+} from "../../index.js";
 
-import connectToMongoDb from "../../../Workers/utility/connectToDb.js";
-import log from "../../../../utility/Logger.js";
-import naukriJDScrap from "../../../Scrapping/services/naukri/naukriJDScrap.js";
+const log = Logger;
+const connectToMongoDb = connectToDb;
 
 let rabbitConnection: Awaited<ReturnType<typeof amqp.connect>> | null = null;
 

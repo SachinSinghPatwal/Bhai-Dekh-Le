@@ -1,5 +1,5 @@
 import type { ChildProcess } from "node:child_process";
-import log from "../../../utility/Logger.js";
+import { Logger } from "../index.js";
 
 const WORKER_SHUTDOWN_TIMEOUT = 10_000;
 
@@ -38,7 +38,7 @@ function stopWorker(worker: ChildProcess): Promise<void> {
         return;
       }
 
-      log.warn(
+      Logger.warn(
         `Worker PID ${worker.pid} did not shut down gracefully. Force killing.`,
       );
 
@@ -53,7 +53,7 @@ function stopWorker(worker: ChildProcess): Promise<void> {
       finish();
     }, WORKER_SHUTDOWN_TIMEOUT);
 
-    log.info(`Stopping worker PID ${worker.pid}...`);
+    Logger.info(`Stopping worker PID ${worker.pid}...`);
 
     /*
      * Ask the worker to execute its own
@@ -69,12 +69,14 @@ export async function shutdown(
 ): Promise<void> {
   setShuttingDown();
 
-  log.info("Shutting down workers...");
+  Logger.info("Shutting down workers...");
 
   /*
    * All workers can receive SIGTERM at the same time.
    */
   await Promise.all(workers.map((worker) => stopWorker(worker)));
 
-  log.success("All workers stopped.");
+  Logger.success("All workers stopped.");
 }
+
+export default shutdown;

@@ -1,6 +1,7 @@
 import amqp from "amqplib";
-import log from "../../../../utility/Logger.js";
-import { ScheduleScrape } from "../../../../constants.js";
+import { Logger, ScheduleScrape } from "../../index.js";
+
+const log = Logger;
 
 /**
  * Producer to enqueue JD scraping and resume evaluation task into RabbitMQ

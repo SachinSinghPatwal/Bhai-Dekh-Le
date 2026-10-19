@@ -1,12 +1,18 @@
 import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 import fs from "node:fs/promises";
-import { retrieveUserResumeLink } from "../../../middlewares/job.middleware.js";
-import { getUserDataFromFile } from "../../../helper/userDataHelper.js";
-import { fetchCloudinaryPdf } from "./Cloudinary.js";
-import { User } from "../../../models/Mongo/user.models.js";
 import mongoose from "mongoose";
-import log from "../../../utility/Logger.js";
+import {
+  retrieveUserResumeLink,
+  userDataHelper,
+  Cloudinary,
+  User,
+  Logger,
+} from "../index.js";
+
+const getUserDataFromFile = userDataHelper;
+const fetchCloudinaryPdf = Cloudinary;
+const log = Logger;
 
 function getAiClient(): GoogleGenAI {
   const apiKey = process.env.GEMINI_API_KEY;

@@ -1,8 +1,9 @@
 import amqp from "amqplib";
-import log from "../../../../utility/Logger.js";
-import { ScheduleScrape } from "../../../../constants.js";
+import { Logger, ScheduleScrape } from "../../index.js";
 
-export default async function ScheduleScrapping(): Promise<void> {
+const log = Logger;
+
+export default async function ScheduleScrapeJob(): Promise<void> {
   const platform = "naukri";
   const connection = await amqp.connect(
     process.env.RABBITMQ_URL_WITH_CREDENTIALS!,

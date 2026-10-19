@@ -1,9 +1,9 @@
 import { Page } from "playwright";
-import { interceptingBrowsersHttpCommunication } from "../../helpers/interceptingBrowsersHttpCommunication.js";
+import { interceptingBrowsersHttpCommunication } from "../../index.js";
 
 type CaptureEvent = "request" | "response";
 
-export default function eventCapturing<T>(
+export default function CapturingEvents<T>(
   page: Page,
   capturingOn: CaptureEvent,
 ): Promise<T> {
@@ -14,3 +14,6 @@ export default function eventCapturing<T>(
     );
   });
 }
+
+const eventCapturing = CapturingEvents;
+export { eventCapturing };

@@ -5,17 +5,16 @@ import type {
   NEW_ENVIRONMENT_DUE_TO_CRASH_RETURNED_TYPES,
 } from "../../index.js";
 import {
-  log,
-  RateLimitError,
+  Logger,
+  RateLimitingError,
   JOB_SEARCH_URL,
-  sendToAnotherQueue,
-  getDesiredJobs as makeHttpRequestToGetAllDesiredJobs,
+  TransferingWorkToNextQueue,
+  GetDesiredJobs as makeHttpRequestToGetAllDesiredJobs,
   ComposeUrl,
 } from "../../index.js";
 import { CreatingEnvironmentToScrap } from "../CreatingEnvironmentToScrap.js";
 
-
-export default async function httpScrapping(
+export default async function HttpBasedScrap(
   workerId: string,
   totalNumberOfJobs: number,
   channel: ConfirmChannel,
@@ -52,15 +51,15 @@ export default async function httpScrapping(
         initialbatchOfJobs: jobDetails,
       });
 
-      await sendToAnotherQueue(channel, orderedJobs, message, workerId);
+      await TransferingWorkToNextQueue(channel, orderedJobs, message, workerId);
       return;
     } catch (error: unknown) {
       const errorMessage = (error as Error)?.message ?? String(error);
-      if (error instanceof RateLimitError) {
+      if (error instanceof RateLimitingError) {
         lastPageCrashed = error.lastPage;
-        log.warn(error.message);
+        Logger.warn(error.message);
       } else {
-        log.warn(`[${workerId}] Scrape error occurred: ${errorMessage}`);
+        Logger.warn(`[${workerId}] Scrape error occurred: ${errorMessage}`);
       }
       attempt++;
       const { newUrl, newHeaders, newRequest, newJobDetails } =
@@ -97,13 +96,13 @@ async function creatingNewEnviromentToScrapForNextiterationDueToPrevCrash({
   const isRecaptcha = errorMessage.includes("RECAPTCHA_BLOCK");
   if (attempt < customMaxRetries.times) {
     const cooldownMs = isRecaptcha ? 20000 : 15000;
-    log.warn(
+    Logger.warn(
       `[${workerId}] Scrape attempt ${attempt} failed. Cooling down for ${cooldownMs / 1000}s before retrying...`,
     );
     await new Promise((resolve) => setTimeout(resolve, cooldownMs));
 
     if (isRecaptcha) {
-      log.info(
+      Logger.info(
         `[${workerId}] Detected dead session (RECAPTCHA_BLOCK). Renewing stealth browser session...`,
       );
       try {
@@ -113,14 +112,17 @@ async function creatingNewEnviromentToScrapForNextiterationDueToPrevCrash({
           request: newRequest,
           jobDetails: newJobDetails,
         } = await CreatingEnvironmentToScrap(composedURL, workerId);
-        log.success(
+        Logger.success(
           `[${workerId}] Fresh session tokens obtained. Resuming scrape from page ${lastPageCrashed ?? "initial"}.`,
         );
         return { newUrl, newHeaders, newRequest, newJobDetails };
       } catch (renewErr) {
-        log.error(`[${workerId}] Failed to renew session tokens: ${renewErr}`);
+        Logger.error(`[${workerId}] Failed to renew session tokens: ${renewErr}`);
       }
     }
   }
   return errorMessage;
 }
+
+const httpScrapping = HttpBasedScrap;
+export { HttpBasedScrap, httpScrapping };
