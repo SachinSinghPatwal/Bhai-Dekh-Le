@@ -55,7 +55,7 @@ export async function jobMiddleware(
     req.userProfile = profileData;
 
     log.debug(
-      `[Job Middleware] Resolved candidate resume: ${resumeLink ?? "No resume linked yet"}`,
+      `[Job Middleware] Resolved candidate resume`,
     );
 
     next();

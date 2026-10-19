@@ -101,11 +101,7 @@ export default async function ScrappingPaginatedJob({
       unSortedJobs.push(...consolidatingSnapshotJobs);
       return unSortedJobs;
     }
-
-    console.log(unSortedJobs.length);
-
     unSortedJobs.push(...response);
   }
-
   return unSortedJobs;
 }
