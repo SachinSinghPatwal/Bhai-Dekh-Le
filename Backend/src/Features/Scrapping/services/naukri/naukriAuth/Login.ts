@@ -9,12 +9,9 @@ import {
   JOB_AUTH_URL,
   AUTH_SELECTORS,
   ComposeUrl,
-  encryption,
-  Logger,
+  log,
+  encrypt,
 } from "../../../index.js";
-
-const log = Logger;
-const encrypt = encryption;
 
 /**
  * Handles Naukri authentication lifecycle:
@@ -32,9 +29,6 @@ export default async function loginToNaukri(
   context: BrowserContext,
   workerId: string = "auth-worker",
 ): Promise<void> {
-  // =========================================================================
-  // 1. DATA CHECKING: Verify existing session state
-  // =========================================================================
   const hasSavedSession = existsSync(CLIENT_DATA_PATH);
 
   if (hasSavedSession) {
@@ -43,10 +37,6 @@ export default async function loginToNaukri(
     );
     return;
   }
-
-  // =========================================================================
-  // 2. DATA CHECKING: Validate required environment credentials
-  // =========================================================================
   const email = process.env.NAUKRI_EMAIL;
   const password = process.env.NAUKRI_PASSWORD;
 
@@ -57,51 +47,14 @@ export default async function loginToNaukri(
   }
 
   try {
-    // =======================================================================
-    // 3. NAVIGATION: Navigate to login before any user-requested path
-    // =======================================================================
     const loginUrl = ComposeUrl(JOB_AUTH_URL.path);
-    log.info(`[${workerId}] No active session found. Navigating to login: ${loginUrl}`);
+    log.info(
+      `[${workerId}] No active session found. Navigating to login: ${loginUrl}`,
+    );
 
     await page.goto(loginUrl, {
       waitUntil: "domcontentloaded",
     });
-
-    /*
-     * =======================================================================
-     * SCOPE: ACCOUNT CREATION / REGISTRATION (NOT BUILT YET)
-     * =======================================================================
-     * When fresh job details require a new user account, this scope will:
-     * 1. Check condition whether account creation is required:
-     *    - e.g., if (process.env.CREATE_NEW_ACCOUNT === "true" || userDoesNotExist)
-     *
-     * 2. Navigate to Naukri registration page or click register trigger:
-     *    - await clickButton(page, { selector: AUTH_SELECTORS.registerButton });
-     *    - OR await page.goto("https://www.naukri.com/registration/createRegister", { waitUntil: "domcontentloaded" });
-     *
-     * 3. Fill required user profile details with human-like interactions:
-     *    - Full Name:
-     *      await typeIntoField(page, { selector: AUTH_SELECTORS.nameField }, process.env.NAUKRI_NAME ?? "New User", { humanDelay: 90 });
-     *    - Email ID:
-     *      await typeIntoField(page, { selector: AUTH_SELECTORS.emailField }, email, { humanDelay: 90 });
-     *    - Password:
-     *      await typeIntoField(page, { selector: AUTH_SELECTORS.passwordField }, password, { humanDelay: 80 });
-     *    - Mobile Number:
-     *      await typeIntoField(page, { selector: AUTH_SELECTORS.mobileField }, process.env.NAUKRI_MOBILE ?? "", { humanDelay: 60 });
-     *    - Work Status:
-     *      await clickButton(page, { selector: "div[data-val='fresher']" });
-     *
-     * 4. Submit Registration:
-     *    - await clickButton(page, { selector: AUTH_SELECTORS.registerSubmit }, { timeout: 10_000 });
-     *
-     * 5. Verification / OTP Handling:
-     *    - Wait for OTP screen / mobile verification if required.
-     * =======================================================================
-     */
-
-    // =======================================================================
-    // 4. PERFORM LOGIN: Enter credentials and submit
-    // =======================================================================
     log.info(`[${workerId}] Typing login credentials...`);
 
     await typeIntoField(
@@ -123,17 +76,9 @@ export default async function loginToNaukri(
       { selector: AUTH_SELECTORS.loginSubmit },
       { timeout: 10_000 },
     );
-
-    // =======================================================================
-    // 5. WAIT FOR AUTHENTICATION COMPLETION
-    // =======================================================================
     await page.waitForURL((url) => !url.href.includes("nlogin/login"), {
       timeout: 60_000,
     });
-
-    // =======================================================================
-    // 6. PERSIST SESSION: Extract, encrypt, and store auth state
-    // =======================================================================
     const storageState = await context.storageState();
     const encrypted = encrypt(storageState);
 
@@ -145,10 +90,11 @@ export default async function loginToNaukri(
     );
   } catch (error) {
     log.error(`[${workerId}] Authentication failed: ${error}`);
-    throw new Error(`Something went wrong while logging in: ${(error as Error)?.message ?? error}`);
+    throw new Error(
+      `Something went wrong while logging in: ${(error as Error)?.message ?? error}`,
+    );
   }
 }
 
 const Login = loginToNaukri;
 export { Login };
-
