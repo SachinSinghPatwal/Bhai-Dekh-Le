@@ -224,8 +224,8 @@ export const DashboardView: React.FC = () => {
               </h3>
               <p className="app-sub text-zinc-400">
                 Weekly pacing of sent submissions and inbound recruiter
-                responses
               </p>
+                responses
             </div>
             <span className="app-caption text-zinc-400 px-2.5 py-1 rounded bg-zinc-900/60 border border-white/5 font-medium shrink-0">
               Current Week

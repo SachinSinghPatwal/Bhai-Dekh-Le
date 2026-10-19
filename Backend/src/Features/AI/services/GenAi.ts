@@ -3,7 +3,7 @@ import { z } from "zod";
 import fs from "node:fs/promises";
 import { retrieveUserResumeLink } from "../../../middlewares/job.middleware.js";
 import { getUserDataFromFile } from "../../../helper/userDataHelper.js";
-import { fetchCloudinaryPdf } from "./Cloudincary.js";
+import { fetchCloudinaryPdf } from "./Cloudinary.js";
 import { User } from "../../../models/Mongo/user.models.js";
 import mongoose from "mongoose";
 import log from "../../../utility/Logger.js";

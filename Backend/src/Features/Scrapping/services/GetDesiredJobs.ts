@@ -12,7 +12,7 @@ export default async function getDesiredJobs({
   request,
   headers,
   totalJobsAvailable,
-  jobDetails,
+  initialbatchOfJobs,
   workerId,
   retryStartingPage,
 }: RequestParams): Promise<JOB_DETAILS[]> {
@@ -35,7 +35,7 @@ export default async function getDesiredJobs({
     headers,
     request,
     initialPage,
-    initialJobs: jobDetails,
+    initialJobs: initialbatchOfJobs,
     workerId,
     endPage,
   });
@@ -46,12 +46,9 @@ export default async function getDesiredJobs({
       footerPlaceholderLabel,
     })),
   );
-  const snapshotDir = path.resolve(`./${process.env.SNAPSHOT_FOLDER_NAME!}`);
+  const snapshotDir = path.resolve(`./snapShots`);
 
   const entries = await fs.readdir(snapshotDir);
-
-  console.log(entries)
-
   await Promise.all(
     entries
       .filter((entry) => entry !== ".gitkeep")

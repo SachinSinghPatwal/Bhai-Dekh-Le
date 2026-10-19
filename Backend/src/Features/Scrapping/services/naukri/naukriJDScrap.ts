@@ -14,7 +14,7 @@ import {
   CLIENT_DATA_FOLDER_NAME,
   GENERAL_TIMEOUT,
 } from "../../../../constants.js";
-import { fetchCloudinaryPdf } from "../../../AI/services/Cloudincary.js";
+import { fetchCloudinaryPdf } from "../../../AI/services/Cloudinary.js";
 import { retrieveUserResumeLink } from "../../../../middlewares/job.middleware.js";
 import { getUserDataFromFile } from "../../../../helper/userDataHelper.js";
 import { getAllSnapshotJobs } from "../../../../helper/getAllSnapShots.js";

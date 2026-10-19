@@ -1,17 +1,19 @@
-import { ConfirmChannel, Message } from "amqplib";
-import {
+import type { ConfirmChannel, Message } from "amqplib";
+import type {
   JOB_DETAILS,
-  log,
-  JOB_SEARCH_URL,
-  dbSaveExchange,
+  NEW_ENVIRONMENT_DUE_TO_CRASH_PARAMS_TYPES,
+  NEW_ENVIRONMENT_DUE_TO_CRASH_RETURNED_TYPES,
 } from "../../index.js";
-import { RateLimitError } from "../../../Scrapping/utility/playwright/RateLimitingError.js";
+import {
+  log,
+  RateLimitError,
+  JOB_SEARCH_URL,
+  sendToAnotherQueue,
+  getDesiredJobs as makeHttpRequestToGetAllDesiredJobs,
+  ComposeUrl,
+} from "../../index.js";
 import { CreatingEnvironmentToScrap } from "../CreatingEnvironmentToScrap.js";
-import makeHttpRequestToGetAllDesiredJobs from "../../../Scrapping/services/GetDesiredJobs.js";
 
-import ComposeUrl from "../../utility/ComposeUrl.js";
-import saveSnapShots from "../../../../helper/SaveSnapShots.js";
-import { cleanupStaleSnapshots } from "../../../../helper/cleanupStaleSnapshots.js";
 
 export default async function httpScrapping(
   workerId: string,
@@ -21,7 +23,7 @@ export default async function httpScrapping(
 ): Promise<JOB_DETAILS[] | undefined> {
   let attempt = 0;
   let lastPageCrashed = null;
-  let customMaxRetries = { times: 10, changed: false };
+  let customMaxRetries = { times: 10 };
   let orderedJobs;
   let initialTotalJobs = 0;
 
@@ -33,17 +35,11 @@ export default async function httpScrapping(
   while (attempt < customMaxRetries.times) {
     try {
       /**
+       * @deprecating soon as logged user are always found nearly similar amount of jobs and recent jobs dont really relevant to total job length
        * @description Final Check on the Total pages from consumer to self
        */
       if (initialTotalJobs === 0) {
         initialTotalJobs = Math.max(totalJobsAvailable, totalNumberOfJobs);
-      }
-
-      if (!customMaxRetries.changed) {
-        customMaxRetries.changed = true; //flag for updated end page
-
-        customMaxRetries.times =
-          initialTotalJobs / Number(process.env.SCRAP_WORKER_COUNT ?? 4);
       }
 
       orderedJobs = await makeHttpRequestToGetAllDesiredJobs({
@@ -53,131 +49,78 @@ export default async function httpScrapping(
         totalJobsAvailable: initialTotalJobs,
         retryStartingPage: lastPageCrashed,
         workerId,
-        jobDetails,
+        initialbatchOfJobs: jobDetails,
       });
-      /*
-       * =========================
-       * 2. NOTHING FOUND
-       * =========================
-       */
 
-      if (!Array.isArray(orderedJobs) || orderedJobs.length === 0) {
-        channel!.nack(message);
-
-        log.info(`[${workerId}] No jobs found. Task acknowledged.`);
-
-        return;
-      }
-      /*
-       * =========================
-       * 3. MONGO_URI NOT DEFINED:
-       * STORE LOCALLY IN SNAPSHOTS
-       * & DO NOT FORWARD TO DB QUEUE
-       * =========================
-       */
-      if (!process.env.MONGO_URI || process.env.MONGO_URI.trim() === "") {
-        log.warn(
-          `[${workerId}] MONGO_URI is not defined. DB workers are suspended; saving ${orderedJobs.length} jobs to 'Backend/snapShots' and cleaning up stale snapshots.`,
-        );
-
-        await saveSnapShots(orderedJobs);
-        await cleanupStaleSnapshots();
-
-        channel!.ack(message);
-
-        log.success(
-          `[${workerId}] Scrape result persisted to local snapshots. Task acknowledged.`,
-        );
-
-        return;
-      }
-
-      /*
-       * =========================
-       * 4. PUBLISH TO DB QUEUE
-       * =========================
-       */
-
-      channel!.publish(
-        dbSaveExchange,
-        "Save",
-        Buffer.from(
-          JSON.stringify({
-            jobs: orderedJobs,
-          }),
-        ),
-        {
-          persistent: true,
-        },
-      );
-
-      /*
-       * =========================
-       * 5. WAIT FOR BROKER CONFIRM
-       * =========================
-       *
-       * Do NOT ACK the original scrape task
-       * before this.
-       */
-
-      await channel.waitForConfirms();
-
-      /*
-       * =========================
-       * 6. ACK SCRAPE TASK
-       * =========================
-       */
-
-      channel!.ack(message);
-
-      log.success(
-        `[${workerId}] Scrape result successfully handed to DB queue.`,
-      );
-
+      await sendToAnotherQueue(channel, orderedJobs, message, workerId);
       return;
     } catch (error: unknown) {
       const errorMessage = (error as Error)?.message ?? String(error);
-      const isRecaptcha = errorMessage.includes("RECAPTCHA_BLOCK");
-
       if (error instanceof RateLimitError) {
         lastPageCrashed = error.lastPage;
         log.warn(error.message);
       } else {
-        log.warn(
-          `[${workerId}] Scrape error occurred: ${errorMessage}`,
-        );
+        log.warn(`[${workerId}] Scrape error occurred: ${errorMessage}`);
       }
-
       attempt++;
-
-      if (attempt < customMaxRetries.times) {
-        const cooldownMs = isRecaptcha ? 20000 : 15000;
-        log.warn(
-          `[${workerId}] Scrape attempt ${attempt} failed. Cooling down for ${cooldownMs / 1000}s before retrying...`,
-        );
-        await new Promise((resolve) => setTimeout(resolve, cooldownMs));
-
-        if (isRecaptcha) {
-          log.info(
-            `[${workerId}] Detected dead session (RECAPTCHA_BLOCK). Renewing stealth browser session...`,
-          );
-          try {
-            const freshEnv = await CreatingEnvironmentToScrap(composedURL, workerId);
-            headers = freshEnv.headers;
-            url = freshEnv.url;
-            request = freshEnv.request;
-            log.success(
-              `[${workerId}] Fresh session tokens obtained. Resuming scrape from page ${lastPageCrashed ?? "initial"}.`,
-            );
-          } catch (renewErr) {
-            log.error(`[${workerId}] Failed to renew session tokens: ${renewErr}`);
-          }
-        }
-      }
+      const { newUrl, newHeaders, newRequest, newJobDetails } =
+        (await creatingNewEnviromentToScrapForNextiterationDueToPrevCrash({
+          attempt,
+          customMaxRetries,
+          workerId,
+          composedURL,
+          lastPageCrashed,
+          errorMessage,
+        })) as NEW_ENVIRONMENT_DUE_TO_CRASH_RETURNED_TYPES;
+      url = newUrl;
+      headers = newHeaders;
+      request = newRequest;
+      jobDetails = newJobDetails;
     }
   }
 
   throw new Error(
     `[${workerId}] Max scrape retries (${customMaxRetries.times}) exhausted without completing scrape.`,
   );
+}
+
+async function creatingNewEnviromentToScrapForNextiterationDueToPrevCrash({
+  attempt,
+  customMaxRetries,
+  workerId,
+  composedURL,
+  lastPageCrashed,
+  errorMessage,
+}: NEW_ENVIRONMENT_DUE_TO_CRASH_PARAMS_TYPES): Promise<
+  NEW_ENVIRONMENT_DUE_TO_CRASH_RETURNED_TYPES | string
+> {
+  const isRecaptcha = errorMessage.includes("RECAPTCHA_BLOCK");
+  if (attempt < customMaxRetries.times) {
+    const cooldownMs = isRecaptcha ? 20000 : 15000;
+    log.warn(
+      `[${workerId}] Scrape attempt ${attempt} failed. Cooling down for ${cooldownMs / 1000}s before retrying...`,
+    );
+    await new Promise((resolve) => setTimeout(resolve, cooldownMs));
+
+    if (isRecaptcha) {
+      log.info(
+        `[${workerId}] Detected dead session (RECAPTCHA_BLOCK). Renewing stealth browser session...`,
+      );
+      try {
+        const {
+          url: newUrl,
+          headers: newHeaders,
+          request: newRequest,
+          jobDetails: newJobDetails,
+        } = await CreatingEnvironmentToScrap(composedURL, workerId);
+        log.success(
+          `[${workerId}] Fresh session tokens obtained. Resuming scrape from page ${lastPageCrashed ?? "initial"}.`,
+        );
+        return { newUrl, newHeaders, newRequest, newJobDetails };
+      } catch (renewErr) {
+        log.error(`[${workerId}] Failed to renew session tokens: ${renewErr}`);
+      }
+    }
+  }
+  return errorMessage;
 }
