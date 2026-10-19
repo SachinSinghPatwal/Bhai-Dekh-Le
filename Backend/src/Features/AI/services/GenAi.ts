@@ -31,17 +31,10 @@ export const ResumeSchema = z.object({
 
 export type ResumeAnalysis = z.infer<typeof ResumeSchema>;
 
-/**
- * Retrieves the resume URL/link from MongoDB if connected,
- * or falls back to local userDetails/personalDetails JSON file.
- */
 export async function getResumeLink(): Promise<string | null> {
   return retrieveUserResumeLink();
 }
 
-/**
- * Retrieves full user profile information from MongoDB or local userDetails JSON.
- */
 export async function getUserProfileData(): Promise<Record<
   string,
   any
@@ -118,11 +111,6 @@ export async function analyzeResumePdf(
   return ResumeSchema.parse(JSON.parse(response.text));
 }
 
-/**
- * Retrieves the resume link from the database or local file,
- * downloads the PDF (supporting Cloudinary URLs, remote HTTP, or local files),
- * and analyzes it with Gemini.
- */
 export async function analyzeResumeFromStoredLink(
   customUrl?: string,
 ): Promise<ResumeAnalysis> {
@@ -182,9 +170,6 @@ export const BulletReviewSchema = z.object({
 
 export type BulletReviewResult = z.infer<typeof BulletReviewSchema>;
 
-/**
- * Reviews resume bullet points against recruiter readability and keyword matching criteria.
- */
 export async function reviewResumeBullets(
   bullets: string[],
   targetRole?: string,
@@ -193,7 +178,7 @@ export async function reviewResumeBullets(
   const ai = getAiClient();
 
   const promptText = `
-    You are an expert technical resume editor. Resumes are screened first by non-technical recruiters matching keywords, then by senior engineering leads.
+    You are an expert technical resume editor. Resumes are screened first by non-technical recruiters matching keywords, then by senior engineering leads. Returned only the Best Matched not worst/less/sligthly matched results
     
     Target Role / Niche: ${targetRole || "Software Engineer / Web Developer"}
     Additional Context: ${context || "None provided"}

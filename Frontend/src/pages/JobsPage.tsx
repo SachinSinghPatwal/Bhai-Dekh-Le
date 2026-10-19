@@ -37,36 +37,60 @@ export const JobsPage: React.FC = () => {
           <span>Active Search Portal Queries</span>
         </h2>
 
-        {profile?.searchKeywords && profile.searchKeywords.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {profile.searchKeywords.map((keyword) => (
-              <div
-                key={keyword}
-                className="p-4 rounded bg-zinc-900/60 border border-white/[0.06] flex items-center justify-between group hover:border-white/15 transition-colors"
-              >
-                <div className="space-y-1">
-                  <span className="app-label text-zinc-200">"{keyword}"</span>
-                  <p className="app-caption text-zinc-400">
-                    Filtered for role: {profile.role}
-                  </p>
-                </div>
-                <a
-                  href={`https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(keyword)}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="p-2 rounded bg-zinc-800/80 text-zinc-400 group-hover:text-zinc-200 hover:bg-zinc-700/80 transition-colors"
-                  title="Search on LinkedIn"
-                >
-                  <FiExternalLink className="text-xs" />
-                </a>
+        {(() => {
+          const queries = (profile?.searchKeywords && profile.searchKeywords.length > 0)
+            ? profile.searchKeywords
+            : profile?.role
+            ? [profile.role, ...(profile.skills || []).slice(0, 3)]
+            : [];
+
+          if (queries.length === 0) {
+            return (
+              <div className="text-center py-8 text-zinc-400 app-sub">
+                No search queries registered. Update your profile to add target role or skills.
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-8 text-zinc-400 app-sub">
-            No keywords registered. Go to Change Details to add job keywords.
-          </div>
-        )}
+            );
+          }
+
+          return (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {queries.map((keyword: string) => (
+                <div
+                  key={keyword}
+                  className="p-4 rounded bg-zinc-900/60 border border-white/[0.06] flex items-center justify-between group hover:border-white/15 transition-colors"
+                >
+                  <div className="space-y-1">
+                    <span className="app-label text-zinc-200">"{keyword}"</span>
+                    <p className="app-caption text-zinc-400">
+                      Target role: {profile?.role || "Software Engineer"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={`https://www.naukri.com/${encodeURIComponent(keyword.toLowerCase().replace(/\s+/g, "-"))}-jobs`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-2.5 py-1 rounded bg-zinc-800/80 text-zinc-300 group-hover:text-zinc-100 hover:bg-zinc-700/80 text-xs transition-colors flex items-center gap-1.5"
+                      title="Search on Naukri"
+                    >
+                      <span>Naukri</span>
+                      <FiExternalLink className="text-[10px]" />
+                    </a>
+                    <a
+                      href={`https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(keyword)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="p-2 rounded bg-zinc-800/80 text-zinc-400 group-hover:text-zinc-200 hover:bg-zinc-700/80 transition-colors"
+                      title="Search on LinkedIn"
+                    >
+                      <FiExternalLink className="text-xs" />
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
       </div>
 
       {/* Empty Jobs List Placeholder */}

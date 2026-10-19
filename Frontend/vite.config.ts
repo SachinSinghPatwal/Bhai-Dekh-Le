@@ -28,5 +28,12 @@ export default defineConfig({
       },
     ],
   },
+  server: {
+    port: 5173,
+    host: true,
+  },
+  optimizeDeps: {
+    include: ["pdfjs-dist"],
+  },
   plugins: lazyPlugins(() => [react(), babel({ presets: [reactCompilerPreset()] }), tailwindcss()]),
 });

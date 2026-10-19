@@ -398,12 +398,12 @@ export const DashboardView: React.FC = () => {
                 <span>Job Portal Search Queries</span>
               </h4>
               <span className="app-caption text-zinc-400 px-2.5 py-1 rounded bg-zinc-900/60 border border-white/5 font-medium">
-                {profile.searchKeywords.length} active
+                {(profile.searchKeywords || [profile.role, ...(profile.skills || []).slice(0, 3)]).length} active
               </span>
             </div>
 
             <div className="flex flex-wrap gap-2">
-              {profile.searchKeywords.map((kw) => (
+              {(profile.searchKeywords || [profile.role, ...(profile.skills || []).slice(0, 3)]).map((kw) => (
                 <span
                   key={kw}
                   className="px-3 py-1.5 rounded app-sub bg-zinc-900/60 text-zinc-300 border border-white/10"

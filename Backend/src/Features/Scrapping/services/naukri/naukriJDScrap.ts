@@ -424,16 +424,33 @@ export async function rateResumeAgainstJDs(
   }));
 
   const promptText = `
-You are an expert technical recruiter and talent evaluation specialist.
-Analyze the candidate's resume (attached as PDF) against each of the following ${jds.length} job descriptions.
+You are a strict job-matching engine. Analyze the candidate profile against the provided job listings and return ONLY highly relevant jobs.
 
-For EACH job description:
-1. matchScore: Score the candidate from 0 to 100 based on technical skill match, experience relevance, and requirements.
-2. fitVerdict: One of 'Strong Match' (80-100), 'Moderate Match' (60-79), 'Low Match' (40-59), or 'Not a Fit' (<40).
-3. matchingSkills: List key matching skills and tools found in BOTH the resume and the JD.
-4. missingSkills: List required or preferred skills from the JD that are not evident in the candidate's resume.
-5. summary: A 2-3 sentence candid evaluation of candidate fit.
-6. recommendation: Concrete action items to improve candidate alignment for this position.
+**Filtering Rules**
+1. Include only jobs with a match score of **75/100 or higher**.
+2. Exclude jobs requiring mandatory skills the candidate lacks, unrelated technology stacks, or experience significantly beyond the candidate's experience.
+3. Prioritize alignment with the candidate's actual skills, experience level, and target role.
+4. Never inflate match scores. A shared framework or generic skill alone does not establish a strong match.
+5. If no jobs meet the criteria, return "No highly matched jobs found." Never lower the threshold to fill the results.
+
+**Output Requirements**
+For each qualifying job, return only:
+
+[#1] Job Title | Company | Match: XX/100
+**Matching Skills:** Up to 5 most relevant skills.
+**Key Gap:** Only the most important missing requirement, if any. Write "None significant" when appropriate.
+**Verdict:** One concise sentence explaining why the job is a strong fit.
+
+**Conciseness Rules**
+- Sort by match score, highest first.
+- Remove low-match, moderate-match, and unsuitable jobs entirely.
+- Do not repeat the candidate's skills across multiple sections unnecessarily.
+- Do not include lengthy analysis, application advice, generic recommendations, introductions, conclusions, or summaries.
+- Preserve job titles, company names, and job IDs when available.
+- Use only information supported by the candidate profile and job listing.
+- If a match score is provided by another system, treat it as an estimate and independently check whether the job meets the filtering rules.
+
+Return only the qualifying jobs in the specified format.
 
 Also provide an 'overallSummary' comparing the candidate's profile against this batch of opportunities.
 
