@@ -44,6 +44,26 @@ export const INTERACTION_DELAYS = {
   clickDelay: Number(process.env.INTERACTION_CLICK_DELAY ?? 0),
 } as const;
 
+// Jitter & Delay Configuration for Scraping (controllable via constants or ENV variables)
+export const SCRAPING_JITTER = {
+  // Delay between pagination requests in ScrappingPaginatedJob (ms)
+  paginationBaseDelay: Number(process.env.SCRAPING_PAGINATION_BASE_DELAY ?? 1000), // reduced from 3000-4000ms
+  paginationMaxJitter: Number(process.env.SCRAPING_PAGINATION_MAX_JITTER ?? 1000), // reduced from 2500ms
+
+  // Periodic breather interval and duration in ScrappingPaginatedJob (ms)
+  breatherIntervalPages: Number(process.env.SCRAPING_BREATHER_INTERVAL_PAGES ?? 15),
+  breatherBaseDelay: Number(process.env.SCRAPING_BREATHER_BASE_DELAY ?? 3000), // reduced from 8000ms
+  breatherMaxJitter: Number(process.env.SCRAPING_BREATHER_MAX_JITTER ?? 2000), // reduced from 5000ms
+
+  // Delay between individual JD scraping requests in naukriJDScrap (ms)
+  jdScrapBaseDelay: Number(process.env.SCRAPING_JD_BASE_DELAY ?? 500), // reduced from 1500ms
+  jdScrapMaxJitter: Number(process.env.SCRAPING_JD_MAX_JITTER ?? 500), // reduced from 1500ms
+
+  // Retry base delay and jitter in Fetch (ms)
+  fetchRetryBaseDelay: Number(process.env.FETCH_RETRY_BASE_DELAY ?? 2000), // reduced from 5000ms
+  fetchRetryMaxJitter: Number(process.env.FETCH_RETRY_MAX_JITTER ?? 1000), // reduced from 3000ms
+} as const;
+
 // path
 export const CLIENT_DATA_PATH = path.resolve(
   process.cwd(),

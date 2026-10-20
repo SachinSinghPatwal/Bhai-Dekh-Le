@@ -13,6 +13,7 @@ import {
   GENERAL_TIMEOUT,
   MatchedURLOfSearch,
   INTERACTION_DELAYS,
+  SCRAPING_JITTER,
 } from "../../constants.js";
 import { getFileFolderNamingConvention as SnapShotsFileNamingConvention } from "../../helper/SnapShotsFileNamingConvention.js";
 import RaceForResponseOrTimeOut from "./utility/playwright/RaceForResponseOrTimeOut.js";
@@ -133,6 +134,7 @@ export {
   GENERAL_TIMEOUT,
   MatchedURLOfSearch,
   INTERACTION_DELAYS,
+  SCRAPING_JITTER,
   RateLimitingError,
   RateLimitError,
   RaceForResponseOrTimeOut,

@@ -18,6 +18,7 @@ import {
   retrieveUserResumeLink,
   userDataHelper,
   getAllSnapShots,
+  SCRAPING_JITTER,
 } from "../../index.js";
 
 const log = Logger;
@@ -356,10 +357,14 @@ export async function scrapeJobDescriptions(
           `[${workerId}] Scraped JD for ${job.jobId} (${containerText.length} chars)`,
         );
 
-        // Friendly jitter delay between navigations (1.5s - 3s)
+        // Friendly jitter delay between navigations (controlled via SCRAPING_JITTER)
         if (i < validJobs.length - 1) {
-          const delay = Math.floor(Math.random() * 1500) + 1500;
-          await new Promise((resolve) => setTimeout(resolve, delay));
+          const delay =
+            Math.floor(Math.random() * SCRAPING_JITTER.jdScrapMaxJitter) +
+            SCRAPING_JITTER.jdScrapBaseDelay;
+          if (delay > 0) {
+            await new Promise((resolve) => setTimeout(resolve, delay));
+          }
         }
       } catch (pageErr: any) {
         log.warn(

@@ -6,6 +6,7 @@ import {
   Fetch,
   RateLimitingError,
   getAllSnapShots,
+  SCRAPING_JITTER,
 } from "../index.js";
 import { setIterativePaginationParams } from "./setIterativePaginationParams.js";
 
@@ -37,19 +38,26 @@ export default async function ScrappingPaginatedJob({
   for (let i = initialPage; i < endPage; i++) {
     // Pattern-based adaptive jitter:
     if (i > initialPage) {
-      // Periodic breather every 15 pages to reset Naukri's sliding rate-limit counter
-      if ((i - initialPage) % 15 === 0) {
-        const breather = Math.floor(Math.random() * 5000) + 8000; // 8.0s - 13.0s
-        Logger.debug(
-          `[${workerId}] Periodic breather: Waiting ${(breather / 1000).toFixed(1)}s`,
-        );
-        await new Promise((resolve) => setTimeout(resolve, breather));
+      // Periodic breather to reset Naukri's sliding rate-limit counter
+      if ((i - initialPage) % SCRAPING_JITTER.breatherIntervalPages === 0) {
+        const breather =
+          Math.floor(Math.random() * SCRAPING_JITTER.breatherMaxJitter) +
+          SCRAPING_JITTER.breatherBaseDelay;
+        if (breather > 0) {
+          Logger.debug(
+            `[${workerId}] Periodic breather: Waiting ${(breather / 1000).toFixed(1)}s`,
+          );
+          await new Promise((resolve) => setTimeout(resolve, breather));
+        }
       }
 
-      // Adaptive jitter: 3.5s - 6.0s early on, 4s - 7.0s after page 10
-      const baseJitter = i > initialPage + 8 ? 4000 : 3000;
-      const pageJitter = Math.floor(Math.random() * 2500) + baseJitter;
-      await new Promise((resolve) => setTimeout(resolve, pageJitter));
+      // Jitter delay between paginated requests (controlled via constants/env)
+      const pageJitter =
+        Math.floor(Math.random() * SCRAPING_JITTER.paginationMaxJitter) +
+        SCRAPING_JITTER.paginationBaseDelay;
+      if (pageJitter > 0) {
+        await new Promise((resolve) => setTimeout(resolve, pageJitter));
+      }
     }
 
     setIterativePaginationParams(url as URL, i);
