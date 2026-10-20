@@ -64,11 +64,8 @@ export async function createScrapingSession(
 
     // 2. Launch browser with stealth
     browser = await chromium.launch({
-      headless: false,
-      args: [
-        // "--no-sandbox", 
-        // "--start-minimized"
-      ],
+      headless: true,
+      args: ["--no-sandbox", "--start-minimized"],
     });
 
     // 3. Create context (attaching storageState if authenticated session is present)
