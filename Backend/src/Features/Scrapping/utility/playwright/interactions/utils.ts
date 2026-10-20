@@ -19,9 +19,24 @@ export function resolveSelector(sel: ElementSelector): string {
     const classes = sel.className.trim().split(/\s+/).filter(Boolean);
     return classes.map((c) => `.${c}`).join("");
   }
-  if (sel.attribute) return `[${sel.attribute.name}="${sel.attribute.value}"]`;
+  const parts: string[] = [];
+  if (sel.role) parts.push(`[role="${sel.role}"]`);
+  if (sel.alt) parts.push(`[alt="${sel.alt}"]`);
+  if (sel.src) {
+    const hasSpecial = sel.src.includes("/") || sel.src.includes("?") || sel.src.includes(".");
+    const op = hasSpecial ? "*=" : "=";
+    parts.push(`[src${op}"${sel.src}"]`);
+  }
+  if (sel.attribute) {
+    parts.push(`[${sel.attribute.name}="${sel.attribute.value}"]`);
+  }
+
+  if (parts.length > 0) {
+    return parts.join("");
+  }
+
   throw new Error(
-    "ElementSelector must have at least one of: selector, id, className, attribute",
+    "ElementSelector must have at least one of: selector, id, className, attribute, alt, src, role",
   );
 }
 

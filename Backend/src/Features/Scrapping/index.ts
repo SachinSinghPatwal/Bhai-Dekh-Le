@@ -46,6 +46,9 @@ import {
   waitForPageReady,
   clickButton,
   typeIntoField,
+  CheckForElement,
+  checkForElement,
+  editPhoneInputField,
 } from "./utility/playwright/interactions/index.js";
 import CreatingEnvironmentToScrap, {
   createScrapingSession,
@@ -60,6 +63,7 @@ import SaveUserData from "./helpers/SaveUserData.js";
 import ScrappingPaginatedJob from "./helpers/ScrappingPaginatedJob.js";
 import { setIterativePaginationParams } from "./helpers/setIterativePaginationParams.js";
 import bodyValidation from "./helpers/naukri/bodyValidation.js";
+import checkSavedSessionAndUserCredentialsForAuth from "./helpers/CheckSavedSessionAndUserCredentialsForAuth.js";
 
 // Aliases for compatibility
 const log = Logger;
@@ -89,7 +93,6 @@ export {
   type RequestParams,
   type NEW_ENVIRONMENT_DUE_TO_CRASH_PARAMS_TYPES,
   type NEW_ENVIRONMENT_DUE_TO_CRASH_RETURNED_TYPES,
-
   Logger,
   log,
   TimeOutError,
@@ -115,7 +118,8 @@ export {
   sendToAnotherQueue,
   Cloudinary,
   fetchCloudinaryPdf,
-
+  checkSavedSessionAndUserCredentialsForAuth,
+  
   PROXIES,
   JOB_AUTH_URL,
   dbSaveExchange,
@@ -126,7 +130,6 @@ export {
   CLIENT_DATA_PATH,
   GENERAL_TIMEOUT,
   MatchedURLOfSearch,
-
   RateLimitingError,
   RateLimitError,
   RaceForResponseOrTimeOut,
@@ -141,6 +144,9 @@ export {
   waitForPageReady,
   clickButton,
   typeIntoField,
+  CheckForElement,
+  checkForElement,
+  editPhoneInputField,
   ComposeUrl,
   Fetch,
   GetAllJobs,

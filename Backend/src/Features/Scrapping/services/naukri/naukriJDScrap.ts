@@ -450,7 +450,7 @@ For each qualifying job, return only:
 - Use only information supported by the candidate profile and job listing.
 - If a match score is provided by another system, treat it as an estimate and independently check whether the job meets the filtering rules.
 
-Return only the qualifying jobs in the specified format.
+Return the qualifying jobs in the specified format. And Above of All provide common skills asked by company in their skills and jd for today's collected jobs
 
 Also provide an 'overallSummary' comparing the candidate's profile against this batch of opportunities.
 

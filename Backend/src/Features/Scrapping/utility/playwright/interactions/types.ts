@@ -17,6 +17,12 @@ export interface ElementSelector {
   className?: string;
   /** Arbitrary attribute key/value pair, e.g. `{ name: "data-testid", value: "login" }` */
   attribute?: { name: string; value: string };
+  /** Image or element alt text, e.g. `"Company Logo"` → `[alt="Company Logo"]` */
+  alt?: string;
+  /** Image or media src URL/fragment, e.g. `"logo.png"` → matches exact or substring src */
+  src?: string;
+  /** ARIA or HTML role attribute, e.g. `"img"` → `[role="img"]` */
+  role?: string;
 }
 
 /** Options controlling how long to wait and how to handle timeouts */

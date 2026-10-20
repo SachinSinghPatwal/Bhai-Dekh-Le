@@ -1,5 +1,4 @@
 import { BrowserContext, Page } from "playwright";
-import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import {
@@ -11,7 +10,9 @@ import {
   ComposeUrl,
   log,
   encrypt,
+  checkSavedSessionAndUserCredentialsForAuth,
 } from "../../../index.js";
+import SignUpUser from "./Signup.js";
 
 /**
  * Handles Naukri authentication lifecycle:
@@ -29,70 +30,65 @@ export default async function loginToNaukri(
   context: BrowserContext,
   workerId: string = "auth-worker",
 ): Promise<void> {
-  const hasSavedSession = existsSync(CLIENT_DATA_PATH);
+  const { email, password, phoneNumber, username } =
+    checkSavedSessionAndUserCredentialsForAuth(workerId) as Record<
+      string,
+      string
+    >;
+  const credentials = Object.values({ email, password, phoneNumber, username });
+  const checkFor = { doesUserHaveAccount: false, maxRetriesCount: 3 };
+  let attempt = 0;
 
-  if (hasSavedSession) {
-    log.info(
-      `[${workerId}] Authenticated session file found , Session is active.`,
-    );
-    return;
-  }
-  const email = process.env.NAUKRI_EMAIL;
-  const password = process.env.NAUKRI_PASSWORD;
+  while (!checkFor.doesUserHaveAccount || attempt > checkFor.maxRetriesCount) {
+    try {
+      const loginUrl = ComposeUrl(JOB_AUTH_URL.loginPath);
+      log.info(
+        `[${workerId}] No active session found. Navigating to login: ${loginUrl}`,
+      );
 
-  if (!email || !password) {
-    throw new Error(
-      `[${workerId}] Missing NAUKRI_EMAIL or NAUKRI_PASSWORD in environment variables for fresh login.`,
-    );
-  }
+      await page.goto(loginUrl, {
+        waitUntil: "domcontentloaded",
+      });
+      log.info(`[${workerId}] Typing login credentials...`);
 
-  try {
-    const loginUrl = ComposeUrl(JOB_AUTH_URL.path);
-    log.info(
-      `[${workerId}] No active session found. Navigating to login: ${loginUrl}`,
-    );
+      await typeIntoField(
+        page,
+        { selector: AUTH_SELECTORS.signedUserField },
+        email,
+        { humanDelay: 100 },
+      );
 
-    await page.goto(loginUrl, {
-      waitUntil: "domcontentloaded",
-    });
-    log.info(`[${workerId}] Typing login credentials...`);
+      await typeIntoField(
+        page,
+        { selector: AUTH_SELECTORS.signedPasswordField },
+        password,
+        { humanDelay: 70 },
+      );
 
-    await typeIntoField(
-      page,
-      { selector: AUTH_SELECTORS.usernameField },
-      email,
-      { humanDelay: 100 },
-    );
+      await clickButton(
+        page,
+        { selector: AUTH_SELECTORS.loginSubmit },
+        { timeout: 10_000 },
+      );
+      await page.waitForURL((url) => !url.href.includes("nlogin/login"), {
+        timeout: 60_000,
+      });
+      const storageState = await context.storageState();
+      const encrypted = encrypt(storageState);
 
-    await typeIntoField(
-      page,
-      { selector: AUTH_SELECTORS.passwordField },
-      password,
-      { humanDelay: 70 },
-    );
+      await fs.mkdir(path.dirname(CLIENT_DATA_PATH), { recursive: true });
+      await fs.writeFile(CLIENT_DATA_PATH, JSON.stringify(encrypted), "utf8");
 
-    await clickButton(
-      page,
-      { selector: AUTH_SELECTORS.loginSubmit },
-      { timeout: 10_000 },
-    );
-    await page.waitForURL((url) => !url.href.includes("nlogin/login"), {
-      timeout: 60_000,
-    });
-    const storageState = await context.storageState();
-    const encrypted = encrypt(storageState);
-
-    await fs.mkdir(path.dirname(CLIENT_DATA_PATH), { recursive: true });
-    await fs.writeFile(CLIENT_DATA_PATH, JSON.stringify(encrypted), "utf8");
-
-    log.success(
-      `[${workerId}] Successfully authenticated and stored encrypted client auth state.`,
-    );
-  } catch (error) {
-    log.error(`[${workerId}] Authentication failed: ${error}`);
-    throw new Error(
-      `Something went wrong while logging in: ${(error as Error)?.message ?? error}`,
-    );
+      log.success(
+        `[${workerId}] Successfully authenticated and stored encrypted client auth state.`,
+      );
+    } catch (error) {
+      log.error(
+        `[${workerId}] Login failed tryingcreating new account Reason : ${(error as Error).message}`,
+      );
+      await SignUpUser(page, context, workerId, credentials);
+      attempt++;
+    }
   }
 }
 

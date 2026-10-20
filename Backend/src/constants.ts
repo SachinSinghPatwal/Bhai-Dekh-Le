@@ -9,12 +9,13 @@ export const JOB_SEARCH_URL = {
   query: {
     k: "react",
     nignbevent_src: "jobsearchDeskGNB",
-    sort:"f",
+    sort: "f",
   },
 };
 
 export const JOB_AUTH_URL = {
-  path: "nlogin/login",
+  loginPath: "nlogin/login",
+  signUpPath: "registration/createAccount",
 };
 
 // RabbitMQ Constants
@@ -26,7 +27,6 @@ export const jdScrape = "jd_scrape";
 
 // URL Constants
 export const MatchedURLOfSearch = "/jobapi/v3/search";
-
 
 // Misc Constants
 export const SNAPSHOT_FOLDER_NAME = "snapShots";
@@ -56,14 +56,17 @@ export const USER_DETAILS_PATH = path.resolve(
 
 // Authentication and Account Creation Selectors
 export const AUTH_SELECTORS = {
-  usernameField: "#usernameField",
-  passwordField: "#passwordField",
+  signedUserField: "#signedUserField",
+  signedPasswordField: "#signedPasswordField",
   loginSubmit: "button[type='submit']",
 
   // Scope: Account Creation / Registration Selectors (for future registration workflow)
-  registerButton: "a[href*='register'], .register-btn",
   nameField: "#name",
   emailField: "#email",
+  passwordField: "#password",
   mobileField: "#mobile",
-  registerSubmit: "button[type='submit']",
+  navigatetoPhoneVerification: "div[data-val='fresher']",
+  editPhoneNumber:"img[role='button']",
+  sendOTP:".verify",
+  skip:"span[role='button']"
 } as const;
