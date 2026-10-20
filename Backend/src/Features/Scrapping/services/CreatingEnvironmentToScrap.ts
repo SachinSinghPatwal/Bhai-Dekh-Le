@@ -64,7 +64,7 @@ export async function createScrapingSession(
 
     // 2. Launch browser with stealth
     browser = await chromium.launch({
-      headless: true,
+      headless: false,
       args: [
         // "--no-sandbox", 
         // "--start-minimized"

@@ -103,7 +103,7 @@ export async function CheckForElement(
   options: CheckElementOptions = {},
 ): Promise<boolean> {
   const {
-    timeout = 5_000,
+    timeout = 10_000,
     state = "visible",
     hasText,
     waitForPage = false,

@@ -1,6 +1,7 @@
 import { Page } from "playwright";
 import { ElementSelector, WaitOptions } from "./types.js";
 import { resolveSelector, waitForPageReady } from "./utils.js";
+import { INTERACTION_DELAYS } from "../../../../../constants.js";
 
 /**
  * Waits for the page to be fully ready (network idle) and then clicks the
@@ -29,6 +30,8 @@ import { resolveSelector, waitForPageReady } from "./utils.js";
 export interface ClickOptions extends WaitOptions {
   /** If true, bypasses actionability checks when clicking */
   force?: boolean;
+  /** Pause in milliseconds after click completes */
+  postClickDelay?: number;
 }
 
 export async function clickButton(
@@ -36,7 +39,11 @@ export async function clickButton(
   target: ElementSelector,
   options: ClickOptions = {},
 ): Promise<void> {
-  const { timeout = 10_000, force = true } = options;
+  const {
+    timeout = 10_000,
+    force = true,
+    postClickDelay = INTERACTION_DELAYS.clickDelay,
+  } = options;
   const cssSelector = resolveSelector(target);
 
   await waitForPageReady(page, 3_000);
@@ -45,9 +52,13 @@ export async function clickButton(
   await locator.waitFor({ state: "attached", timeout });
 
   try {
-    await locator.click({ timeout: 5_000, force });
+    await locator.click({ timeout: 10_000, force });
   } catch {
     // If Playwright click is intercepted or blocked by overlay, dispatch DOM click
     await locator.dispatchEvent("click");
+  }
+
+  if (postClickDelay > 0) {
+    await page.waitForTimeout(postClickDelay);
   }
 }

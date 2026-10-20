@@ -29,7 +29,7 @@ export interface ElementSelector {
 export interface WaitOptions {
   /**
    * Maximum time in milliseconds to wait for page readiness / element visibility.
-   * Defaults to 30_000 ms.
+   * Defaults to 10_000 ms.
    */
   timeout?: number;
 }

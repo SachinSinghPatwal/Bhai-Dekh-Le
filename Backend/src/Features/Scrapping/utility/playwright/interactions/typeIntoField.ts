@@ -1,6 +1,7 @@
 import { Page } from "playwright";
 import { ElementSelector, WaitOptions } from "./types.js";
 import { resolveSelector, waitForPageReady } from "./utils.js";
+import { INTERACTION_DELAYS } from "../../../../../constants.js";
 
 /**
  * Options for {@link typeIntoField}.
@@ -82,20 +83,20 @@ export async function typeIntoField(
   const {
     timeout = 10_000,
     clearFirst = true,
-    humanDelay = 0,
-    postTypeDelay = 0,
+    humanDelay = INTERACTION_DELAYS.typingDelay,
+    postTypeDelay = INTERACTION_DELAYS.postTypeDelay,
   } = options;
 
   const cssSelector = resolveSelector(field);
 
-  await waitForPageReady(page, 3_000);
+  await waitForPageReady(page, 1_000);
 
   const locator = page.locator(cssSelector).first();
   await locator.waitFor({ state: "attached", timeout });
 
   // Ensure input is focused by clicking into it
   try {
-    await locator.click({ timeout: 5_000, force: true });
+    await locator.click({ timeout: 10_000, force: true });
   } catch {
     await locator.focus().catch(() => {});
   }

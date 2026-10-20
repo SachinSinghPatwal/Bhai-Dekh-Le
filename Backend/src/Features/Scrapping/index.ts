@@ -12,6 +12,7 @@ import {
   CLIENT_DATA_PATH,
   GENERAL_TIMEOUT,
   MatchedURLOfSearch,
+  INTERACTION_DELAYS,
 } from "../../constants.js";
 import { getFileFolderNamingConvention as SnapShotsFileNamingConvention } from "../../helper/SnapShotsFileNamingConvention.js";
 import RaceForResponseOrTimeOut from "./utility/playwright/RaceForResponseOrTimeOut.js";
@@ -64,6 +65,7 @@ import ScrappingPaginatedJob from "./helpers/ScrappingPaginatedJob.js";
 import { setIterativePaginationParams } from "./helpers/setIterativePaginationParams.js";
 import bodyValidation from "./helpers/naukri/bodyValidation.js";
 import checkSavedSessionAndUserCredentialsForAuth from "./helpers/CheckSavedSessionAndUserCredentialsForAuth.js";
+import { interceptResponseOnAction } from "./helpers/interceptResponseOnAction.js";
 
 // Aliases for compatibility
 const log = Logger;
@@ -130,6 +132,7 @@ export {
   CLIENT_DATA_PATH,
   GENERAL_TIMEOUT,
   MatchedURLOfSearch,
+  INTERACTION_DELAYS,
   RateLimitingError,
   RateLimitError,
   RaceForResponseOrTimeOut,
@@ -168,4 +171,5 @@ export {
   ScrappingPaginatedJob,
   setIterativePaginationParams,
   bodyValidation,
+  interceptResponseOnAction,
 };

@@ -31,48 +31,56 @@ export default async function SignUpUser(
     });
     log.info(`[${workerId}] Typing login credentials...`);
 
-    credentials.forEach(
-      async (each:string) =>
-        await typeIntoField(
-          page,
-          { selector: AUTH_SELECTORS.signedUserField },
-          each,
-          { humanDelay: 100 },
-        ),
+    const [name, email, password, mobile] = credentials;
+
+    const fieldsToType = [
+      { selector: AUTH_SELECTORS.nameField, value: name },
+      { selector: AUTH_SELECTORS.emailField, value: email },
+      { selector: AUTH_SELECTORS.passwordField, value: password },
+      { selector: AUTH_SELECTORS.mobileField, value: mobile },
+    ];
+
+    for (const field of fieldsToType) {
+      if (field.value) {
+        await typeIntoField(page, { selector: field.selector }, field.value);
+      }
+    }
+
+    await clickButton(page, {
+      selector: AUTH_SELECTORS.userType,
+    });
+
+    await clickButton(page, { selector: AUTH_SELECTORS.loginSubmit });
+
+    // Wait for the verification step / editPhoneNumber button to appear (or URL change)
+    const hasVerificationStep = await CheckForElement(
+      page,
+      { selector: AUTH_SELECTORS.editPhoneNumber },
+      { timeout: 10_000 },
     );
 
-    await clickButton(
-      page,
-      { selector: AUTH_SELECTORS.navigatetoPhoneVerification },
-      { timeout: 5_000 },
-    );
-    await page.waitForURL((url) => !url.href.includes(signUpUrl), {
-      timeout: 10_000,
-    });
+    if (!hasVerificationStep) {
+      await page
+        .waitForURL((url) => !url.href.includes(signUpUrl), {
+          timeout: 10_000,
+        })
+        .catch(() => {});
+    }
 
     let isVisible = false;
 
     while (!isVisible) {
       await clickButton(page, { selector: AUTH_SELECTORS.editPhoneNumber });
-      await clickButton(
-        page,
-        { selector: AUTH_SELECTORS.editPhoneNumber },
-        { timeout: 5_000 },
-      );
 
       await editPhoneInputField(
         page,
-        { selector: AUTH_SELECTORS.mobileField },
-        { timeout: 5_000 },
+        { selector: AUTH_SELECTORS.refillMobileField },
+        { timeout: 10_000 },
       );
 
-      await clickButton(
-        page,
-        { selector: AUTH_SELECTORS.sendOTP },
-        { timeout: 5_000 },
-      );
+      await clickButton(page, { selector: AUTH_SELECTORS.sendOTP });
       isVisible = await CheckForElement(page, AUTH_SELECTORS.skip, {
-        timeout: 5_000,
+        timeout: 10_000,
       });
     }
 

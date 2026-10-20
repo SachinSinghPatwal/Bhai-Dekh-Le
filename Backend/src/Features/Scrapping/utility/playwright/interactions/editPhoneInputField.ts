@@ -1,6 +1,7 @@
 import { Page } from "playwright";
 import { ElementSelector, WaitOptions } from "./types.js";
 import { resolveSelector, waitForPageReady } from "./utils.js";
+import { INTERACTION_DELAYS } from "../../../../../constants.js";
 
 /**
  * Options for {@link editPhoneInputField}.
@@ -52,7 +53,11 @@ export async function editPhoneInputField(
   target: ElementSelector | string,
   options: EditPhoneOptions = {},
 ): Promise<EditPhoneResult> {
-  const { timeout = 10_000, delay = 50, waitForPage = false } = options;
+  const {
+    timeout = 10_000,
+    delay = INTERACTION_DELAYS.typingDelay,
+    waitForPage = false,
+  } = options;
 
   if (waitForPage) {
     await waitForPageReady(page, 3_000);
@@ -61,12 +66,22 @@ export async function editPhoneInputField(
   const cssSelector =
     typeof target === "string" ? target : resolveSelector(target);
 
-  const locator = page.locator(cssSelector).first();
-  await locator.waitFor({ state: "visible", timeout });
+  // Target visible input to avoid selecting hidden background elements
+  let locator = page.locator(`${cssSelector}:visible, ${cssSelector}`).first();
+  try {
+    await locator.waitFor({ state: "visible", timeout });
+  } catch {
+    locator = page
+      .locator(
+        "input[type='tel']:visible, input[placeholder*='Mobile']:visible, input[placeholder*='mobile']:visible, input[name*='mobile']:visible, input:visible",
+      )
+      .first();
+    await locator.waitFor({ state: "visible", timeout });
+  }
 
   // 1. Select the input (focus and click into it)
   try {
-    await locator.click({ timeout: 5_000, force: true });
+    await locator.click({ timeout, force: true });
   } catch {
     await locator.focus();
   }

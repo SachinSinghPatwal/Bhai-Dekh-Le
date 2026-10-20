@@ -36,7 +36,13 @@ export const CLIENT_DATA_FOLDER_NAME = "src/Features/Scrapping/data";
 export const PROXIES = ["http://62.72.43.79:3129"];
 
 // General TimeOut
-export const GENERAL_TIMEOUT = 30000; // 30 seconds
+export const GENERAL_TIMEOUT = 2000; // 2 seconds
+
+export const INTERACTION_DELAYS = {
+  typingDelay: Number(process.env.INTERACTION_TYPING_DELAY ?? 0),
+  postTypeDelay: Number(process.env.INTERACTION_POST_TYPE_DELAY ?? 0),
+  clickDelay: Number(process.env.INTERACTION_CLICK_DELAY ?? 0),
+} as const;
 
 // path
 export const CLIENT_DATA_PATH = path.resolve(
@@ -56,8 +62,10 @@ export const USER_DETAILS_PATH = path.resolve(
 
 // Authentication and Account Creation Selectors
 export const AUTH_SELECTORS = {
-  signedUserField: "#signedUserField",
-  signedPasswordField: "#signedPasswordField",
+  signedUserField:
+    "#usernameField, #signedUserField, input[placeholder*='Username'], input[placeholder*='Email']",
+  signedPasswordField:
+    "#passwordField, #signedPasswordField, input[type='password']",
   loginSubmit: "button[type='submit']",
 
   // Scope: Account Creation / Registration Selectors (for future registration workflow)
@@ -65,8 +73,9 @@ export const AUTH_SELECTORS = {
   emailField: "#email",
   passwordField: "#password",
   mobileField: "#mobile",
-  navigatetoPhoneVerification: "div[data-val='fresher']",
-  editPhoneNumber:"img[role='button']",
-  sendOTP:".verify",
-  skip:"span[role='button']"
+  refillMobileField: "#mobile-number",
+  userType: "div[data-val='exp']",
+  editPhoneNumber: "img[role='button']",
+  sendOTP: ".verify",
+  skip: "span[role='button']",
 } as const;
