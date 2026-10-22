@@ -1,9 +1,5 @@
 import type { ConfirmChannel, Message } from "amqplib";
-import type {
-  JOB_DETAILS,
-  NEW_ENVIRONMENT_DUE_TO_CRASH_PARAMS_TYPES,
-  NEW_ENVIRONMENT_DUE_TO_CRASH_RETURNED_TYPES,
-} from "../../index.js";
+import type { JOB_DETAILS } from "../../index.js";
 import {
   Logger,
   RateLimitingError,
@@ -62,19 +58,22 @@ export default async function HttpBasedScrap(
         Logger.warn(`[${workerId}] Scrape error occurred: ${errorMessage}`);
       }
       attempt++;
-      const { newUrl, newHeaders, newRequest, newJobDetails } =
-        (await creatingNewEnviromentToScrapForNextiterationDueToPrevCrash({
-          attempt,
-          customMaxRetries,
-          workerId,
-          composedURL,
-          lastPageCrashed,
-          errorMessage,
-        })) as NEW_ENVIRONMENT_DUE_TO_CRASH_RETURNED_TYPES;
-      url = newUrl;
-      headers = newHeaders;
-      request = newRequest;
-      jobDetails = newJobDetails;
+      /**
+       * @depricating soon since logged user are not get diff cookies
+       * */
+      // const { newUrl, newHeaders, newRequest, newJobDetails } =
+      //   (await creatingNewEnviromentToScrapForNextiterationDueToPrevCrash({
+      //     attempt,
+      //     customMaxRetries,
+      //     workerId,
+      //     composedURL,
+      //     lastPageCrashed,
+      //     errorMessage,
+      //   })) as NEW_ENVIRONMENT_DUE_TO_CRASH_RETURNED_TYPES;
+      // url = newUrl;
+      // headers = newHeaders;
+      // request = newRequest;
+      // jobDetails = newJobDetails;
     }
   }
 
@@ -83,46 +82,46 @@ export default async function HttpBasedScrap(
   );
 }
 
-async function creatingNewEnviromentToScrapForNextiterationDueToPrevCrash({
-  attempt,
-  customMaxRetries,
-  workerId,
-  composedURL,
-  lastPageCrashed,
-  errorMessage,
-}: NEW_ENVIRONMENT_DUE_TO_CRASH_PARAMS_TYPES): Promise<
-  NEW_ENVIRONMENT_DUE_TO_CRASH_RETURNED_TYPES | string
-> {
-  const isRecaptcha = errorMessage.includes("RECAPTCHA_BLOCK");
-  if (attempt < customMaxRetries.times) {
-    const cooldownMs = isRecaptcha ? 20000 : 15000;
-    Logger.warn(
-      `[${workerId}] Scrape attempt ${attempt} failed. Cooling down for ${cooldownMs / 1000}s before retrying...`,
-    );
-    await new Promise((resolve) => setTimeout(resolve, cooldownMs));
+// async function creatingNewEnviromentToScrapForNextiterationDueToPrevCrash({
+//   attempt,
+//   customMaxRetries,
+//   workerId,
+//   composedURL,
+//   lastPageCrashed,
+//   errorMessage,
+// }: NEW_ENVIRONMENT_DUE_TO_CRASH_PARAMS_TYPES): Promise<
+//   NEW_ENVIRONMENT_DUE_TO_CRASH_RETURNED_TYPES | string
+// > {
+//   const isRecaptcha = errorMessage.includes("RECAPTCHA_BLOCK");
+//   if (attempt < customMaxRetries.times) {
+//     const cooldownMs = isRecaptcha ? 20000 : 15000;
+//     Logger.warn(
+//       `[${workerId}] Scrape attempt ${attempt} failed. Cooling down for ${cooldownMs / 1000}s before retrying...`,
+//     );
+//     await new Promise((resolve) => setTimeout(resolve, cooldownMs));
 
-    if (isRecaptcha) {
-      Logger.info(
-        `[${workerId}] Detected dead session (RECAPTCHA_BLOCK). Renewing stealth browser session...`,
-      );
-      try {
-        const {
-          url: newUrl,
-          headers: newHeaders,
-          request: newRequest,
-          jobDetails: newJobDetails,
-        } = await CreatingEnvironmentToScrap(composedURL, workerId);
-        Logger.success(
-          `[${workerId}] Fresh session tokens obtained. Resuming scrape from page ${lastPageCrashed ?? "initial"}.`,
-        );
-        return { newUrl, newHeaders, newRequest, newJobDetails };
-      } catch (renewErr) {
-        Logger.error(`[${workerId}] Failed to renew session tokens: ${renewErr}`);
-      }
-    }
-  }
-  return errorMessage;
-}
+//     if (isRecaptcha) {
+//       Logger.info(
+//         `[${workerId}] Detected dead session (RECAPTCHA_BLOCK). Renewing stealth browser session...`,
+//       );
+//       try {
+//         const {
+//           url: newUrl,
+//           headers: newHeaders,
+//           request: newRequest,
+//           jobDetails: newJobDetails,
+//         } = await CreatingEnvironmentToScrap(composedURL, workerId);
+//         Logger.success(
+//           `[${workerId}] Fresh session tokens obtained. Resuming scrape from page ${lastPageCrashed ?? "initial"}.`,
+//         );
+//         return { newUrl, newHeaders, newRequest, newJobDetails };
+//       } catch (renewErr) {
+//         Logger.error(`[${workerId}] Failed to renew session tokens: ${renewErr}`);
+//       }
+//     }
+//   }
+//   return errorMessage;
+// }
 
 const httpScrapping = HttpBasedScrap;
 export { HttpBasedScrap, httpScrapping };

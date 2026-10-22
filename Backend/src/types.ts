@@ -10,18 +10,3 @@ export interface RequestParams {
   retryStartingPage: number | null;
 }
 
-export interface NEW_ENVIRONMENT_DUE_TO_CRASH_PARAMS_TYPES {
-  attempt: number;
-  customMaxRetries: Record<string, number>;
-  workerId: string;
-  composedURL: string;
-  lastPageCrashed: number | null;
-  errorMessage: string;
-}
-
-export interface NEW_ENVIRONMENT_DUE_TO_CRASH_RETURNED_TYPES {
-  newUrl:URL;
-  newHeaders:Record<string,string>;
-  newRequest:string;
-  newJobDetails:JOB_DETAILS[];
-}

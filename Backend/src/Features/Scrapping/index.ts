@@ -29,11 +29,7 @@ import DistributingWork from "../MessageQueues/helpers/DistributingWork.js";
 import TransferingWorkToNextQueue from "../MessageQueues/helpers/TransferingWorkToNextQueue.js";
 import { fetchCloudinaryPdf as Cloudinary } from "../AI/services/Cloudinary.js";
 
-import {
-  RequestParams,
-  NEW_ENVIRONMENT_DUE_TO_CRASH_PARAMS_TYPES,
-  NEW_ENVIRONMENT_DUE_TO_CRASH_RETURNED_TYPES,
-} from "../../types.js";
+import { RequestParams } from "../../types.js";
 
 import { RateLimitError as RateLimitingError } from "./utility/playwright/RateLimitingError.js";
 import GetDesiredJobs from "./services/GetDesiredJobs.js";
@@ -94,8 +90,6 @@ const decrypt = decryption;
 export {
   type JOB_DETAILS,
   type RequestParams,
-  type NEW_ENVIRONMENT_DUE_TO_CRASH_PARAMS_TYPES,
-  type NEW_ENVIRONMENT_DUE_TO_CRASH_RETURNED_TYPES,
   Logger,
   log,
   TimeOutError,
@@ -122,7 +116,6 @@ export {
   Cloudinary,
   fetchCloudinaryPdf,
   checkSavedSessionAndUserCredentialsForAuth,
-  
   PROXIES,
   JOB_AUTH_URL,
   dbSaveExchange,
