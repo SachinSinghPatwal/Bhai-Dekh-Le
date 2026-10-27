@@ -9,6 +9,8 @@ import {
 import fs from "node:fs/promises";
 import path from "node:path";
 
+import { existsSync } from "node:fs";
+
 export default async function GetDesiredJobs({
   url,
   request,
@@ -17,8 +19,10 @@ export default async function GetDesiredJobs({
   initialbatchOfJobs,
   workerId,
   retryStartingPage,
+  platform = "naukri",
 }: RequestParams): Promise<JOB_DETAILS[]> {
   let initialPage: number = 0;
+  
   const { startPage: expectedStartPage, endPage } =
     await DistributingWork(totalJobsAvailable as number, workerId);
 
@@ -33,13 +37,14 @@ export default async function GetDesiredJobs({
   );
 
   const jobs = await ScrappingPaginatedJob({
-    url: new URL(url.toString()),
+    url: new URL(url!.toString()),
     headers,
     request,
     initialPage,
-    initialJobs: initialbatchOfJobs,
+    initialJobs: initialbatchOfJobs as JOB_DETAILS[],
     workerId,
     endPage,
+    platform,
   });
   const filteredRecentJob = sortingJobBasedOnCreated(jobs);
   console.log(
@@ -48,19 +53,21 @@ export default async function GetDesiredJobs({
       footerPlaceholderLabel,
     })),
   );
-  const snapshotDir = path.resolve(`./snapShots`);
+  const snapshotDir = path.resolve(`./snapShots`, platform);
 
-  const entries = await fs.readdir(snapshotDir);
-  await Promise.all(
-    entries
-      .filter((entry) => entry !== ".gitkeep")
-      .map((entry) =>
-        fs.rm(path.join(snapshotDir, entry), {
-          recursive: true,
-          force: true,
-        }),
-      ),
-  );
+  if (existsSync(snapshotDir)) {
+    const entries = await fs.readdir(snapshotDir);
+    await Promise.all(
+      entries
+        .filter((entry) => entry !== ".gitkeep")
+        .map((entry) =>
+          fs.rm(path.join(snapshotDir, entry), {
+            recursive: true,
+            force: true,
+          }),
+        ),
+    );
+  }
 
   return filteredRecentJob as JOB_DETAILS[];
 }

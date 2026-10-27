@@ -115,10 +115,10 @@ export async function getJobsFromBackend(
   }
 
   // 2. Fall back to local decrypted snapshots
-  const snapshotJobs = await getAllSnapshotJobs("./snapShots");
+  const snapshotJobs = await getAllSnapshotJobs("naukri");
   if (snapshotJobs.length > 0) {
     log.info(
-      `[Naukri JD Scrap] Retrieved ${snapshotJobs.length} jobs from local snapshots.`,
+      `[Naukri JD Scrap] Retrieved ${snapshotJobs.length} jobs from local snapshots (naukri).`,
     );
     return snapshotJobs;
   }

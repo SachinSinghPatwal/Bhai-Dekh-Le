@@ -1,35 +1,45 @@
-import { JOB_DETAILS } from "../models/Mongo/job.models.js";
+import { JOB_DETAILS } from "../types.js";
 import fs from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { decrypt } from "../utility/crypto/decryption.js";
 import path from "node:path";
+import { SNAPSHOT_FOLDER_NAME } from "../constants.js";
 
-export async function getAllSnapshotJobs(rootDir: string) {
+export async function getAllSnapshotJobs(target: string = SNAPSHOT_FOLDER_NAME) {
   const allJobs: JOB_DETAILS[] = [];
 
-  if (!existsSync(rootDir)) {
+  let resolvedDir = target;
+  if (target === "naukri" || target === "jobFound") {
+    resolvedDir = path.join(SNAPSHOT_FOLDER_NAME, target);
+  }
+
+  if (!existsSync(resolvedDir)) {
     return allJobs;
   }
 
-  const dateFolders = await fs.readdir(rootDir, {
-    withFileTypes: true,
-  });
+  async function collectJsonFiles(dir: string): Promise<string[]> {
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    const jsonPaths: string[] = [];
 
-  for (const folder of dateFolders) {
-    if (!folder.isDirectory()) continue;
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        jsonPaths.push(...(await collectJsonFiles(fullPath)));
+      } else if (entry.isFile() && entry.name.endsWith(".json")) {
+        jsonPaths.push(fullPath);
+      }
+    }
+    return jsonPaths;
+  }
 
-    const folderPath = path.join(rootDir, folder.name);
+  const files = await collectJsonFiles(resolvedDir);
 
-    const files = await fs.readdir(folderPath);
-
-    for (const file of files) {
-      if (!file.endsWith(".json")) continue;
-
-      const filePath = path.join(folderPath, file);
-
+  for (const filePath of files) {
+    try {
       const jobs = await decrypt(filePath);
-
       allJobs.push(...jobs);
+    } catch {
+      // Ignore corrupted or unreadable snapshot files
     }
   }
 

@@ -3,6 +3,7 @@ import path from "node:path";
 export const MONGO_DB_NAME = "BhaiDekhLe";
 
 export const NAUKRI_BASE_URL = "https://www.naukri.com";
+export const JOB_FOUND_BASE_URL = "https://jobfound.org";
 
 export const JOB_SEARCH_URL = {
   path: "react-jobs",
@@ -10,6 +11,19 @@ export const JOB_SEARCH_URL = {
     k: "react",
     nignbevent_src: "jobsearchDeskGNB",
     sort: "f",
+  },
+};
+
+export const JOB_FOUND_SEARCH_URL = {
+  path: "api/job/search",
+  query: {
+    q: "Frontend Engineer",
+    page: 1,
+    limit: 45,
+    sort: "newest",
+    experience: "0-1+yr",
+    country: "India,Remote",
+    postedWithin: 1,
   },
 };
 
@@ -30,6 +44,8 @@ export const MatchedURLOfSearch = "/jobapi/v3/search";
 
 // Misc Constants
 export const SNAPSHOT_FOLDER_NAME = "snapShots";
+export const NAUKRI_SNAPSHOT_FOLDER = path.join(SNAPSHOT_FOLDER_NAME, "naukri");
+export const JOB_FOUND_SNAPSHOT_FOLDER = path.join(SNAPSHOT_FOLDER_NAME, "jobFound");
 export const CLIENT_DATA_FOLDER_NAME = "src/Features/Scrapping/data";
 
 // proxies
@@ -47,20 +63,26 @@ export const INTERACTION_DELAYS = {
 // Jitter & Delay Configuration for Scraping (controllable via constants or ENV variables)
 export const SCRAPING_JITTER = {
   // Delay between pagination requests in ScrappingPaginatedJob (ms)
-  paginationBaseDelay: Number(process.env.SCRAPING_PAGINATION_BASE_DELAY ?? 1000), // reduced from 3000-4000ms
-  paginationMaxJitter: Number(process.env.SCRAPING_PAGINATION_MAX_JITTER ?? 1000), // reduced from 2500ms
+  paginationBaseDelay: Number(
+    process.env.SCRAPING_PAGINATION_BASE_DELAY ?? 1000,
+  ), // reduced from 3000-4000ms
+  paginationMaxJitter: Number(
+    process.env.SCRAPING_PAGINATION_MAX_JITTER ?? 1000,
+  ), // reduced from 2500ms
 
   // Periodic breather interval and duration in ScrappingPaginatedJob (ms)
-  breatherIntervalPages: Number(process.env.SCRAPING_BREATHER_INTERVAL_PAGES ?? 15),
-  breatherBaseDelay: Number(process.env.SCRAPING_BREATHER_BASE_DELAY ?? 3000), // reduced from 8000ms
-  breatherMaxJitter: Number(process.env.SCRAPING_BREATHER_MAX_JITTER ?? 2000), // reduced from 5000ms
+  breatherIntervalPages: Number(
+    process.env.SCRAPING_BREATHER_INTERVAL_PAGES ?? 18,
+  ),
+  breatherBaseDelay: Number(process.env.SCRAPING_BREATHER_BASE_DELAY ?? 1000), // reduced from 8000ms
+  breatherMaxJitter: Number(process.env.SCRAPING_BREATHER_MAX_JITTER ?? 1000), // reduced from 5000ms
 
   // Delay between individual JD scraping requests in naukriJDScrap (ms)
   jdScrapBaseDelay: Number(process.env.SCRAPING_JD_BASE_DELAY ?? 500), // reduced from 1500ms
   jdScrapMaxJitter: Number(process.env.SCRAPING_JD_MAX_JITTER ?? 500), // reduced from 1500ms
 
   // Retry base delay and jitter in Fetch (ms)
-  fetchRetryBaseDelay: Number(process.env.FETCH_RETRY_BASE_DELAY ?? 2000), // reduced from 5000ms
+  fetchRetryBaseDelay: Number(process.env.FETCH_RETRY_BASE_DELAY ?? 1000), // reduced from 5000ms
   fetchRetryMaxJitter: Number(process.env.FETCH_RETRY_MAX_JITTER ?? 1000), // reduced from 3000ms
 } as const;
 

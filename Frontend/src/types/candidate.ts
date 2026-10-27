@@ -15,3 +15,5 @@ export interface JobMetricStats {
   offersCount: number;
   rejectionsCount: number;
 }
+
+export type { CandidateFormValues } from "../schema/candidateSchema";

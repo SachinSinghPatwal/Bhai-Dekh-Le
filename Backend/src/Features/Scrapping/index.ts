@@ -1,4 +1,4 @@
-import type { JOB_DETAILS } from "../../models/Mongo/job.models.js";
+import type { JOB_DETAILS } from "../../types.js";
 import { JobModel } from "../../models/Mongo/job.models.js";
 import Logger from "../../utility/Logger.js";
 import {
@@ -14,6 +14,8 @@ import {
   MatchedURLOfSearch,
   INTERACTION_DELAYS,
   SCRAPING_JITTER,
+  JOB_FOUND_BASE_URL,
+  JOB_FOUND_SEARCH_URL,
 } from "../../constants.js";
 import { getFileFolderNamingConvention as SnapShotsFileNamingConvention } from "../../helper/SnapShotsFileNamingConvention.js";
 import RaceForResponseOrTimeOut from "./utility/playwright/RaceForResponseOrTimeOut.js";
@@ -63,8 +65,9 @@ import { setIterativePaginationParams } from "./helpers/setIterativePaginationPa
 import bodyValidation from "./helpers/naukri/bodyValidation.js";
 import checkSavedSessionAndUserCredentialsForAuth from "./helpers/CheckSavedSessionAndUserCredentialsForAuth.js";
 import { interceptResponseOnAction } from "./helpers/interceptResponseOnAction.js";
+import breather from "./helpers/naukri/breather.js";
+import intialFetch from "./helpers/JobFound/initialFetch.js";
 
-// Aliases for compatibility
 const log = Logger;
 const TimeoutError = TimeOutError;
 const RateLimitError = RateLimitingError;
@@ -97,6 +100,7 @@ export {
   TimeOut,
   encryption,
   encrypt,
+  breather,
   decryption,
   decrypt,
   SnapShotsFileNamingConvention,
@@ -114,14 +118,17 @@ export {
   TransferingWorkToNextQueue,
   sendToAnotherQueue,
   Cloudinary,
+  intialFetch,
   fetchCloudinaryPdf,
   checkSavedSessionAndUserCredentialsForAuth,
   PROXIES,
   JOB_AUTH_URL,
   dbSaveExchange,
   JOB_SEARCH_URL,
+  JOB_FOUND_SEARCH_URL,
   AUTH_SELECTORS,
   NAUKRI_BASE_URL,
+  JOB_FOUND_BASE_URL,
   CLIENT_DATA_FOLDER_NAME,
   CLIENT_DATA_PATH,
   GENERAL_TIMEOUT,

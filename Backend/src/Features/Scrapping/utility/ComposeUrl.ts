@@ -1,10 +1,9 @@
-import { NAUKRI_BASE_URL } from "../index.js";
-
 export default function ComposeUrl(
   path: string,
-  query?: Record<string, string>,
+  BaseUrl:string,
+  query?: Record<string, any>,
 ): string {
-  const url = new URL(path, `${NAUKRI_BASE_URL}/`);
+  const url = new URL(path, `${BaseUrl}/`);
 
   if (query) {
     url.search = new URLSearchParams(query).toString();

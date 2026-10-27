@@ -6,15 +6,17 @@ import {
   Fetch,
   RateLimitingError,
   getAllSnapShots,
-  SCRAPING_JITTER,
+  breather,
 } from "../index.js";
+import checkIsJobStale from "./naukri/checkIsJobStale.js";
 import { setIterativePaginationParams } from "./setIterativePaginationParams.js";
 
 interface SCRAPPING_PAGINATED_JOBS extends Partial<RequestParams> {
   workerId: string;
   endPage: number;
   initialPage: number;
-  initialJobs: JOB_DETAILS[];
+  initialJobs: JOB_DETAILS[] | any[];
+  platform?: "naukri" | "jobFound" | string;
 }
 
 export default async function ScrappingPaginatedJob({
@@ -25,6 +27,7 @@ export default async function ScrappingPaginatedJob({
   initialPage,
   initialJobs,
   endPage,
+  platform = "naukri",
 }: SCRAPPING_PAGINATED_JOBS): Promise<any> {
   let unSortedJobs = [];
 
@@ -36,34 +39,15 @@ export default async function ScrappingPaginatedJob({
   }
 
   for (let i = initialPage; i < endPage; i++) {
-    // Pattern-based adaptive jitter:
-    if (i > initialPage) {
-      // Periodic breather to reset Naukri's sliding rate-limit counter
-      if ((i - initialPage) % SCRAPING_JITTER.breatherIntervalPages === 0) {
-        const breather =
-          Math.floor(Math.random() * SCRAPING_JITTER.breatherMaxJitter) +
-          SCRAPING_JITTER.breatherBaseDelay;
-        if (breather > 0) {
-          Logger.debug(
-            `[${workerId}] Periodic breather: Waiting ${(breather / 1000).toFixed(1)}s`,
-          );
-          await new Promise((resolve) => setTimeout(resolve, breather));
-        }
-      }
 
-      // Jitter delay between paginated requests (controlled via constants/env)
-      const pageJitter =
-        Math.floor(Math.random() * SCRAPING_JITTER.paginationMaxJitter) +
-        SCRAPING_JITTER.paginationBaseDelay;
-      if (pageJitter > 0) {
-        await new Promise((resolve) => setTimeout(resolve, pageJitter));
-      }
-    }
-
+    await breather(i, initialPage, workerId);
+    
     setIterativePaginationParams(url as URL, i);
+    
     Logger.debug(`[${workerId}] Scraping page ${i}...`);
 
     let response: JOB_DETAILS[];
+
     try {
       response = (await Fetch({
         url,
@@ -74,7 +58,7 @@ export default async function ScrappingPaginatedJob({
       Logger.debug("snapShotting the jobs before throwing error");
 
       if (unSortedJobs.length > 0) {
-        await SaveSnapShots(unSortedJobs).catch((err) => {
+        await SaveSnapShots(unSortedJobs, platform).catch((err) => {
           Logger.error(
             `[${workerId}] Error while saving snapshot Reason: ${err.message}`,
           );
@@ -92,24 +76,21 @@ export default async function ScrappingPaginatedJob({
         `[${workerId}] cannot iterate over the jobs , Jobs are not iteratable`,
       );
     }
-    // Checking early once we reach jobs older than 1 day
-    const jobAge = Number(
-      String(response[0]?.footerPlaceholderLabel ?? "")
-        .split(" ")[0]
-        .replace("+", ""),
-    );
 
-    const isOlderThanLimit = !isNaN(jobAge) && jobAge > 1;
+    const isOlderThanLimit = checkIsJobStale(response);
 
     if (isOlderThanLimit) {
       Logger.success(
         `[${workerId}] Reached end of fresh jobs at page ${i}. Stopping Scrapping and returning Data.`,
       );
-      let consolidatingSnapshotJobs = await getAllSnapShots("./snapShots");
+      let consolidatingSnapshotJobs = await getAllSnapShots(platform);
       unSortedJobs.push(...consolidatingSnapshotJobs);
       return unSortedJobs;
     }
+
     unSortedJobs.push(...response);
+
   }
+
   return unSortedJobs;
 }

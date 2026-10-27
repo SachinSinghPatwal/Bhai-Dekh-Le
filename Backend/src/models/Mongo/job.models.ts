@@ -1,23 +1,8 @@
-import mongoose, { Document, Schema } from "mongoose";
+import mongoose, { Schema } from "mongoose";
 import { ApiError } from "../../utility/endpointWrapper/ApiError.js";
+import { type JOB_DETAILS } from "../../types.js";
 
-export interface JOB_DETAILS extends Document {
-  readonly title: string;
-  readonly jobId: string;
-  readonly footerPlaceholderLabel: string;
-  readonly footerPlaceholderColor: string;
-  readonly companyName: string;
-  readonly tagsAndSkills: string[];
-  readonly placeholders: Record<string, string>[];
-  readonly jdURL: string;
-  readonly JD: string;
-  readonly createdDate: number;
-  readonly salaryDetails: Record<string, unknown>;
-  readonly minExp: string;
-  readonly maxExp: string;
-  readonly applyByTime: string;
-  readonly walkIn: boolean;
-}
+export type { JOB_DETAILS };
 
 const jobSchema = new Schema<Required<JOB_DETAILS>>(
   {
