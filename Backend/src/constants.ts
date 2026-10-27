@@ -1,5 +1,6 @@
 import path from "node:path";
 
+
 export const MONGO_DB_NAME = "BhaiDekhLe";
 
 export const NAUKRI_BASE_URL = "https://www.naukri.com";

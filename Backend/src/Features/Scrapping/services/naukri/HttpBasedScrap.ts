@@ -3,11 +3,8 @@ import type { JOB_DETAILS } from "../../index.js";
 import {
   Logger,
   RateLimitingError,
-  JOB_SEARCH_URL,
   TransferingWorkToNextQueue,
   GetDesiredJobs as makeHttpRequestToGetAllDesiredJobs,
-  ComposeUrl,
-  NAUKRI_BASE_URL,
 } from "../../index.js";
 import { CreatingEnvironmentToScrap } from "../CreatingEnvironmentToScrap.js";
 
@@ -15,17 +12,12 @@ export default async function HttpBasedScrap(
   workerId: string,
   channel: ConfirmChannel,
   message: Message,
+  composedURL: string,
 ): Promise<JOB_DETAILS[] | undefined> {
   let attempt = 0;
   let lastPageCrashed = null;
   let customMaxRetries = { times: 10 };
   let orderedJobs;
-
-  const composedURL = ComposeUrl(
-    JOB_SEARCH_URL.path,
-    NAUKRI_BASE_URL,
-    JOB_SEARCH_URL.query,
-  );
 
   let {
     totalJobsAvailable: initialTotalJobs,

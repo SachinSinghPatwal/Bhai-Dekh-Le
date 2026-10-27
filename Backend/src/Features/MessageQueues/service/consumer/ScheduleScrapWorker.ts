@@ -110,8 +110,6 @@ async function start(): Promise<void> {
         return;
       }
 
-      let totalNumberOfJobs = Number(content.totalNumberOfJobs ?? 0);
-
       if (!channel) {
         throw new Error("RabbitMQ channel is not initialized");
       }
@@ -139,7 +137,6 @@ async function start(): Promise<void> {
 
       await PlatformInitialization(
         workerId,
-        totalNumberOfJobs,
         platform,
         safeChannel,
         message,
