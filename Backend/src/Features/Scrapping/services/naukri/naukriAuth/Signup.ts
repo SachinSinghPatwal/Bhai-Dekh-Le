@@ -12,6 +12,7 @@ import {
   log,
   encrypt,
   CheckForElement,
+  NAUKRI_BASE_URL,
 } from "../../../index.js";
 
 export default async function SignUpUser(
@@ -21,7 +22,7 @@ export default async function SignUpUser(
   credentials: string[],
 ): Promise<void> {
   try {
-    const signUpUrl = ComposeUrl(JOB_AUTH_URL.signUpPath);
+    const signUpUrl = ComposeUrl(JOB_AUTH_URL.signUpPath, NAUKRI_BASE_URL);
     log.info(
       `[${workerId}] No active session found. Navigating to SignUp: ${signUpUrl}`,
     );

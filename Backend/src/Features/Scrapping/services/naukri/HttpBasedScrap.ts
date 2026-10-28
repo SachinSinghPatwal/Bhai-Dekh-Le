@@ -13,6 +13,7 @@ export default async function HttpBasedScrap(
   channel: ConfirmChannel,
   message: Message,
   composedURL: string,
+  platform: string = "naukri",
 ): Promise<JOB_DETAILS[] | undefined> {
   let attempt = 0;
   let lastPageCrashed = null;
@@ -37,7 +38,7 @@ export default async function HttpBasedScrap(
         retryStartingPage: lastPageCrashed,
         workerId,
         initialbatchOfJobs: jobDetails,
-        platform: "naukri",
+        platform,
       });
 
       await TransferingWorkToNextQueue(
@@ -45,7 +46,7 @@ export default async function HttpBasedScrap(
         orderedJobs,
         message,
         workerId,
-        "naukri",
+        platform,
       );
       return;
     } catch (error: unknown) {

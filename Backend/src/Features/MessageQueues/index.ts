@@ -6,6 +6,7 @@ import {
   dbSave,
   dbSaveExchange,
   ScheduleScrape,
+  SCRAPING_PLATFORMS,
 } from "../../constants.js";
 import SaveSnapShots from "../../helper/SaveSnapShots.js";
 import cleanupStaleSnapshots from "../../helper/cleanupStaleSnapshots.js";
@@ -42,6 +43,7 @@ export {
   dbSave,
   dbSaveExchange,
   ScheduleScrape,
+  SCRAPING_PLATFORMS,
   SaveSnapShots,
   saveSnapShots,
   cleanupStaleSnapshots,

@@ -21,7 +21,7 @@ export default async function PlatformInitialization(
       NAUKRI_BASE_URL,
       JOB_SEARCH_URL.query,
     );
-    await HttpBasedScrap(workerId, channel, message, composedURL);
+    await HttpBasedScrap(workerId, channel, message, composedURL, platform);
   } else if (platform === "jobFound") {
     const composedURL = ComposeUrl(
       JOB_FOUND_SEARCH_URL.path,
@@ -29,14 +29,11 @@ export default async function PlatformInitialization(
       JOB_FOUND_SEARCH_URL.query,
     );
 
-    await HttpBasedScrap(workerId, channel, message, composedURL);
+    await HttpBasedScrap(workerId, channel, message, composedURL, platform);
   } else if (platform === "naukri-jd" || platform === "jdScrap") {
-    // Playwright JD scraping and Gemini AI resume evaluation
     await naukriJDScrap(undefined, workerId);
     channel.ack(message);
   } else if (platform === "linkedIn") {
-    // Scope: LinkedIn scraping support
   } else {
-    // Scope: Public platforms support
   }
 }

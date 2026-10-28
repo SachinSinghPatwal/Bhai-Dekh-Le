@@ -1,10 +1,11 @@
 import amqp from "amqplib";
-import { Logger, ScheduleScrape } from "../../index.js";
+import { Logger, ScheduleScrape, SCRAPING_PLATFORMS } from "../../index.js";
 
 const log = Logger;
 
-export default async function ScheduleScrapeJob(): Promise<void> {
-  const platform = "naukri";
+export default async function ScheduleScrapeJob(
+  platformsToScrape: string[] = SCRAPING_PLATFORMS,
+): Promise<void> {
   const connection = await amqp.connect(
     process.env.RABBITMQ_URL_WITH_CREDENTIALS!,
   );
@@ -19,9 +20,7 @@ export default async function ScheduleScrapeJob(): Promise<void> {
       autoDelete: false,
     });
 
-    const workerCount = Number(process.env.SCRAP_WORKER_COUNT ?? 4);
-
-    for (let i = 0; i < workerCount; i++) {
+    for (const platform of platformsToScrape) {
       channel.publish(
         ScheduleScrape,
         "Scrapper",
@@ -39,7 +38,7 @@ export default async function ScheduleScrapeJob(): Promise<void> {
 
     await channel.waitForConfirms();
 
-    log.success(`${workerCount} messages published and confirmed`);
+    log.success(`${platformsToScrape.length} platform scrape messages published and confirmed`);
 
     await channel.close();
   } finally {

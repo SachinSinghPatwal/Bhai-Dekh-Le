@@ -34,6 +34,8 @@ export const JOB_AUTH_URL = {
 };
 
 // RabbitMQ Constants
+export const SCRAPING_PLATFORMS: string[] = ["naukri", "jobFound"];
+
 export const ScheduleScrape = "TimedScrapping";
 export const dbSaveExchange = "db_save_exchange";
 export const dbSave = "db_save";

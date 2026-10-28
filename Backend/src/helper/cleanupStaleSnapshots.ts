@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { SNAPSHOT_FOLDER_NAME } from "../constants.js";
+import { SNAPSHOT_FOLDER_NAME, SCRAPING_PLATFORMS } from "../constants.js";
 import log from "../utility/Logger.js";
 import { getFileFolderNamingConvention } from "./SnapShotsFileNamingConvention.js";
 
@@ -14,7 +14,7 @@ const DEFAULT_SNAPSHOT_DIR = path.resolve(
   SNAPSHOT_FOLDER_NAME,
 );
 
-const KNOWN_PLATFORMS = ["naukri", "jobFound"];
+const KNOWN_PLATFORMS = SCRAPING_PLATFORMS;
 
 export async function cleanupStaleSnapshots(
   targetDirOrPlatform: string = DEFAULT_SNAPSHOT_DIR,

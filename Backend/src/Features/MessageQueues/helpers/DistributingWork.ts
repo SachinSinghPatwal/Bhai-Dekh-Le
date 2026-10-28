@@ -1,22 +1,11 @@
 export default async function DistributingWork(
   totalJobsAvailable: number,
-  workerId: string,
+  _workerId?: string,
 ) {
   const jobsPerPage = 20;
-  const totalPages = Math.ceil(totalJobsAvailable / jobsPerPage) - 1; // page 1 already fetched
-  const totalWorkers = Number(process.env.SCRAP_WORKER_COUNT ?? 4);
-
-  const workerNumber = Number(workerId.split("-")[1]) || 1;
-
-  const basePages = Math.floor(totalPages / totalWorkers);
-  const remainder = totalPages % totalWorkers;
-
-  const pagesForThisWorker = basePages + (workerNumber <= remainder ? 1 : 0);
-
-  const startPage =
-    2 + (workerNumber - 1) * basePages + Math.min(workerNumber - 1, remainder);
-
-  const endPage = startPage + pagesForThisWorker - 1;
+  const totalPages = Math.ceil((totalJobsAvailable || 0) / jobsPerPage);
+  const startPage = 2;
+  const endPage = Math.max(startPage, totalPages + 1);
 
   return { startPage, endPage };
 }

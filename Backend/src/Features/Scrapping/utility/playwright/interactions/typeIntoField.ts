@@ -104,7 +104,7 @@ export async function typeIntoField(
     await locator.fill("").catch(() => {});
   }
 
-  if (humanDelay > 0) {
+  if (humanDelay && humanDelay > 0) {
     // Human-like typing with per-key delay
     await locator.pressSequentially(text, { delay: humanDelay });
   } else {
@@ -112,7 +112,7 @@ export async function typeIntoField(
     await locator.fill(text);
   }
 
-  if (postTypeDelay > 0) {
+  if (postTypeDelay && postTypeDelay > 0) {
     await page.waitForTimeout(postTypeDelay);
   }
 }

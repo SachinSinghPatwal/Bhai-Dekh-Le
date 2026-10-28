@@ -4,8 +4,11 @@ import ScheduleScrapping from "../Features/MessageQueues/service/producer/Schedu
 import ScheduleJdScrape from "../Features/MessageQueues/service/producer/ScheduleJdScrape.js";
 import { ApiResponse } from "../utility/endpointWrapper/ApiResponse.js";
 
-export const getAllJobs = AsyncHandler(async (_: Request, res: Response) => {
-  await ScheduleScrapping();
+export const getAllJobs = AsyncHandler(async (req: Request, res: Response) => {
+  const platforms = req.query.platform
+    ? [String(req.query.platform)]
+    : undefined;
+  await ScheduleScrapping(platforms);
 
   return res.status(202).json(
     new ApiResponse({
@@ -25,4 +28,3 @@ export const triggerJdScrape = AsyncHandler(async (_: Request, res: Response) =>
     }),
   );
 });
-

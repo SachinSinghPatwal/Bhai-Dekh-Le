@@ -57,7 +57,7 @@ export async function clickButton(
     await locator.dispatchEvent("click");
   }
 
-  if (postClickDelay > 0) {
+  if (postClickDelay && postClickDelay > 0) {
     await page.waitForTimeout(postClickDelay);
   }
 }
