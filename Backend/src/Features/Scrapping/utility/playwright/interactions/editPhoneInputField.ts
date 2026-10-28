@@ -1,7 +1,6 @@
 import { Page } from "playwright";
 import { ElementSelector, WaitOptions } from "./types.js";
 import { resolveSelector, waitForPageReady } from "./utils.js";
-import { INTERACTION_DELAYS } from "../../../../../constants.js";
 
 /**
  * Options for {@link editPhoneInputField}.
@@ -55,7 +54,7 @@ export async function editPhoneInputField(
 ): Promise<EditPhoneResult> {
   const {
     timeout = 10_000,
-    delay = INTERACTION_DELAYS.typingDelay,
+    delay,
     waitForPage = false,
   } = options;
 

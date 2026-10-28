@@ -1,6 +1,6 @@
 export class TimeoutError extends Error {
-  constructor() {
-    super("Request timed out");
+  constructor(reason:string) {
+    super(`Request timed out Reason: ${reason}`);
     this.name = "TimeoutError";
   }
 }

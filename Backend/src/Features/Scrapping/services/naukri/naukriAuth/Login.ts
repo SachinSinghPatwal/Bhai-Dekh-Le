@@ -11,20 +11,10 @@ import {
   encrypt,
   checkSavedSessionAndUserCredentialsForAuth,
   interceptResponseOnAction,
+  NAUKRI_BASE_URL,
 } from "../../../index.js";
 import SignUpUser from "./Signup.js";
 
-/**
- * Handles Naukri authentication lifecycle:
- * 1. Checks if a saved authenticated session state already exists on disk.
- * 2. If present, verifies and utilizes the existing session without re-navigating to login.
- * 3. If absent, validates login credentials, navigates to the login page first,
- *    provides scope for account creation / registration, performs login, and saves encrypted session state.
- *
- * @param page - Playwright Page instance
- * @param context - Playwright BrowserContext instance
- * @param workerId - Identifier of worker triggering authentication
- */
 export default async function loginToNaukri(
   page: Page,
   context: BrowserContext,
@@ -32,7 +22,6 @@ export default async function loginToNaukri(
 ): Promise<void> {
   const authCredentials = checkSavedSessionAndUserCredentialsForAuth(workerId);
   if (!authCredentials) {
-    // Authenticated session file found and already loaded into context
     return;
   }
 
@@ -43,7 +32,7 @@ export default async function loginToNaukri(
 
   while (!checkFor.doesUserHaveAccount && attempt < checkFor.maxRetriesCount) {
     try {
-      const loginUrl = ComposeUrl(JOB_AUTH_URL.loginPath);
+      const loginUrl = ComposeUrl(JOB_AUTH_URL.loginPath, NAUKRI_BASE_URL);
       log.info(
         `[${workerId}] No active session found. Navigating to login: ${loginUrl}`,
       );

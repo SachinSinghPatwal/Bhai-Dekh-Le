@@ -1,7 +1,6 @@
 import { Page } from "playwright";
 import { ElementSelector, WaitOptions } from "./types.js";
 import { resolveSelector, waitForPageReady } from "./utils.js";
-import { INTERACTION_DELAYS } from "../../../../../constants.js";
 
 /**
  * Waits for the page to be fully ready (network idle) and then clicks the
@@ -42,7 +41,7 @@ export async function clickButton(
   const {
     timeout = 10_000,
     force = true,
-    postClickDelay = INTERACTION_DELAYS.clickDelay,
+    postClickDelay,
   } = options;
   const cssSelector = resolveSelector(target);
 

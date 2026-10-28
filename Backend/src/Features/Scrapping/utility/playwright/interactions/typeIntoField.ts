@@ -1,7 +1,6 @@
 import { Page } from "playwright";
 import { ElementSelector, WaitOptions } from "./types.js";
 import { resolveSelector, waitForPageReady } from "./utils.js";
-import { INTERACTION_DELAYS } from "../../../../../constants.js";
 
 /**
  * Options for {@link typeIntoField}.
@@ -83,8 +82,8 @@ export async function typeIntoField(
   const {
     timeout = 10_000,
     clearFirst = true,
-    humanDelay = INTERACTION_DELAYS.typingDelay,
-    postTypeDelay = INTERACTION_DELAYS.postTypeDelay,
+    humanDelay ,
+    postTypeDelay,
   } = options;
 
   const cssSelector = resolveSelector(field);

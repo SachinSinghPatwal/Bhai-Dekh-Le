@@ -107,17 +107,19 @@ export async function CreatingEnvironmentToScrap(
     const capturedRequest = CapturingEvents<Request>(page, "request");
     const capturedResponse = CapturingEvents<Response>(page, "response");
 
-    // Navigate to the intended path requested by caller
     await page.goto(navigateTo, {
       waitUntil: "domcontentloaded",
     });
 
-    // Await intercepted search API request and response
     const request = await RaceForResponseOrTimeOut<Request>(
-      capturedRequest as Promise<Request>,
+      capturedRequest,
+      "Request Event took longer than the timeout",
     );
 
-    const response = await RaceForResponseOrTimeOut<Response>(capturedResponse);
+    const response = await RaceForResponseOrTimeOut<Response>(
+      capturedResponse,
+      "Response Event took longer than the timeout",
+    );
 
     if (request instanceof TimeOutError || response instanceof TimeOutError) {
       throw new Error(

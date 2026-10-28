@@ -4,7 +4,7 @@ import { Logger, ScheduleScrape } from "../../index.js";
 const log = Logger;
 
 export default async function ScheduleScrapeJob(): Promise<void> {
-  const platform = ["naukri", "jobFound"];
+  const platform = "naukri";
   const connection = await amqp.connect(
     process.env.RABBITMQ_URL_WITH_CREDENTIALS!,
   );
@@ -27,7 +27,7 @@ export default async function ScheduleScrapeJob(): Promise<void> {
         "Scrapper",
         Buffer.from(
           JSON.stringify({
-            platform: platform[i],
+            platform,
             totalNumberOfJobs: 0,
           }),
         ),

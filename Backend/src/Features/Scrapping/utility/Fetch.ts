@@ -5,6 +5,7 @@ import {
   bodyValidation,
   responseValidation,
   SCRAPING_JITTER,
+  GENERAL_TIMEOUT,
 } from "../index.js";
 
 export default async function Fetch({
@@ -38,8 +39,8 @@ export default async function Fetch({
         throw error;
       }
 
-      const baseDelay = SCRAPING_JITTER.fetchRetryBaseDelay;
-      const jitter = Math.floor(Math.random() * SCRAPING_JITTER.fetchRetryMaxJitter);
+      const baseDelay = GENERAL_TIMEOUT;
+      const jitter = Math.floor(Math.random() * GENERAL_TIMEOUT);
       const delayMs = baseDelay * Math.pow(2, attempt - 1) + jitter;
 
       Logger.debug(

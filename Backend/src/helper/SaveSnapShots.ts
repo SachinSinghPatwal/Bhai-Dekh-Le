@@ -25,12 +25,6 @@ export default async function saveSnapShots(
 
   const newJobs = [];
 
-  /**
-   * @description This loop checks if the jobId already exists in the existingIds set.
-   * If it does, it skips that job. If it doesn't,
-   * it adds the jobId to the existingIds set and pushes the job to the newJobs array.
-   * Ensuring that only unique jobs in the snapshot, preventing duplicates.
-   * */
   for (const job of scrapedJobs) {
     if (existingIds.has(job.jobId)) {
       continue;

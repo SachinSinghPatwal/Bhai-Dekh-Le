@@ -53,38 +53,12 @@ export const CLIENT_DATA_FOLDER_NAME = "src/Features/Scrapping/data";
 export const PROXIES = ["http://62.72.43.79:3129"];
 
 // General TimeOut
-export const GENERAL_TIMEOUT = 2000; // 2 seconds
+export const GENERAL_TIMEOUT = 1000; 
 
-export const INTERACTION_DELAYS = {
-  typingDelay: Number(process.env.INTERACTION_TYPING_DELAY ?? 0),
-  postTypeDelay: Number(process.env.INTERACTION_POST_TYPE_DELAY ?? 0),
-  clickDelay: Number(process.env.INTERACTION_CLICK_DELAY ?? 0),
-} as const;
-
-// Jitter & Delay Configuration for Scraping (controllable via constants or ENV variables)
 export const SCRAPING_JITTER = {
-  // Delay between pagination requests in ScrappingPaginatedJob (ms)
-  paginationBaseDelay: Number(
-    process.env.SCRAPING_PAGINATION_BASE_DELAY ?? 1000,
-  ), // reduced from 3000-4000ms
-  paginationMaxJitter: Number(
-    process.env.SCRAPING_PAGINATION_MAX_JITTER ?? 1000,
-  ), // reduced from 2500ms
-
-  // Periodic breather interval and duration in ScrappingPaginatedJob (ms)
-  breatherIntervalPages: Number(
-    process.env.SCRAPING_BREATHER_INTERVAL_PAGES ?? 18,
-  ),
-  breatherBaseDelay: Number(process.env.SCRAPING_BREATHER_BASE_DELAY ?? 1000), // reduced from 8000ms
-  breatherMaxJitter: Number(process.env.SCRAPING_BREATHER_MAX_JITTER ?? 1000), // reduced from 5000ms
-
-  // Delay between individual JD scraping requests in naukriJDScrap (ms)
-  jdScrapBaseDelay: Number(process.env.SCRAPING_JD_BASE_DELAY ?? 500), // reduced from 1500ms
-  jdScrapMaxJitter: Number(process.env.SCRAPING_JD_MAX_JITTER ?? 500), // reduced from 1500ms
-
-  // Retry base delay and jitter in Fetch (ms)
-  fetchRetryBaseDelay: Number(process.env.FETCH_RETRY_BASE_DELAY ?? 1000), // reduced from 5000ms
-  fetchRetryMaxJitter: Number(process.env.FETCH_RETRY_MAX_JITTER ?? 1000), // reduced from 3000ms
+  breatherIntervalPages: 18,
+  jdScrapBaseDelay: 500, 
+  jdScrapMaxJitter: 500,
 } as const;
 
 // path

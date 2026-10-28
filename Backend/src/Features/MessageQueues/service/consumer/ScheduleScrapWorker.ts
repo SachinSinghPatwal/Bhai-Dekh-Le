@@ -143,7 +143,7 @@ async function start(): Promise<void> {
       );
     } catch (error) {
       log.error(
-        `[${workerId}] Scraping or DB-queue publishing failed: ${error}`,
+        `[${workerId}] Scraping or DB-queue publishing failed: ${(error as Error).message}`,
       );
 
       /*

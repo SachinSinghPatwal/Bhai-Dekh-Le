@@ -16,7 +16,7 @@ interface SCRAPPING_PAGINATED_JOBS extends Partial<RequestParams> {
   endPage: number;
   initialPage: number;
   initialJobs: JOB_DETAILS[] | any[];
-  platform?: "naukri" | "jobFound" | string;
+  platform?: string;
 }
 
 export default async function ScrappingPaginatedJob({
@@ -27,7 +27,7 @@ export default async function ScrappingPaginatedJob({
   initialPage,
   initialJobs,
   endPage,
-  platform = "naukri",
+  platform,
 }: SCRAPPING_PAGINATED_JOBS): Promise<any> {
   let unSortedJobs = [];
 
