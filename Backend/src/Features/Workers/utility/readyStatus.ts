@@ -1,5 +1,4 @@
 import { ChildProcess } from "node:child_process";
-import { Logger } from "../index.js";
 
 export default function readyStatus(
   worker: ChildProcess,
@@ -16,6 +15,7 @@ export default function readyStatus(
       }
 
       settled = true;
+      worker.removeListener("message", onMessage);
 
       reject(
         new Error(
@@ -26,7 +26,7 @@ export default function readyStatus(
       );
     }, WORKER_READY_TIMEOUT);
 
-    worker.once("message", (msg: any) => {
+    const onMessage = (msg: any) => {
       if (settled) {
         return;
       }
@@ -36,11 +36,12 @@ export default function readyStatus(
       }
 
       settled = true;
-
+      worker.removeListener("message", onMessage);
       clearTimeout(timeout);
-
       resolve();
-    });
+    };
+
+    worker.on("message", onMessage);
 
     worker.once("exit", (code, signal) => {
       if (settled) {
@@ -48,7 +49,7 @@ export default function readyStatus(
       }
 
       settled = true;
-
+      worker.removeListener("message", onMessage);
       clearTimeout(timeout);
 
       reject(

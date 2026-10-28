@@ -47,12 +47,7 @@ export default async function GetDesiredJobs({
     platform,
   });
   const filteredRecentJob = sortingJobBasedOnCreated(jobs);
-  console.log(
-    filteredRecentJob.map(({ title, footerPlaceholderLabel }: any) => ({
-      title,
-      footerPlaceholderLabel,
-    })),
-  );
+  Logger.debug(`[${workerId}] Sorted ${filteredRecentJob.length} recent jobs.`);
   const snapshotDir = path.resolve(`./snapShots`, platform);
 
   if (existsSync(snapshotDir)) {

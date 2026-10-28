@@ -1,35 +1,35 @@
 import path from "node:path";
 import fs from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { GoogleGenAI } from "@google/genai";
-import { z } from "zod";
 import mongoose from "mongoose";
-
-import Logger from "../../../../utility/Logger.js";
-import { createScrapingSession } from "../CreatingEnvironmentToScrap.js";
-import { waitForPageReady } from "../../utility/playwright/interactions/index.js";
-import type { JOB_DETAILS } from "../../../../types.js";
-import { JobModel } from "../../../../models/Mongo/job.models.js";
+import { z } from "zod";
+import { GoogleGenAI } from "@google/genai";
 import {
+  Logger,
+  createScrapingSession,
+  waitForPageReady,
+  JOB_DETAILS,
+  JobModel,
   NAUKRI_BASE_URL,
   CLIENT_DATA_FOLDER_NAME,
   GENERAL_TIMEOUT,
+  Cloudinary,
+  retrieveUserResumeLink,
+  userDataHelper,
+  getAllSnapShots,
   SCRAPING_JITTER,
-} from "../../../../constants.js";
-import { fetchCloudinaryPdf } from "../../../AI/services/Cloudinary.js";
-import { retrieveUserResumeLink } from "../../../../middlewares/job.middleware.js";
-import { getUserDataFromFile } from "../../../../helper/userDataHelper.js";
-import { getAllSnapshotJobs } from "../../../../helper/getAllSnapShots.js";
-
-const log = Logger;
+} from "../../index.js";
 import {
   CustomBrailleDotBar,
+  startCustomBrailleBar,
   startSpinningLoader,
 } from "../../../../utility/TerminalProgress.js";
 
-/**
- * Parsed and structured Job Description schema
- */
+const log = Logger;
+const fetchCloudinaryPdf = Cloudinary;
+const getUserDataFromFile = userDataHelper;
+const getAllSnapshotJobs = getAllSnapShots;
+
 export interface ScrapedJobDescription {
   jobId: string;
   title: string;
@@ -43,9 +43,6 @@ export interface ScrapedJobDescription {
   scrapedAt: string;
 }
 
-/**
- * Zod schemas for AI Resume-to-JD Evaluation
- */
 export const JobRatingSchema = z.object({
   jobId: z.string(),
   title: z.string(),
@@ -71,9 +68,6 @@ export const BatchJobRatingSchema = z.object({
 export type JobRating = z.infer<typeof JobRatingSchema>;
 export type BatchJobRating = z.infer<typeof BatchJobRatingSchema>;
 
-/**
- * Selectors for extracting Job Description content across Naukri page variations
- */
 const JD_CONTAINER_SELECTORS = [
   ".styles_JDC__dang-inner-html__h0K4t",
   "[class*='styles_JDC__dang-inner-html']",
@@ -88,9 +82,6 @@ const JD_CONTAINER_SELECTORS = [
   "main",
 ];
 
-/**
- * 1. Fetch jobs from provided argument, MongoDB, or local snapshots fallback
- */
 export async function getJobsFromBackend(
   inputJobs?: JOB_DETAILS[],
 ): Promise<JOB_DETAILS[]> {
@@ -98,7 +89,6 @@ export async function getJobsFromBackend(
     return inputJobs;
   }
 
-  // 1. Query MongoDB if connected
   if (mongoose.connection.readyState === 1) {
     try {
       const dbJobs = (await JobModel.find(
@@ -115,7 +105,6 @@ export async function getJobsFromBackend(
     }
   }
 
-  // 2. Fall back to local decrypted snapshots
   const snapshotJobs = await getAllSnapshotJobs("naukri");
   if (snapshotJobs.length > 0) {
     log.info(
@@ -127,25 +116,10 @@ export async function getJobsFromBackend(
   return [];
 }
 
-/**
- * 2. Retrieves the candidate resume as a Buffer.
- *
- * Priority order:
- *   1. LOCAL  — any *.pdf file inside Backend/data/ (highest priority, always tried first)
- *   2. REMOTE — Cloudinary or other HTTP URL stored in the user profile (soft-fail)
- *   3. JSON   — resumeLink/resumePath found inside personalDetails JSON (soft-fail)
- *
- * Cloudinary / remote sources are soft-fails: on any network or auth error we log
- * a warning and move on rather than aborting the whole pipeline.
- *
- * Returns null when no resume can be resolved so the caller can skip AI rating
- * gracefully instead of crashing the DB worker.
- */
 export async function loadResumeBuffer(): Promise<{
   buffer: Buffer;
   source: string;
 } | null> {
-  // ─── PRIORITY 1: Local Backend/data/*.pdf ────────────────────────────────────
   const localDataDir = path.resolve(process.cwd(), "data");
   if (existsSync(localDataDir)) {
     try {
@@ -155,7 +129,7 @@ export async function loadResumeBuffer(): Promise<{
         const pdfPath = path.join(localDataDir, pdfFile);
         const buffer = await fs.readFile(pdfPath);
         log.info(
-          `[Naukri JD Scrap] ✅ Resume loaded from local file: data/${pdfFile}`,
+          `[Naukri JD Scrap] Resume loaded from local file: data/${pdfFile}`,
         );
         return { buffer, source: `local:data/${pdfFile}` };
       }
@@ -170,25 +144,20 @@ export async function loadResumeBuffer(): Promise<{
     );
   }
 
-  // ─── PRIORITY 2: Remote URL from user profile ────────────────────────────────
-  // Soft-fail: network / auth errors skip to next option
   const tryFetchUrl = async (
     url: string,
     label: string,
   ): Promise<{ buffer: Buffer; source: string } | null> => {
-    // Try strict Cloudinary helper first
     if (url.startsWith("https://res.cloudinary.com")) {
       try {
         const buffer = await fetchCloudinaryPdf(url);
         return { buffer, source: label };
       } catch (cloudErr: any) {
         log.warn(
-          `[Naukri JD Scrap] ${label} — fetchCloudinaryPdf failed (${cloudErr?.message}). ` +
-            `Trying plain HTTP fallback...`,
+          `[Naukri JD Scrap] ${label} — fetchCloudinaryPdf failed (${cloudErr?.message}). Trying plain HTTP fallback...`,
         );
       }
     }
-    // Plain HTTP fetch (also used as Cloudinary fallback)
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
       if (!res.ok) {
@@ -207,7 +176,6 @@ export async function loadResumeBuffer(): Promise<{
     }
   };
 
-  // 2a. URL from MongoDB / retrieveUserResumeLink
   try {
     const resumeLink = await retrieveUserResumeLink();
     if (resumeLink) {
@@ -230,7 +198,6 @@ export async function loadResumeBuffer(): Promise<{
     );
   }
 
-  // 2b. URL from personalDetails JSON file
   try {
     const userData = await getUserDataFromFile();
     const linkFromJson =
@@ -259,18 +226,12 @@ export async function loadResumeBuffer(): Promise<{
     );
   }
 
-  // ─── No resume found ─────────────────────────────────────────────────────────
   log.warn(
-    `[Naukri JD Scrap] ⚠️  No resume PDF found. ` +
-      `Place a PDF inside Backend/data/ to enable AI resume rating.`,
+    `[Naukri JD Scrap] No resume PDF found. Place a PDF inside Backend/data/ to enable AI resume rating.`,
   );
   return null;
 }
 
-/**
- * 3. Scrapes full Job Descriptions using Playwright stealth session
- *    and saves consolidated results to Backend/src/Features/Scrapping/data/allJdDescriptions.private.json
- */
 export async function scrapeJobDescriptions(
   jobs: JOB_DETAILS[],
   workerId: string = "jd-scraper-worker",
@@ -309,28 +270,23 @@ export async function scrapeJobDescriptions(
   const dataDir = path.resolve(process.cwd(), CLIENT_DATA_FOLDER_NAME);
   await fs.mkdir(dataDir, { recursive: true });
 
+  const jdBar = startCustomBrailleBar(
+    0,
+    validJobs.length,
+    `[${workerId}] Scraping JDs`,
+    24,
+    `${workerId}-jds`,
+  );
+
   try {
     for (let i = 0; i < validJobs.length; i++) {
       const job = validJobs[i];
 
-      // Normalize JD URL
-      CustomBrailleDotBar(
-        i + 1,
-        validJobs.length,
-        `[${workerId}] Scraping JDs`,
-        24,
-        undefined,
-        `${workerId}-jds`,
-      );
+      jdBar.update(i + 1, validJobs.length);
 
       const fullUrl = job.jdURL.startsWith("http")
         ? job.jdURL
         : `${NAUKRI_BASE_URL.replace(/\/$/, "")}/${job.jdURL.replace(/^\//, "")}`;
-
-      log.info(
-        `[${workerId}] [${i + 1}/${validJobs.length}] Navigating to JD: ${job.title} (${job.jobId}) -> ${fullUrl}`,
-      );
-
       try {
         await page.goto(fullUrl, {
           waitUntil: "domcontentloaded",
@@ -339,7 +295,6 @@ export async function scrapeJobDescriptions(
 
         await waitForPageReady(page, 4_000);
 
-        // Search for JD container in page
         let containerText = "";
         let containerHtml = "";
 
@@ -355,7 +310,6 @@ export async function scrapeJobDescriptions(
           }
         }
 
-        // Fallback to body content if specific container not found
         if (!containerText) {
           const bodyText = await page.locator("body").innerText();
           containerText = bodyText.slice(0, 5000).trim();
@@ -381,7 +335,6 @@ export async function scrapeJobDescriptions(
           `[${workerId}] Scraped JD for ${job.jobId} (${containerText.length} chars)`,
         );
 
-        // Friendly jitter delay between navigations (controlled via SCRAPING_JITTER)
         if (i < validJobs.length - 1) {
           const delay =
             Math.floor(Math.random() * SCRAPING_JITTER.jdScrapMaxJitter) +
@@ -395,7 +348,6 @@ export async function scrapeJobDescriptions(
           `[${workerId}] Failed scraping JD for jobId ${job.jobId}: ${pageErr.message}`,
         );
 
-        // If page failed but we have existing job data, build best-effort JD record
         const fallbackJdRecord: ScrapedJobDescription = {
           jobId: job.jobId,
           title: job.title,
@@ -412,7 +364,8 @@ export async function scrapeJobDescriptions(
       }
     }
 
-    // Persist consolidated batch file in Backend/src/Features/Scrapping/data
+    jdBar.stop();
+
     const batchFilePath = path.join(dataDir, "allJdDescriptions.private.json");
     await fs.writeFile(
       batchFilePath,
@@ -429,9 +382,6 @@ export async function scrapeJobDescriptions(
   return scrapedJds;
 }
 
-/**
- * 4. Evaluates Candidate Resume against all Scraped Job Descriptions using Gemini AI
- */
 export async function rateResumeAgainstJDs(
   jds: ScrapedJobDescription[],
   resumeBuffer: Buffer,
@@ -569,9 +519,6 @@ ${JSON.stringify(jobSummariesForPrompt, null, 2)}
   return BatchJobRatingSchema.parse(rawJson);
 }
 
-/**
- * 5. Prints formatted rating dashboard to the terminal
- */
 export function displayRatingReportOnTerminal(
   ratingResult: BatchJobRating,
   resumeSource: string,
@@ -580,51 +527,38 @@ export function displayRatingReportOnTerminal(
   const subLine = "-".repeat(85);
 
   console.log("\n" + line);
-  console.log("🎯  GEMINI AI RESUME vs NAUKRI JOB DESCRIPTIONS RATING REPORT");
+  console.log("GEMINI AI RESUME vs NAUKRI JOB DESCRIPTIONS RATING REPORT");
   console.log(line);
-  console.log(`📄 Candidate Resume Source: ${resumeSource}`);
+  console.log(`Candidate Resume Source: ${resumeSource}`);
   console.log(
-    `📊 Total Opportunities Evaluated: ${ratingResult.ratedJobs.length}`,
+    `Total Opportunities Evaluated: ${ratingResult.ratedJobs.length}`,
   );
-  console.log(`💡 Profile Summary: ${ratingResult.overallSummary}`);
+  console.log(`Profile Summary: ${ratingResult.overallSummary}`);
   console.log(subLine);
 
   ratingResult.ratedJobs.forEach((job, index) => {
     const scoreColor =
-      job.matchScore >= 80 ? "🟢" : job.matchScore >= 60 ? "🟡" : "🔴";
+      job.matchScore >= 80 ? "Match" : job.matchScore >= 60 ? "Moderate" : "Low";
 
     console.log(
       `\n[#${index + 1}] ${job.title} | ${job.companyName} (Job ID: ${job.jobId})`,
     );
     console.log(
-      `    ${scoreColor} Match Score: ${job.matchScore}/100 [${job.fitVerdict}]`,
+      `    ${scoreColor} Score: ${job.matchScore}/100 [${job.fitVerdict}]`,
     );
     console.log(
-      `    ✅ Matching Skills: ${job.matchingSkills.join(", ") || "None highlighted"}`,
+      `    Matching Skills: ${job.matchingSkills.join(", ") || "None highlighted"}`,
     );
     console.log(
-      `    ⚠️  Missing / Gap Skills: ${job.missingSkills.join(", ") || "None"}`,
+      `    Missing / Gap Skills: ${job.missingSkills.join(", ") || "None"}`,
     );
-    console.log(`    📝 Analysis: ${job.summary}`);
-    console.log(`    💡 Advice: ${job.recommendation}`);
+    console.log(`    Analysis: ${job.summary}`);
+    console.log(`    Advice: ${job.recommendation}`);
   });
 
   console.log("\n" + line + "\n");
 }
 
-/**
- * Main Orchestrator:
- * 1. Called immediately after DB workers store data in MongoDB.
- * 2. Gets all jobs from backend and extracts jdURL.
- * 3. Launches Playwright via abstract createScrapingSession.
- * 4. Navigates to each JD page, extracts container content, and saves to Backend/src/Features/Scrapping/data/allJdDescriptions.private.json.
- * 5. Loads resume from Backend/data or Cloudinary.
- * 6. Prompts Gemini AI to rate resume against all JDs.
- * 7. Prints detailed rating list on terminal and returns the result.
- *
- * @param inputJobs - Optional job list if passed directly from DB worker
- * @param workerId  - Identifier for the worker running this job
- */
 export default async function naukriJDScrap(
   inputJobs?: JOB_DETAILS[],
   workerId: string = "jd-scraper",
@@ -632,7 +566,6 @@ export default async function naukriJDScrap(
   try {
     log.info(`[${workerId}] naukriJDScrap started.`);
 
-    // 1. Get all jobs from backend
     const jobs = await getJobsFromBackend(inputJobs);
     if (!jobs || jobs.length === 0) {
       log.warn(
@@ -643,25 +576,21 @@ export default async function naukriJDScrap(
 
     log.info(`[${workerId}] Processing ${jobs.length} jobs for JD scraping.`);
 
-    // 2. Scrape JD pages and save consolidated to Backend/src/Features/Scrapping/data/allJdDescriptions.private.json
     const scrapedJds = await scrapeJobDescriptions(jobs, workerId);
     if (scrapedJds.length === 0) {
       log.warn(`[${workerId}] No job descriptions could be scraped.`);
       return [];
     }
 
-    // 3. Load candidate resume — local Backend/data/*.pdf is top priority
     const resumeInfo = await loadResumeBuffer();
     if (!resumeInfo) {
       log.warn(
-        `[${workerId}] No resume found — skipping AI rating. ` +
-          `Drop a PDF into Backend/data/ to enable resume scoring.`,
+        `[${workerId}] No resume found — skipping AI rating. Drop a PDF into Backend/data/ to enable resume scoring.`,
       );
       return [];
     }
     const { buffer: resumeBuffer, source: resumeSource } = resumeInfo;
 
-    // 4. Rate resume against JDs using Gemini GenAI
     log.info(
       `[${workerId}] Rating candidate resume against ${scrapedJds.length} JDs...`,
     );
@@ -677,7 +606,6 @@ export default async function naukriJDScrap(
       throw err;
     }
 
-    // 5. Output rating list to backend terminal
     displayRatingReportOnTerminal(ratingResult, resumeSource);
     log.success(
       `[${workerId}] JD Scrape and Resume Evaluation completed successfully for ${ratingResult.ratedJobs.length} jobs.`,

@@ -60,6 +60,129 @@ export function resetBrailleBarSession(sessionId: string | number = "default"): 
   sessionMap.delete(String(sessionId));
 }
 
+let activeLoaderRenderer: (() => void) | null = null;
+let currentLoaderOutput = "";
+let latestLogMessage = "";
+let isTwoLineAllocated = false;
+
+function clampVisible(raw: string, maxLen: number): string {
+  if (!raw) return "";
+  const str = raw.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, (match) => {
+    return match.endsWith("m") ? match : "";
+  });
+  let visible = 0;
+  let inEscape = false;
+  let result = "";
+  for (let i = 0; i < str.length; i++) {
+    if (str[i] === "\x1b") {
+      inEscape = true;
+      result += str[i];
+    } else if (inEscape) {
+      result += str[i];
+      if (/[a-zA-Z]/.test(str[i])) {
+        inEscape = false;
+      }
+    } else {
+      if (visible >= maxLen) break;
+      visible++;
+      result += str[i];
+    }
+  }
+  return result + "\x1b[0m";
+}
+
+function draw(): void {
+  if (typeof process.send === "function") {
+    return;
+  }
+  if (!isTwoLineAllocated) {
+    process.stdout.write("\n");
+    isTwoLineAllocated = true;
+  }
+  const maxCols = Math.max((process.stdout.columns || 120) - 1, 20);
+  const cleanLog = clampVisible(latestLogMessage.replace(/[\r\n]+/g, " ").trim(), maxCols);
+  const cleanLoader = clampVisible(currentLoaderOutput.replace(/[\r\n]+/g, " ").trim(), maxCols);
+  process.stdout.write(`\x1b[1A\r\x1b[2K${cleanLog}\n\r\x1b[2K${cleanLoader}`);
+}
+
+export function registerActiveLoader(renderer: () => void): () => void {
+  activeLoaderRenderer = renderer;
+  if (typeof process.send !== "function" && !isTwoLineAllocated) {
+    process.stdout.write("\n");
+    isTwoLineAllocated = true;
+  }
+  return () => {
+    if (activeLoaderRenderer === renderer) {
+      activeLoaderRenderer = null;
+    }
+  };
+}
+
+export function isLoaderActive(): boolean {
+  return activeLoaderRenderer !== null;
+}
+
+export function handleLogWithActiveLoader(formattedMessage: string): boolean {
+  if (typeof process.send === "function") {
+    process.send({ type: "TERMINAL_LOG", message: formattedMessage });
+    return true;
+  }
+  latestLogMessage = formattedMessage;
+  draw();
+  return true;
+}
+
+export function getLatestLogMessage(): string {
+  return latestLogMessage;
+}
+
+export function renderTwoLineOutput(loaderOutput: string): void {
+  if (typeof process.send === "function") {
+    process.send({ type: "TERMINAL_LOADER", output: loaderOutput });
+    return;
+  }
+  currentLoaderOutput = loaderOutput;
+  draw();
+}
+
+export function handleLoaderStop(completedText?: string): void {
+  if (typeof process.send === "function") {
+    process.send({ type: "TERMINAL_STOP", completedText });
+    return;
+  }
+  if (completedText) {
+    latestLogMessage = `\x1b[32m✔\x1b[0m ${completedText}`;
+  }
+  currentLoaderOutput = "";
+  draw();
+}
+
+export function handleLoaderFail(errorText?: string): void {
+  if (typeof process.send === "function") {
+    process.send({ type: "TERMINAL_FAIL", errorText });
+    return;
+  }
+  currentLoaderOutput = "";
+  draw();
+  if (errorText) {
+    process.stdout.write(`\n\x1b[31m✖ Error: ${errorText}\x1b[0m\n`);
+    isTwoLineAllocated = false;
+  }
+}
+
+export function handleTerminalIpcMessage(msg: any): void {
+  if (!msg || typeof msg !== "object") return;
+  if (msg.type === "TERMINAL_LOG" && typeof msg.message === "string") {
+    handleLogWithActiveLoader(msg.message);
+  } else if (msg.type === "TERMINAL_LOADER" && typeof msg.output === "string") {
+    renderTwoLineOutput(msg.output);
+  } else if (msg.type === "TERMINAL_STOP") {
+    handleLoaderStop(msg.completedText);
+  } else if (msg.type === "TERMINAL_FAIL") {
+    handleLoaderFail(msg.errorText);
+  }
+}
+
 export interface SpinnerHandle {
   updateLabel: (newLabel: string) => void;
   stop: (completedText?: string) => void;
@@ -75,10 +198,11 @@ export function startSpinningLoader(label: string): SpinnerHandle {
   const render = () => {
     if (isStopped) return;
     const frame = frames[frameIndex % frames.length];
-    process.stdout.write(
-      `\r\x1b[2K\x1b[38;2;245;158;11m${frame}\x1b[0m ${currentLabel}`,
-    );
+    const loaderOutput = `\x1b[38;2;245;158;11m${frame}\x1b[0m ${currentLabel}`;
+    renderTwoLineOutput(loaderOutput);
   };
+
+  const unregister = registerActiveLoader(render);
 
   const timer = setInterval(() => {
     frameIndex++;
@@ -96,22 +220,20 @@ export function startSpinningLoader(label: string): SpinnerHandle {
       if (isStopped) return;
       isStopped = true;
       clearInterval(timer);
-      process.stdout.write(
-        `\r\x1b[2K\x1b[32m✔\x1b[0m ${completedText || currentLabel}\n`,
-      );
+      unregister();
+      handleLoaderStop(completedText);
     },
     fail(errorText?: string) {
       if (isStopped) return;
       isStopped = true;
       clearInterval(timer);
-      process.stdout.write(
-        `\r\x1b[2K\x1b[31m✖\x1b[0m ${errorText || currentLabel}\n`,
-      );
+      unregister();
+      handleLoaderFail(errorText || currentLabel);
     },
   };
 }
 
-export function CustomBrailleDotBar(
+export function formatCustomBrailleBar(
   current: number,
   total: number,
   label = "",
@@ -119,8 +241,7 @@ export function CustomBrailleDotBar(
   tick?: number,
   sessionId?: string | number,
   hasError = false,
-  errorMessage?: string,
-): void {
+): string {
   const currentTick = tick ?? Math.floor(Date.now() / 50);
   const progressRatio = Math.min(Math.max(current / (total || 1), 0), 1);
   const totalX = barWidth * 2;
@@ -173,20 +294,98 @@ export function CustomBrailleDotBar(
   }
 
   const percent = (progressRatio * 100).toFixed(0);
-  process.stdout.write(
-    `\r\x1b[2K\x1b[1m${label}\x1b[0m  \x1b[90m[\x1b[0m${bar}\x1b[90m]\x1b[0m  \x1b[38;2;255;180;60m${percent}%\x1b[0m \x1b[90m(${current}/${total})\x1b[0m`,
-  );
+  return `\x1b[1m${label}\x1b[0m  \x1b[90m[\x1b[0m${bar}\x1b[90m]\x1b[0m  \x1b[38;2;255;180;60m${percent}%\x1b[0m \x1b[90m(${current}/${total})\x1b[0m`;
+}
+
+export function CustomBrailleDotBar(
+  current: number,
+  total: number,
+  label = "",
+  barWidth = 24,
+  tick?: number,
+  sessionId?: string | number,
+  hasError = false,
+  errorMessage?: string,
+): void {
+  const sessionKey = String(sessionId ?? label ?? "default");
+  const output = formatCustomBrailleBar(current, total, label, barWidth, tick, sessionKey, hasError);
 
   if (hasError) {
     sessionMap.delete(sessionKey);
-    process.stdout.write(`\n\x1b[31m✖ Error: ${errorMessage || "Scrape operation halted"}\x1b[0m\n`);
+    renderTwoLineOutput(output);
+    handleLoaderFail(errorMessage || "Scrape operation halted");
     return;
   }
 
-  if (current >= total) {
+  renderTwoLineOutput(output);
+
+  if (current >= total && !isLoaderActive()) {
     sessionMap.delete(sessionKey);
-    process.stdout.write("\n");
+    handleLoaderStop();
   }
+}
+
+export interface ActiveBrailleBar {
+  update: (current: number, total?: number, label?: string) => void;
+  stop: (completedText?: string) => void;
+  fail: (errorText?: string) => void;
+}
+
+export function startCustomBrailleBar(
+  initialCurrent: number,
+  total: number,
+  label = "",
+  barWidth = 24,
+  sessionId?: string | number,
+): ActiveBrailleBar {
+  let cur = initialCurrent;
+  let tot = total;
+  let curLabel = label;
+  let isFinished = false;
+  let tick = 0;
+  const sessionKey = String(sessionId ?? label ?? "default");
+
+  const render = () => {
+    if (isFinished) return;
+    tick++;
+    const output = formatCustomBrailleBar(cur, tot, curLabel, barWidth, tick, sessionKey, false);
+    renderTwoLineOutput(output);
+  };
+
+  const unregister = registerActiveLoader(render);
+
+  const timer = setInterval(() => {
+    render();
+  }, 80);
+
+  render();
+
+  return {
+    update(newCurrent: number, newTotal?: number, newLabel?: string) {
+      if (isFinished) return;
+      cur = newCurrent;
+      if (typeof newTotal === "number") tot = newTotal;
+      if (newLabel) curLabel = newLabel;
+      render();
+    },
+    stop(completedText?: string) {
+      if (isFinished) return;
+      isFinished = true;
+      clearInterval(timer);
+      unregister();
+      sessionMap.delete(sessionKey);
+      handleLoaderStop(completedText);
+    },
+    fail(errorText?: string) {
+      if (isFinished) return;
+      isFinished = true;
+      clearInterval(timer);
+      unregister();
+      const errorOutput = formatCustomBrailleBar(cur, tot, curLabel, barWidth, tick, sessionKey, true);
+      renderTwoLineOutput(errorOutput);
+      handleLoaderFail(errorText || "Scrape operation halted");
+    },
+  };
 }
 
 export interface SingleBarOptions {

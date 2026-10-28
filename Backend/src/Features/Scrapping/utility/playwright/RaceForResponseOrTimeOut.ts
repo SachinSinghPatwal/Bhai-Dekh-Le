@@ -1,8 +1,9 @@
-import { TimeOut } from "../../index.js";
+import TimeOut from "../../../../utility/TimeOut.js";
 
 export default function RaceForResponseOrTimeOut<T>(
   process: Promise<T>,
-  reason:string
+  reason: string,
+  timeoutMs: number = 25_000,
 ): Promise<T> {
-  return Promise.race([process, TimeOut(reason)]);
+  return Promise.race([process, TimeOut(reason, timeoutMs)]);
 }

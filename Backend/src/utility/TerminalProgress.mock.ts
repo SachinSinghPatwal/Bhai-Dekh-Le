@@ -41,9 +41,6 @@ async function runMock() {
     tick++,
     siteSession,
   );
-  console.log("\r\x1b[2K[worker-1] Reached end of fresh jobs at page 65. Returning 130 jobs to DB queue.");
-
-  console.log("\n--- Scenario 3: JD Scraping (0 to End, No Early Snap) ---");
   const totalJds = 30;
   const jdSession = "mock-jd";
 

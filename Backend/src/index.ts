@@ -18,15 +18,10 @@ import cleanupStaleSnapshots from "./helper/cleanupStaleSnapshots.js";
 import { startSpinningLoader } from "./utility/TerminalProgress.js";
 import ScheduleScrapeJob from "./Features/MessageQueues/service/producer/ScheduleScrape.js";
 
-// 1. Ensure user resume & job preference profile exists before starting the server
 await ensureBasicUserInformation();
-
-
 await cleanupStaleSnapshots();
 
-
 const port = Number(process.env.PORT) || 8000;
-
 let shuttingDown = false;
 
 app.listen(port, "0.0.0.0", () => {
@@ -39,24 +34,11 @@ async function handleShutdown(): Promise<void> {
   }
 
   shuttingDown = true;
-
   log.debug("Application shutting down...");
 
   try {
-    /*
-     * Stop scraper workers first.
-     *
-     * This prevents new scrape results from
-     * being produced while we shut down the
-     * DB workers.
-     */
     await handleScrapWorkerShutdown();
-
-    /*
-     * Now stop DB workers.
-     */
     await handleDbWorkerShutdown();
-
     log.debug("Application shutdown complete.");
   } catch (error) {
     log.error("Application shutdown error:", error);
@@ -91,9 +73,6 @@ connectToMongoDb()
       }
     } else {
       initLoader.stop("Scraper workers initialized (DB workers suspended).");
-
-
-
     }
   })
   .catch((err: unknown) => {

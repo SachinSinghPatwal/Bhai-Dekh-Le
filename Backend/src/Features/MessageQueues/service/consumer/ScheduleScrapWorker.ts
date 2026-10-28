@@ -1,3 +1,13 @@
+const parentPid = process.ppid;
+if (parentPid) {
+  setInterval(() => {
+    try {
+      process.kill(parentPid, 0);
+    } catch {
+      process.exit(0);
+    }
+  }, 2000);
+}
 import "../../../../config/load-env.js";
 import amqp, { type Message, type ConfirmChannel } from "amqplib";
 import {
@@ -13,33 +23,14 @@ const log = Logger;
 const workerId = process.env.WORKER_ID ?? "worker-unknown";
 
 let connection: Awaited<ReturnType<typeof amqp.connect>> | null = null;
-
 let channel: ConfirmChannel | null = null;
-
 let shuttingDown = false;
 
 async function start(): Promise<void> {
-  /*
-   * =========================
-   * RABBITMQ
-   * =========================
-   */
-
   connection = await amqp.connect(process.env.RABBITMQ_URL_WITH_CREDENTIALS!);
-
   channel = await connection.createConfirmChannel();
 
-  /*
-   * One scraping task at a time
-   * for this worker.
-   */
   await channel.prefetch(1);
-
-  /*
-   * =========================
-   * SCRAPE QUEUE
-   * =========================
-   */
 
   await channel.assertExchange(ScheduleScrape, "direct", {
     durable: true,
@@ -52,12 +43,6 @@ async function start(): Promise<void> {
 
   await channel.bindQueue(ScheduleScrape, ScheduleScrape, "Scrapper");
 
-  /*
-   * =========================
-   * DB SAVE QUEUE
-   * =========================
-   */
-
   await channel.assertExchange(dbSaveExchange, "direct", {
     durable: true,
     autoDelete: false,
@@ -69,12 +54,6 @@ async function start(): Promise<void> {
 
   await channel.bindQueue(dbSave, dbSaveExchange, "Save");
 
-  /*
-   * =========================
-   * CONSUMER
-   * =========================
-   */
-
   await channel.consume(ScheduleScrape, async (message: Message | null) => {
     if (!message || shuttingDown) {
       return;
@@ -82,11 +61,7 @@ async function start(): Promise<void> {
 
     try {
       log.debug(`[${workerId}] PID=${process.pid} PPID=${process.ppid}`);
-      /*
-       * =========================
-       * 1. SCRAPE
-       * =========================
-       */
+
       let content: {
         platform?: string;
         totalNumberOfJobs?: number;
@@ -148,23 +123,14 @@ async function start(): Promise<void> {
         `[${workerId}] Scraping or DB-queue publishing failed: ${(error as Error).message}`,
       );
 
-      /*
-       * The original scrape task is returned
-       * to RabbitMQ only if not already acknowledged.
-       */
       if (!shuttingDown && channel) {
         try {
           channel.nack(message, false, true);
-        } catch {
-          // Channel may already be closed or message already settled
-        }
+        } catch {}
       }
     }
   });
 
-  /*
-   * Worker is now completely initialized.
-   */
   if (process.send) {
     process.send({
       type: "ready",
@@ -178,12 +144,10 @@ async function shutdown(): Promise<void> {
   }
 
   shuttingDown = true;
-
   log.info(`[${workerId}] Shutting down...`);
 
   try {
     await channel?.close();
-
     await connection?.close();
   } catch (error) {
     log.error(`[${workerId}] RabbitMQ shutdown error: ${error}`);
@@ -213,6 +177,5 @@ process.once("disconnect", () => {
 
 start().catch((error) => {
   log.error(`[${workerId}] Fatal startup error: ${error}`);
-
   process.exit(1);
 });

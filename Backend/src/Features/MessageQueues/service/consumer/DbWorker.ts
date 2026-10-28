@@ -1,3 +1,13 @@
+const parentPid = process.ppid;
+if (parentPid) {
+  setInterval(() => {
+    try {
+      process.kill(parentPid, 0);
+    } catch {
+      process.exit(0);
+    }
+  }, 2000);
+}
 import "../../../../config/load-env.js";
 
 import amqp from "amqplib";
@@ -16,11 +26,9 @@ const log = Logger;
 const connectToMongoDb = connectToDb;
 
 let rabbitConnection: Awaited<ReturnType<typeof amqp.connect>> | null = null;
-
 let channel: Awaited<
   ReturnType<Awaited<ReturnType<typeof amqp.connect>>["createChannel"]>
 > | null = null;
-
 let shuttingDown = false;
 
 async function start(): Promise<void> {
@@ -32,37 +40,14 @@ async function start(): Promise<void> {
     return;
   }
 
-  /*
-   * =========================
-   * MONGODB
-   * =========================
-   */
-  // from utiltiy as the exit 1 code is handled by the lifecycle
   await connectToMongoDb();
-
-  /*
-   * =========================
-   * RABBITMQ
-   * =========================
-   */
 
   rabbitConnection = await amqp.connect(
     process.env.RABBITMQ_URL_WITH_CREDENTIALS!,
   );
 
   channel = await rabbitConnection.createChannel();
-
-  /*
-   * One DB-save message at a time
-   * for this worker.
-   */
   await channel.prefetch(1);
-
-  /*
-   * =========================
-   * DB SAVE QUEUE
-   * =========================
-   */
 
   await channel.assertExchange(dbSaveExchange, "direct", {
     durable: true,
@@ -75,12 +60,6 @@ async function start(): Promise<void> {
 
   await channel.bindQueue(dbSave, dbSaveExchange, "Save");
 
-  /*
-   * =========================
-   * CONSUMER
-   * =========================
-   */
-
   await channel.consume(dbSave, async (message: Message | null) => {
     if (!message || shuttingDown) {
       return;
@@ -90,24 +69,15 @@ async function start(): Promise<void> {
 
     try {
       const payload = JSON.parse(message.content.toString());
-
       jobs = payload.jobs;
 
       if (!Array.isArray(jobs) || jobs.length === 0) {
         channel!.ack(message);
-
         log.info(`[DB Worker] Empty job batch. ACK.`);
-
         return;
       }
 
       log.info(`[DB Worker] Saving ${jobs.length} jobs`);
-
-      /*
-       * =========================
-       * MONGODB BULK WRITE
-       * =========================
-       */
 
       const response = await JobModel.bulkWrite(
         jobs.map((job) => ({
@@ -119,14 +89,7 @@ async function start(): Promise<void> {
           ordered: false,
         },
       );
-      /*
-       * bulkWrite() resolving means the
-       * operation completed successfully.
-       *
-       * Do not check result.acknowledged here
-       * because the Mongoose BulkWriteResult type
-       * does not expose that property in your setup.
-       */
+
       if (response) {
         if (response.mongoose?.validationErrors?.length) {
           const errorDetails = response.mongoose.validationErrors
@@ -148,7 +111,6 @@ async function start(): Promise<void> {
           `[DB Worker] Saved ${response.insertedCount} new jobs in MongoDB (received: ${jobs.length}).`,
         );
 
-        // Immediately trigger JD scraping and AI rating
         try {
           await naukriJDScrap(jobs, process.env.WORKER_ID ?? "db-worker");
         } catch (jdErr: any) {
@@ -181,7 +143,6 @@ async function start(): Promise<void> {
         );
         channel!.ack(message);
 
-        // Immediately trigger JD scraping and AI rating on the jobs
         try {
           await naukriJDScrap(jobs, process.env.WORKER_ID ?? "db-worker");
         } catch (jdErr: any) {
@@ -194,24 +155,12 @@ async function start(): Promise<void> {
 
       log.error(`[DB Worker] DB write failed: ${error}`);
 
-      /*
-       * Put the message back into RabbitMQ.
-       *
-       * NOTE:
-       * This is simple retry behavior. If MongoDB
-       * remains unavailable, this can retry rapidly.
-       * Later we should add retry/DLQ backoff.
-       */
       if (!shuttingDown) {
         channel!.nack(message, false, true);
       }
     }
   });
 
-  /*
-   * Tell WorkerManager that this worker is
-   * completely initialized.
-   */
   if (process.send) {
     process.send({
       type: "ready",
@@ -225,25 +174,11 @@ async function shutdown(): Promise<void> {
   }
 
   shuttingDown = true;
-
   log.info(`[DB Worker] Shutting down...`);
 
   try {
-    /*
-     * Closing the channel stops the consumer.
-     *
-     * Any unacknowledged RabbitMQ message will be
-     * returned to RabbitMQ when the channel/connection
-     * disappears.
-     */
     await channel?.close();
-
     await rabbitConnection?.close();
-
-    /*
-     * This MongoDB connection belongs to THIS
-     * forked DB worker process.
-     */
     await mongoose.connection.close();
   } catch (error) {
     log.error(`[DB Worker] Shutdown error: ${error}`);
@@ -273,6 +208,5 @@ process.once("disconnect", () => {
 
 start().catch((error) => {
   log.error(`[DB Worker] Fatal startup error: ${error}`);
-
   process.exit(1);
 });

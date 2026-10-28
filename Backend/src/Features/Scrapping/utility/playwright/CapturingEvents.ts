@@ -1,5 +1,5 @@
 import { Page } from "playwright";
-import { interceptingBrowsersHttpCommunication } from "../../index.js";
+import { interceptingBrowsersHttpCommunication } from "../../helpers/interceptingBrowsersHttpCommunication.js";
 
 type CaptureEvent = "request" | "response";
 

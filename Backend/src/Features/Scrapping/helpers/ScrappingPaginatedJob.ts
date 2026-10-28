@@ -9,7 +9,7 @@ import {
   breather,
 } from "../index.js";
 import checkIsJobStale from "./naukri/checkIsJobStale.js";
-import { CustomBrailleDotBar } from "../../../utility/TerminalProgress.js";
+import { CustomBrailleDotBar, startCustomBrailleBar } from "../../../utility/TerminalProgress.js";
 import { setIterativePaginationParams } from "./setIterativePaginationParams.js";
 
 interface SCRAPPING_PAGINATED_JOBS extends Partial<RequestParams> {
@@ -32,34 +32,27 @@ export default async function ScrappingPaginatedJob({
 }: SCRAPPING_PAGINATED_JOBS): Promise<any> {
   let unSortedJobs = [];
 
-  /*
-    Intial request interception provide body and no of total jobs exist
-    */
   if (Array.isArray(initialJobs) && initialJobs.length > 0) {
     unSortedJobs.push(...initialJobs);
   }
 
-
-
-  const expectedTotalPages = Math.min(Math.max(endPage - initialPage + 1, 60), 90);
+  const actualTotalPages = Math.max(endPage - initialPage + 1, 1);
   const sessionKey = `${workerId}-${platform || "site"}`;
+  const scrapBar = startCustomBrailleBar(
+    0,
+    actualTotalPages,
+    `[${workerId}] ${platform || "site"}`,
+    24,
+    sessionKey,
+  );
 
   for (let i = initialPage; i < endPage; i++) {
-
     await breather(i, initialPage, workerId);
     
     setIterativePaginationParams(url as URL, i);
     
     const pageIndex = i - initialPage + 1;
-
-    CustomBrailleDotBar(
-      pageIndex,
-      expectedTotalPages,
-      `[${workerId}] ${platform || "site"}`,
-      24,
-      undefined,
-      sessionKey,
-    );
+    scrapBar.update(pageIndex, actualTotalPages);
 
     let response: JOB_DETAILS[];
 
@@ -70,6 +63,7 @@ export default async function ScrappingPaginatedJob({
         request,
       })) as JOB_DETAILS[];
     } catch (fetchError: any) {
+      scrapBar.fail(fetchError?.message ?? "Scraping failed");
       Logger.debug("snapShotting the jobs before throwing error");
 
       if (unSortedJobs.length > 0) {
@@ -87,6 +81,7 @@ export default async function ScrappingPaginatedJob({
     }
 
     if (!Array.isArray(response) || response.length === 0) {
+      scrapBar.fail("Jobs are not iterable");
       throw new Error(
         `[${workerId}] cannot iterate over the jobs , Jobs are not iteratable`,
       );
@@ -95,34 +90,15 @@ export default async function ScrappingPaginatedJob({
     const isOlderThanLimit = checkIsJobStale(response);
 
     if (isOlderThanLimit) {
-      CustomBrailleDotBar(
-        expectedTotalPages,
-        expectedTotalPages,
-        `[${workerId}] ${platform || "site"}`,
-        24,
-        undefined,
-        sessionKey,
-      );
-      Logger.success(
-        `[${workerId}] Reached end of fresh jobs at page ${i}. Stopping Scrapping and returning Data.`,
-      );
+      scrapBar.stop();
       let consolidatingSnapshotJobs = await getAllSnapShots(platform);
       unSortedJobs.push(...consolidatingSnapshotJobs);
       return unSortedJobs;
     }
 
     unSortedJobs.push(...response);
-
   }
 
-
-  CustomBrailleDotBar(
-    expectedTotalPages,
-    expectedTotalPages,
-    `[${workerId}] ${platform || "site"}`,
-    24,
-    undefined,
-    sessionKey,
-  );
+  scrapBar.stop();
   return unSortedJobs;
 }

@@ -1,14 +1,5 @@
 import winston from "winston";
-
-/*
- * ===========================================
- * CUSTOM LOG LEVELS
- * ===========================================
- *
- * Winston uses numeric priority (lower = higher priority).
- * We define semantic levels that map to distinct colors
- * in the console output.
- */
+import { handleLogWithActiveLoader } from "./TerminalProgress.js";
 
 const customLevels = {
   levels: {
@@ -18,7 +9,6 @@ const customLevels = {
     info: 3,
     debug: 4,
   },
-
   colors: {
     error: "red",
     warn: "yellow",
@@ -28,40 +18,16 @@ const customLevels = {
   },
 };
 
-/*
- * Register our custom colors with Winston
- * so that colorize() knows how to render them.
- */
 winston.addColors(customLevels.colors);
-
-/*
- * ===========================================
- * TYPE AUGMENTATION
- * ===========================================
- *
- * Winston's built-in Logger type does not
- * include our custom 'success' level.
- * We extend it so TypeScript recognizes
- * log.success() calls.
- */
 
 interface AppLogger extends winston.Logger {
   success: winston.LeveledLogMethod;
 }
 
-/*
- * ===========================================
- * CONSOLE FORMAT (Full-line colorization)
- * ===========================================
- *
- * { all: true } colors the ENTIRE line,
- * not just the level tag.
- */
-
 const consoleFormat = winston.format.combine(
   winston.format.timestamp({ format: "HH:mm:ss" }),
   winston.format.printf(({ timestamp, level, message, ...meta }) => {
-    let msg = `\r\x1b[2K${timestamp} [${level}]: ${message}`;
+    let msg = `${timestamp} [${level}]: ${message}`;
 
     if (Object.keys(meta).length > 0) {
       msg += ` ${JSON.stringify(meta)}`;
@@ -72,19 +38,21 @@ const consoleFormat = winston.format.combine(
   winston.format.colorize({ all: true }),
 );
 
-/*
- * ===========================================
- * SINGLETON LOGGER INSTANCE
- * ===========================================
- *
- * Console-only — no files are written to disk.
- */
+class PinnedConsoleTransport extends winston.transports.Console {
+  log(info: any, callback?: () => void) {
+    const msg = String(info[Symbol.for("message")] ?? info.message ?? "");
+    handleLogWithActiveLoader(msg);
+    if (typeof callback === "function") {
+      callback();
+    }
+  }
+}
 
 const log = winston.createLogger({
   levels: customLevels.levels,
   level: process.env.LOG_LEVEL || "debug",
   transports: [
-    new winston.transports.Console({
+    new PinnedConsoleTransport({
       format: consoleFormat,
     }),
   ],
