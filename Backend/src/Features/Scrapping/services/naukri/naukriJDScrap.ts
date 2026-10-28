@@ -5,26 +5,27 @@ import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 import mongoose from "mongoose";
 
+import Logger from "../../../../utility/Logger.js";
+import { createScrapingSession } from "../CreatingEnvironmentToScrap.js";
+import { waitForPageReady } from "../../utility/playwright/interactions/index.js";
+import type { JOB_DETAILS } from "../../../../types.js";
+import { JobModel } from "../../../../models/Mongo/job.models.js";
 import {
-  Logger,
-  createScrapingSession,
-  waitForPageReady,
-  JOB_DETAILS,
-  JobModel,
   NAUKRI_BASE_URL,
   CLIENT_DATA_FOLDER_NAME,
   GENERAL_TIMEOUT,
-  Cloudinary,
-  retrieveUserResumeLink,
-  userDataHelper,
-  getAllSnapShots,
   SCRAPING_JITTER,
-} from "../../index.js";
+} from "../../../../constants.js";
+import { fetchCloudinaryPdf } from "../../../AI/services/Cloudinary.js";
+import { retrieveUserResumeLink } from "../../../../middlewares/job.middleware.js";
+import { getUserDataFromFile } from "../../../../helper/userDataHelper.js";
+import { getAllSnapshotJobs } from "../../../../helper/getAllSnapShots.js";
 
 const log = Logger;
-const fetchCloudinaryPdf = Cloudinary;
-const getUserDataFromFile = userDataHelper;
-const getAllSnapshotJobs = getAllSnapShots;
+import {
+  CustomBrailleDotBar,
+  startSpinningLoader,
+} from "../../../../utility/TerminalProgress.js";
 
 /**
  * Parsed and structured Job Description schema
@@ -288,8 +289,22 @@ export async function scrapeJobDescriptions(
     `[${workerId}] Starting Playwright JD scraping for ${validJobs.length} jobs...`,
   );
 
-  // Initialize stealth Playwright session using the abstract helper
-  const { browser, page } = await createScrapingSession(workerId);
+  const jdSessionLoader = startSpinningLoader(
+    `[${workerId}] Initializing JD scraping session...`,
+  );
+  let browser;
+  let page;
+  try {
+    const session = await createScrapingSession(workerId);
+    browser = session.browser;
+    page = session.page;
+    jdSessionLoader.stop(`[${workerId}] JD scraping session active.`);
+  } catch (sessionErr: any) {
+    jdSessionLoader.fail(
+      `[${workerId}] JD session initialization failed: ${sessionErr?.message ?? sessionErr}`,
+    );
+    throw sessionErr;
+  }
 
   const dataDir = path.resolve(process.cwd(), CLIENT_DATA_FOLDER_NAME);
   await fs.mkdir(dataDir, { recursive: true });
@@ -299,6 +314,15 @@ export async function scrapeJobDescriptions(
       const job = validJobs[i];
 
       // Normalize JD URL
+      CustomBrailleDotBar(
+        i + 1,
+        validJobs.length,
+        `[${workerId}] Scraping JDs`,
+        24,
+        undefined,
+        `${workerId}-jds`,
+      );
+
       const fullUrl = job.jdURL.startsWith("http")
         ? job.jdURL
         : `${NAUKRI_BASE_URL.replace(/\/$/, "")}/${job.jdURL.replace(/^\//, "")}`;
@@ -641,7 +665,17 @@ export default async function naukriJDScrap(
     log.info(
       `[${workerId}] Rating candidate resume against ${scrapedJds.length} JDs...`,
     );
-    const ratingResult = await rateResumeAgainstJDs(scrapedJds, resumeBuffer);
+    const aiLoader = startSpinningLoader(
+      `[${workerId}] Evaluating candidate resume with Gemini AI...`,
+    );
+    let ratingResult;
+    try {
+      ratingResult = await rateResumeAgainstJDs(scrapedJds, resumeBuffer);
+      aiLoader.stop("Resume evaluation completed by Gemini AI");
+    } catch (err: any) {
+      aiLoader.fail(`Gemini AI evaluation failed: ${err?.message ?? err}`);
+      throw err;
+    }
 
     // 5. Output rating list to backend terminal
     displayRatingReportOnTerminal(ratingResult, resumeSource);

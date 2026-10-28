@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
-import { CLIENT_DATA_PATH, log } from "../index.js";
+import { CLIENT_DATA_PATH } from "../../../constants.js";
+import log from "../../../utility/Logger.js";
 
 export default function checkSavedSessionAndUserCredentialsForAuth(
   workerId: string,

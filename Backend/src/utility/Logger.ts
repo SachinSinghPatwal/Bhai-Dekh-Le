@@ -61,7 +61,7 @@ interface AppLogger extends winston.Logger {
 const consoleFormat = winston.format.combine(
   winston.format.timestamp({ format: "HH:mm:ss" }),
   winston.format.printf(({ timestamp, level, message, ...meta }) => {
-    let msg = `${timestamp} [${level}]: ${message}`;
+    let msg = `\r\x1b[2K${timestamp} [${level}]: ${message}`;
 
     if (Object.keys(meta).length > 0) {
       msg += ` ${JSON.stringify(meta)}`;

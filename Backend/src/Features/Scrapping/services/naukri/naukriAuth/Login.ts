@@ -1,18 +1,18 @@
 import { BrowserContext, Page } from "playwright";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { typeIntoField } from "../../../utility/playwright/interactions/index.js";
 import {
-  typeIntoField,
   CLIENT_DATA_PATH,
   JOB_AUTH_URL,
   AUTH_SELECTORS,
-  ComposeUrl,
-  log,
-  encrypt,
-  checkSavedSessionAndUserCredentialsForAuth,
-  interceptResponseOnAction,
   NAUKRI_BASE_URL,
-} from "../../../index.js";
+} from "../../../../../constants.js";
+import ComposeUrl from "../../../utility/ComposeUrl.js";
+import log from "../../../../../utility/Logger.js";
+import { encrypt } from "../../../../../utility/crypto/encryption.js";
+import checkSavedSessionAndUserCredentialsForAuth from "../../../helpers/CheckSavedSessionAndUserCredentialsForAuth.js";
+import interceptResponseOnAction from "../../../helpers/interceptResponseOnAction.js";
 import SignUpUser from "./Signup.js";
 
 export default async function loginToNaukri(
@@ -59,7 +59,7 @@ export default async function loginToNaukri(
         targetStatus: 401,
         responseTimeout: 10_000,
         navigationTimeout: 10_000,
-        waitForUrl: (url) => !url.href.includes("nlogin/login"),
+        waitForUrl: (url: URL) => !url.href.includes("nlogin/login"),
       });
 
       if (outcome === "status_matched") {

@@ -4,9 +4,9 @@ import {
   dbSave,
   dbSaveExchange,
   ScheduleScrape,
-  Logger,
-  PlatformInitialization,
-} from "../../index.js";
+} from "../../../../constants.js";
+import Logger from "../../../../utility/Logger.js";
+import PlatformInitialization from "../../../Scrapping/services/PlatformInitialization.js";
 
 const log = Logger; 
 
@@ -109,6 +109,8 @@ async function start(): Promise<void> {
         channel?.ack(message);
         return;
       }
+
+      log.info(`[${workerId}] Received scrape task for platform: ${platform}`);
 
       if (!channel) {
         throw new Error("RabbitMQ channel is not initialized");

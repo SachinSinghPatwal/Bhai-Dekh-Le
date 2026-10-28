@@ -1,12 +1,14 @@
 import type { ConfirmChannel, Message } from "amqplib";
-import type { JOB_DETAILS } from "../../index.js";
-import {
-  Logger,
-  RateLimitingError,
-  TransferingWorkToNextQueue,
-  GetDesiredJobs as makeHttpRequestToGetAllDesiredJobs,
-} from "../../index.js";
+import type { JOB_DETAILS } from "../../../../types.js";
+import Logger from "../../../../utility/Logger.js";
+import { RateLimitError as RateLimitingError } from "../../utility/playwright/RateLimitingError.js";
+import TransferingWorkToNextQueue from "../../../MessageQueues/helpers/TransferingWorkToNextQueue.js";
+import makeHttpRequestToGetAllDesiredJobs from "../GetDesiredJobs.js";
 import { CreatingEnvironmentToScrap } from "../CreatingEnvironmentToScrap.js";
+import {
+  CustomBrailleDotBar,
+  startSpinningLoader,
+} from "../../../../utility/TerminalProgress.js";
 
 export default async function HttpBasedScrap(
   workerId: string,
@@ -20,13 +22,32 @@ export default async function HttpBasedScrap(
   let customMaxRetries = { times: 10 };
   let orderedJobs;
 
-  let {
-    totalJobsAvailable: initialTotalJobs,
-    url,
-    headers,
-    request,
-    jobDetails,
-  } = await CreatingEnvironmentToScrap(composedURL, workerId);
+  const sessionLoader = startSpinningLoader(
+    `[${workerId}] Initializing ${platform} session & scraping environment...`,
+  );
+
+  let initialTotalJobs: number;
+  let url: URL;
+  let headers: Record<string, string>;
+  let request: string;
+  let jobDetails: JOB_DETAILS[];
+
+  try {
+    const env = await CreatingEnvironmentToScrap(composedURL, workerId);
+    initialTotalJobs = env.totalJobsAvailable;
+    url = env.url;
+    headers = env.headers;
+    request = env.request;
+    jobDetails = env.jobDetails;
+    sessionLoader.stop(
+      `[${workerId}] ${platform} session ready (${initialTotalJobs} total jobs available).`,
+    );
+  } catch (envError: any) {
+    sessionLoader.fail(
+      `[${workerId}] ${platform} session initialization failed: ${envError?.message ?? envError}`,
+    );
+    throw envError;
+  }
 
   while (attempt < customMaxRetries.times) {
     try {
@@ -50,20 +71,26 @@ export default async function HttpBasedScrap(
       );
       return;
     } catch (error: unknown) {
-      const errorMessage = (error as Error)?.message ?? String(error);
       if (error instanceof RateLimitingError) {
         lastPageCrashed = error.lastPage;
-        Logger.warn(error.message);
-      } else {
-        Logger.warn(`[${workerId}] Scrape error occurred: ${errorMessage}`);
       }
       attempt++;
     }
   }
 
-  throw new Error(
-    `[${workerId}] Max scrape retries (${customMaxRetries.times}) exhausted without completing scrape.`,
+  const failureReason = `Max scrape retries (${customMaxRetries.times}) exhausted without completing scrape.`;
+  CustomBrailleDotBar(
+    lastPageCrashed ?? 1,
+    60,
+    `[${workerId}] ${platform}`,
+    24,
+    undefined,
+    `${workerId}-${platform}`,
+    true,
+    failureReason,
   );
+
+  throw new Error(`[${workerId}] ${failureReason}`);
 }
 
 const httpScrapping = HttpBasedScrap;

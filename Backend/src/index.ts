@@ -15,6 +15,8 @@ import {
 } from "./Features/MessageQueues/utility/manager/DbWorkerManager.js";
 import { ensureBasicUserInformation } from "./Features/UserInteractions/index.js";
 import cleanupStaleSnapshots from "./helper/cleanupStaleSnapshots.js";
+import { startSpinningLoader } from "./utility/TerminalProgress.js";
+import ScheduleScrapeJob from "./Features/MessageQueues/service/producer/ScheduleScrape.js";
 
 // 1. Ensure user resume & job preference profile exists before starting the server
 await ensureBasicUserInformation();
@@ -75,19 +77,25 @@ process.once("SIGUSR2", () => {
   void handleShutdown();
 });
 
+const initLoader = startSpinningLoader("Initializing workers and queue listeners...");
+
 connectToMongoDb()
   .then(async (connected) => {
     await startScrapConsumer();
 
     if (connected && process.env.MONGO_URI) {
       await startDbWorkers();
-      log.debug("All Scrap and DB workers started.");
+      initLoader.stop("All Scrap and DB workers initialized and listening to queues.");
+      if (process.env.AUTO_SCRAPE !== "false") {
+        await ScheduleScrapeJob();
+      }
     } else {
-      log.warn(
-        "MONGO_URI is not defined. DB workers are suspended; scraper workers will persist snapshots locally.",
-      );
+      initLoader.stop("Scraper workers initialized (DB workers suspended).");
+
+
+
     }
   })
   .catch((err: unknown) => {
-    log.error("Worker startup failed:", err);
+    initLoader.fail(`Worker startup failed: ${err}`);
   });

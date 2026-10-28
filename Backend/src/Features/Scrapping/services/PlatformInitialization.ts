@@ -1,13 +1,13 @@
 import { ConfirmChannel, Message } from "amqplib";
+import ComposeUrl from "../utility/ComposeUrl.js";
+import HttpBasedScrap from "./naukri/HttpBasedScrap.js";
 import {
-  ComposeUrl,
-  HttpBasedScrap,
   JOB_FOUND_BASE_URL,
   JOB_FOUND_SEARCH_URL,
   JOB_SEARCH_URL,
   NAUKRI_BASE_URL,
-  naukriJDScrap,
-} from "../index.js";
+} from "../../../constants.js";
+import naukriJDScrap from "./naukri/naukriJDScrap.js";
 
 export default async function PlatformInitialization(
   workerId: string,

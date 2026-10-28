@@ -1,68 +1,93 @@
 import {
   CustomBrailleDotBar,
-  PackageSingleProgressBar,
-  PackageMultiProgressBar,
+  startSpinningLoader,
 } from "./TerminalProgress.js";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function runMock() {
-  console.log(
-    "\n1. Custom Braille Dot Bar (Slowed Filling + Unique Random Constellation Every Run):",
-  );
-  const totalPages = 600;
-  const TenthOfTheProcess = totalPages / 10;
-  let currentPage = 0;
+  console.log("\n--- Scenario 1: Spinning Loader with Worker Logs Above It ---");
+  const initSpinner = startSpinningLoader("Initializing workers and queue listeners...");
+  await sleep(600);
+  console.log("\r\x1b[2K[worker-1] RabbitMQ consumer channel bound to timed queue");
+  await sleep(600);
+  console.log("\r\x1b[2K[worker-2] RabbitMQ consumer channel bound to timed queue");
+  await sleep(600);
+  initSpinner.stop("All Scrap and DB workers initialized and listening to queues.");
+
+  console.log("\n--- Scenario 2: Site Scrape with Random Constellation & Early Stop Snap ---");
+  const totalSitePages = 600;
+  const earlyStopPage = 65;
+  const siteSession = "mock-naukri";
   let tick = 0;
 
-  while (currentPage < totalPages) {
-    const step =
-      currentPage < TenthOfTheProcess
-        ? [1, 2, 3, 2, 1][Math.floor(Math.random() * 5)]
-        : [6, 10, 8, 14, 9, 12][Math.floor(Math.random() * 6)];
-
-    currentPage = Math.min(totalPages, currentPage + step);
-
+  for (let page = 1; page <= earlyStopPage; page += 2) {
     CustomBrailleDotBar(
-      currentPage,
-      totalPages,
-      "Scraping Naukri pages",
+      page,
+      earlyStopPage,
+      "[worker-1] naukri",
       28,
       tick++,
+      siteSession,
     );
-    await sleep(currentPage < 60 ? 100 : 75);
+    await sleep(75);
   }
 
-  console.log("\n2. Package Single Progress Bar:");
-  const singleBar = PackageSingleProgressBar({
-    label: "Scraping JobFound",
-    total: 30,
-  });
-  for (let page = 1; page <= 30; page++) {
-    await sleep(40);
-    singleBar.update(page);
-  }
-  singleBar.stop();
+  CustomBrailleDotBar(
+    earlyStopPage,
+    earlyStopPage,
+    "[worker-1] naukri",
+    28,
+    tick++,
+    siteSession,
+  );
+  console.log("\r\x1b[2K[worker-1] Reached end of fresh jobs at page 65. Returning 130 jobs to DB queue.");
 
-  console.log("\n3. Package Multi Progress Bar (Parallel Workers):");
-  const multiBar = PackageMultiProgressBar();
-  const worker1Bar = multiBar.create(40, 0, {
-    worker: "worker-1",
-    platform: "naukri",
-  });
-  const worker2Bar = multiBar.create(25, 0, {
-    worker: "worker-2",
-    platform: "jobFound",
-  });
+  console.log("\n--- Scenario 3: JD Scraping (0 to End, No Early Snap) ---");
+  const totalJds = 30;
+  const jdSession = "mock-jd";
 
-  for (let step = 1; step <= 40; step++) {
-    await sleep(50);
-    worker1Bar.update(step);
-    if (step <= 25) {
-      worker2Bar.update(step);
-    }
+  for (let jd = 1; jd <= totalJds; jd++) {
+    CustomBrailleDotBar(
+      jd,
+      totalJds,
+      "[worker-1] Scraping JDs",
+      28,
+      tick++,
+      jdSession,
+    );
+    await sleep(60);
   }
-  multiBar.stop();
+
+  console.log("\n--- Scenario 4: GenAI Spinning Loader ---");
+  const aiSpinner = startSpinningLoader("[worker-1] Evaluating candidate resume with Gemini AI...");
+  await sleep(2000);
+  aiSpinner.stop("Gemini AI resume evaluation completed successfully.");
+
+  console.log("\n--- Scenario 5: Error Handling with Red Dot on Bar and Reason Below ---");
+  const errorSession = "mock-error";
+  for (let p = 1; p <= 18; p += 2) {
+    CustomBrailleDotBar(
+      p,
+      50,
+      "[worker-2] jobFound",
+      28,
+      tick++,
+      errorSession,
+    );
+    await sleep(60);
+  }
+
+  CustomBrailleDotBar(
+    18,
+    50,
+    "[worker-2] jobFound",
+    28,
+    tick++,
+    errorSession,
+    true,
+    "HTTP 429 Too Many Requests: Rate limit exceeded at page 18.",
+  );
 
   console.log("\nAll mock demonstrations finished.\n");
 }

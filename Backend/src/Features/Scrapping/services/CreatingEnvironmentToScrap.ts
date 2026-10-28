@@ -2,16 +2,14 @@ import { Browser, BrowserContext, Page, Request, Response } from "playwright";
 import { chromium } from "playwright-extra";
 import stealth from "puppeteer-extra-plugin-stealth";
 import { sanitizeCaptureHeaderUrl } from "../helpers/sanitizeCaptureHeaderUrl.js";
-import {
-  JOB_DETAILS,
-  CapturingEvents,
-  RaceForResponseOrTimeOut,
-  TimeOutError,
-  decryption,
-  CLIENT_DATA_PATH,
-  Login,
-  Logger,
-} from "../index.js";
+import type { JOB_DETAILS } from "../../../types.js";
+import CapturingEvents from "../utility/playwright/CapturingEvents.js";
+import RaceForResponseOrTimeOut from "../utility/playwright/RaceForResponseOrTimeOut.js";
+import { TimeoutError as TimeOutError } from "../../../utility/TimeOutError.js";
+import { decrypt as decryption } from "../../../utility/crypto/decryption.js";
+import { CLIENT_DATA_PATH } from "../../../constants.js";
+import Login from "./naukri/naukriAuth/Login.js";
+import Logger from "../../../utility/Logger.js";
 import { existsSync } from "node:fs";
 
 chromium.use(stealth());
@@ -32,15 +30,6 @@ export interface ScrapingSession {
   page: Page;
 }
 
-/**
- * Abstract environment initializer for Playwright scraping.
- * 1. Checks and loads encrypted session state if available.
- * 2. Launches browser with stealth plugins.
- * 3. Creates browser context with storage state if present.
- * 4. Ensures authenticated session via Login.
- *
- * @param workerId - The worker ID running this session
- */
 export async function createScrapingSession(
   workerId: string = "scraper-worker",
 ): Promise<ScrapingSession> {
@@ -49,7 +38,6 @@ export async function createScrapingSession(
   let state: any = undefined;
 
   try {
-    // 1. Check if encrypted auth state exists on disk
     if (existsSync(CLIENT_DATA_PATH)) {
       try {
         state = await decryption(CLIENT_DATA_PATH);
@@ -62,20 +50,17 @@ export async function createScrapingSession(
       }
     }
 
-    // 2. Launch browser with stealth
     browser = await chromium.launch({
       headless: true,
       args: ["--no-sandbox", "--start-minimized"],
     });
 
-    // 3. Create context (attaching storageState if authenticated session is present)
     context = await browser.newContext(
       state ? { storageState: state } : undefined,
     );
 
     const page = await context.newPage();
 
-    // 4. Authenticate: Login checks data, goes to login first if needed
     await Login(page, context, workerId);
 
     return { browser, context, page };
@@ -87,15 +72,6 @@ export async function createScrapingSession(
   }
 }
 
-/**
- * Creates and initializes the scraping environment:
- * 1. Calls abstract `createScrapingSession` to initialize browser and session.
- * 2. Navigates to the intended destination URL (`navigateTo`).
- * 3. Intercepts HTTP network communications to retrieve API headers, request, and job data.
- *
- * @param navigateTo - The target search/job listing URL to navigate to
- * @param workerId   - The worker ID running this scrape environment
- */
 export async function CreatingEnvironmentToScrap(
   navigateTo: string,
   workerId: string = "scraper-worker",
@@ -103,7 +79,6 @@ export async function CreatingEnvironmentToScrap(
   const { browser, page } = await createScrapingSession(workerId);
 
   try {
-    // Setup event capturing for HTTP API interception before navigation
     const capturedRequest = CapturingEvents<Request>(page, "request");
     const capturedResponse = CapturingEvents<Response>(page, "response");
 

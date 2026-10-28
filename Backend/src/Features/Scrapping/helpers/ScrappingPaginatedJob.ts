@@ -9,6 +9,7 @@ import {
   breather,
 } from "../index.js";
 import checkIsJobStale from "./naukri/checkIsJobStale.js";
+import { CustomBrailleDotBar } from "../../../utility/TerminalProgress.js";
 import { setIterativePaginationParams } from "./setIterativePaginationParams.js";
 
 interface SCRAPPING_PAGINATED_JOBS extends Partial<RequestParams> {
@@ -38,13 +39,27 @@ export default async function ScrappingPaginatedJob({
     unSortedJobs.push(...initialJobs);
   }
 
+
+
+  const expectedTotalPages = Math.min(Math.max(endPage - initialPage + 1, 60), 90);
+  const sessionKey = `${workerId}-${platform || "site"}`;
+
   for (let i = initialPage; i < endPage; i++) {
 
     await breather(i, initialPage, workerId);
     
     setIterativePaginationParams(url as URL, i);
     
-    Logger.debug(`[${workerId}] Scraping page ${i}...`);
+    const pageIndex = i - initialPage + 1;
+
+    CustomBrailleDotBar(
+      pageIndex,
+      expectedTotalPages,
+      `[${workerId}] ${platform || "site"}`,
+      24,
+      undefined,
+      sessionKey,
+    );
 
     let response: JOB_DETAILS[];
 
@@ -80,6 +95,14 @@ export default async function ScrappingPaginatedJob({
     const isOlderThanLimit = checkIsJobStale(response);
 
     if (isOlderThanLimit) {
+      CustomBrailleDotBar(
+        expectedTotalPages,
+        expectedTotalPages,
+        `[${workerId}] ${platform || "site"}`,
+        24,
+        undefined,
+        sessionKey,
+      );
       Logger.success(
         `[${workerId}] Reached end of fresh jobs at page ${i}. Stopping Scrapping and returning Data.`,
       );
@@ -92,5 +115,14 @@ export default async function ScrappingPaginatedJob({
 
   }
 
+
+  CustomBrailleDotBar(
+    expectedTotalPages,
+    expectedTotalPages,
+    `[${workerId}] ${platform || "site"}`,
+    24,
+    undefined,
+    sessionKey,
+  );
   return unSortedJobs;
 }
