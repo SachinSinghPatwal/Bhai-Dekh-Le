@@ -19,8 +19,8 @@ import {
   getAllSnapShots,
   SCRAPING_JITTER,
 } from "../../index.js";
+import ScheduleAiEvaluation from "../../../MessageQueues/service/producer/ScheduleAiEvaluation.js";
 import {
-  CustomBrailleDotBar,
   startCustomBrailleBar,
   startSpinningLoader,
 } from "../../../../utility/TerminalProgress.js";
@@ -437,7 +437,7 @@ Return the qualifying jobs in the specified format. And Above of All provide com
 Also provide an 'overallSummary' comparing the candidate's profile against this batch of opportunities.
 
 Job Descriptions to evaluate:
-\${JSON.stringify(jobSummariesForPrompt, null, 2)}
+${JSON.stringify(jobSummariesForPrompt, null, 2)}
 `;
 
   const response = await ai.models.generateContent({
@@ -539,30 +539,32 @@ export function displayRatingReportOnTerminal(
 
   console.log("\n" + line);
   console.log("GEMINI AI RESUME vs NAUKRI JOB DESCRIPTIONS RATING REPORT");
+  console.log(`Resume Evaluated: ${resumeSource}`);
   console.log(line);
   console.log(`Profile Summary: ${ratingResult.overallSummary}`);
+  console.log(subLine);
 
   ratingResult.ratedJobs.forEach((job, index) => {
     const scoreColor =
       job.matchScore >= 80 ? "Match" : job.matchScore >= 60 ? "Moderate" : "Low";
 
     console.log(
-      `\n[#\${index + 1}] \${job.title} | \${job.companyName} (Job ID: \${job.jobId})`,
+      `\n[#${index + 1}] ${job.title} | ${job.companyName} (Job ID: ${job.jobId})`,
     );
     if (job.jdURL) {
-      console.log(`    Link: \${job.jdURL}`);
+      console.log(`    Link: ${job.jdURL}`);
     }
     console.log(
-      `    \${scoreColor} Score: \${job.matchScore}/100 [\${job.fitVerdict}]`,
+      `    ${scoreColor} Score: ${job.matchScore}/100 [${job.fitVerdict}]`,
     );
     console.log(
-      `    Matching Skills: \${job.matchingSkills.join(", ") || "None highlighted"}`,
+      `    Matching Skills: ${job.matchingSkills.join(", ") || "None highlighted"}`,
     );
     console.log(
-      `    Missing / Gap Skills: \${job.missingSkills.join(", ") || "None"}`,
+      `    Missing / Gap Skills: ${job.missingSkills.join(", ") || "None"}`,
     );
-    console.log(`    Analysis: \${job.summary}`);
-    console.log(`    Advice: \${job.recommendation}`);
+    console.log(`    Analysis: ${job.summary}`);
+    console.log(`    Advice: ${job.recommendation}`);
   });
 
   console.log("\n" + line + "\n");
@@ -591,36 +593,12 @@ export default async function naukriJDScrap(
       return [];
     }
 
-    const resumeInfo = await loadResumeBuffer();
-    if (!resumeInfo) {
-      log.warn(
-        `[${workerId}] No resume found — skipping AI rating. Drop a PDF into Backend/data/ to enable resume scoring.`,
-      );
-      return [];
-    }
-    const { buffer: resumeBuffer, source: resumeSource } = resumeInfo;
-
-    log.info(
-      `[${workerId}] Rating candidate resume against ${scrapedJds.length} JDs...`,
-    );
-    const aiLoader = startSpinningLoader(
-      `[${workerId}] Evaluating candidate resume with Gemini AI...`,
-    );
-    let ratingResult;
-    try {
-      ratingResult = await rateResumeAgainstJDs(scrapedJds, resumeBuffer);
-      aiLoader.stop("Resume evaluation completed by Gemini AI");
-    } catch (err: any) {
-      aiLoader.fail(`Gemini AI evaluation failed: ${err?.message ?? err}`);
-      throw err;
-    }
-
-    displayRatingReportOnTerminal(ratingResult, resumeSource);
+    await ScheduleAiEvaluation(scrapedJds, workerId);
     log.success(
-      `[${workerId}] JD Scrape and Resume Evaluation completed successfully for ${ratingResult.ratedJobs.length} jobs.`,
+      `[${workerId}] Scraped ${scrapedJds.length} JDs and forwarded to AI Evaluation queue.`,
     );
 
-    return ratingResult.ratedJobs;
+    return [];
   } catch (error: any) {
     log.error(
       `[${workerId}] Error in naukriJDScrap: ${error?.message ?? error}`,

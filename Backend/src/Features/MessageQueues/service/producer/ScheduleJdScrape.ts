@@ -3,9 +3,6 @@ import { Logger, ScheduleScrape } from "../../index.js";
 
 const log = Logger;
 
-/**
- * Producer to enqueue JD scraping and resume evaluation task into RabbitMQ
- */
 export default async function ScheduleJdScrape(): Promise<void> {
   const platform = "naukri-jd";
   const connection = await amqp.connect(

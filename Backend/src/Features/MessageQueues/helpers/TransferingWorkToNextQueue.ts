@@ -16,10 +16,8 @@ export default async function TransferingWorkToNextQueue(
   platform: string = "naukri",
 ) {
   if (!Array.isArray(orderedJobs) || orderedJobs.length === 0) {
-    channel!.nack(message);
-
+    channel.ack(message);
     Logger.info(`[${workerId}] No jobs found. Task acknowledged.`);
-
     return;
   }
   if (!process.env.MONGO_URI || process.env.MONGO_URI.trim() === "") {
@@ -30,7 +28,7 @@ export default async function TransferingWorkToNextQueue(
     await SaveSnapShots(orderedJobs, platform);
     await cleanupStaleSnapshots(platform);
 
-    channel!.ack(message);
+    channel.ack(message);
 
     Logger.success(
       `[${workerId}] Scrape result persisted to local snapshots (${platform}). Task acknowledged.`,
@@ -38,7 +36,7 @@ export default async function TransferingWorkToNextQueue(
 
     return;
   }
-  channel!.publish(
+  channel.publish(
     dbSaveExchange,
     "Save",
     Buffer.from(
@@ -51,7 +49,7 @@ export default async function TransferingWorkToNextQueue(
     },
   );
   await channel.waitForConfirms();
-  channel!.ack(message);
+  channel.ack(message);
   Logger.success(`[${workerId}] Scrape result successfully handed to DB queue.`);
 }
 

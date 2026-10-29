@@ -13,6 +13,12 @@ import {
   startDbWorkers,
   handleDbWorkerShutdown,
 } from "./Features/MessageQueues/utility/manager/DbWorkerManager.js";
+
+import {
+  startAiWorkers,
+  handleAiWorkerShutdown,
+} from "./Features/MessageQueues/utility/manager/AiWorkerManager.js";
+
 import { ensureBasicUserInformation } from "./Features/UserInteractions/index.js";
 import cleanupStaleSnapshots from "./helper/cleanupStaleSnapshots.js";
 import { startSpinningLoader } from "./utility/TerminalProgress.js";
@@ -39,6 +45,7 @@ async function handleShutdown(): Promise<void> {
   try {
     await handleScrapWorkerShutdown();
     await handleDbWorkerShutdown();
+    await handleAiWorkerShutdown();
     log.debug("Application shutdown complete.");
   } catch (error) {
     log.error("Application shutdown error:", error);
@@ -67,12 +74,13 @@ connectToMongoDb()
 
     if (connected && process.env.MONGO_URI) {
       await startDbWorkers();
-      initLoader.stop("All Scrap and DB workers initialized and listening to queues.");
-      if (process.env.AUTO_SCRAPE !== "false") {
-        await ScheduleScrapeJob();
-      }
-    } else {
-      initLoader.stop("Scraper workers initialized (DB workers suspended).");
+    }
+
+    await startAiWorkers();
+    initLoader.stop("All Scrap, DB, and AI workers initialized and listening to queues.");
+
+    if (process.env.AUTO_SCRAPE !== "false") {
+      await ScheduleScrapeJob();
     }
   })
   .catch((err: unknown) => {

@@ -1,5 +1,13 @@
 import amqp from "amqplib";
-import { Logger, ScheduleScrape, SCRAPING_PLATFORMS } from "../../index.js";
+import {
+  Logger,
+  ScheduleScrape,
+  scrapeDlx,
+  scrapeDlq,
+  scrapeDlqRoutingKey,
+  SCRAPING_PLATFORMS,
+} from "../../index.js";
+import { safeAssertConfirmQueue } from "../../helpers/safeAssertQueue.js";
 
 const log = Logger;
 
@@ -13,12 +21,39 @@ export default async function ScheduleScrapeJob(
   try {
     log.success("Producer connected to RabbitMQ");
 
-    const channel = await connection.createConfirmChannel();
+    let channel = await connection.createConfirmChannel();
+
+    await channel.assertExchange(scrapeDlx, "direct", {
+      durable: true,
+      autoDelete: false,
+    });
+
+    await channel.assertQueue(scrapeDlq, {
+      durable: true,
+    });
+
+    await channel.bindQueue(scrapeDlq, scrapeDlx, scrapeDlqRoutingKey);
 
     await channel.assertExchange(ScheduleScrape, "direct", {
       durable: true,
       autoDelete: false,
     });
+
+    const asserted = await safeAssertConfirmQueue(
+      connection,
+      channel,
+      ScheduleScrape,
+      {
+        durable: true,
+        arguments: {
+          "x-dead-letter-exchange": scrapeDlx,
+          "x-dead-letter-routing-key": scrapeDlqRoutingKey,
+        },
+      },
+    );
+    channel = asserted.channel;
+
+    await channel.bindQueue(ScheduleScrape, ScheduleScrape, "Scrapper");
 
     for (const platform of platformsToScrape) {
       channel.publish(
@@ -38,7 +73,9 @@ export default async function ScheduleScrapeJob(
 
     await channel.waitForConfirms();
 
-    log.success(`${platformsToScrape.length} platform scrape messages published and confirmed`);
+    log.success(
+      `${platformsToScrape.length} platform scrape messages published and confirmed`,
+    );
 
     await channel.close();
   } finally {

@@ -5,8 +5,20 @@ import Logger from "../../utility/Logger.js";
 import {
   dbSave,
   dbSaveExchange,
+  dbSaveDlx,
+  dbSaveDlq,
+  dbSaveDlqRoutingKey,
   ScheduleScrape,
+  scrapeDlx,
+  scrapeDlq,
+  scrapeDlqRoutingKey,
   SCRAPING_PLATFORMS,
+  aiEvaluationExchange,
+  aiEvaluationQueue,
+  aiEvaluationDlx,
+  aiEvaluationDlq,
+  aiEvaluationRoutingKey,
+  aiEvaluationDlqRoutingKey,
 } from "../../constants.js";
 import SaveSnapShots from "../../helper/SaveSnapShots.js";
 import cleanupStaleSnapshots from "../../helper/cleanupStaleSnapshots.js";
@@ -22,8 +34,10 @@ import DistributingWork from "./helpers/DistributingWork.js";
 import TransferingWorkToNextQueue from "./helpers/TransferingWorkToNextQueue.js";
 import ScheduleJdScrape from "./service/producer/ScheduleJdScrape.js";
 import ScheduleScrapeJob from "./service/producer/ScheduleScrape.js";
-import DbWorkerManager from "./utility/manager/DbWorkerManager.js";
-import ScrapWorkerManager from "./utility/manager/ScrapWorkerManager.js";
+import ScheduleAiEvaluation from "./service/producer/ScheduleAiEvaluation.js";
+import DbWorkerManager, { startDbWorkers, handleDbWorkerShutdown } from "./utility/manager/DbWorkerManager.js";
+import ScrapWorkerManager, { startScrapConsumer, handleShutdown as handleScrapWorkerShutdown } from "./utility/manager/ScrapWorkerManager.js";
+import AiWorkerManager, { startAiWorkers, handleAiWorkerShutdown } from "./utility/manager/AiWorkerManager.js";
 
 const log = Logger;
 const saveSnapShots = SaveSnapShots;
@@ -42,8 +56,20 @@ export {
   JobModel,
   dbSave,
   dbSaveExchange,
+  dbSaveDlx,
+  dbSaveDlq,
+  dbSaveDlqRoutingKey,
   ScheduleScrape,
+  scrapeDlx,
+  scrapeDlq,
+  scrapeDlqRoutingKey,
   SCRAPING_PLATFORMS,
+  aiEvaluationExchange,
+  aiEvaluationQueue,
+  aiEvaluationDlx,
+  aiEvaluationDlq,
+  aiEvaluationRoutingKey,
+  aiEvaluationDlqRoutingKey,
   SaveSnapShots,
   saveSnapShots,
   cleanupStaleSnapshots,
@@ -61,6 +87,14 @@ export {
   sendToAnotherQueue,
   ScheduleJdScrape,
   ScheduleScrapeJob,
+  ScheduleAiEvaluation,
   DbWorkerManager,
+  startDbWorkers,
+  handleDbWorkerShutdown,
   ScrapWorkerManager,
+  startScrapConsumer,
+  handleScrapWorkerShutdown,
+  AiWorkerManager,
+  startAiWorkers,
+  handleAiWorkerShutdown,
 };

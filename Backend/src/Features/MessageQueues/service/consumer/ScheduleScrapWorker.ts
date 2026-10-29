@@ -13,12 +13,19 @@ import amqp, { type Message, type ConfirmChannel } from "amqplib";
 import {
   dbSave,
   dbSaveExchange,
+  dbSaveDlx,
+  dbSaveDlq,
+  dbSaveDlqRoutingKey,
   ScheduleScrape,
+  scrapeDlx,
+  scrapeDlq,
+  scrapeDlqRoutingKey,
 } from "../../../../constants.js";
 import Logger from "../../../../utility/Logger.js";
 import PlatformInitialization from "../../../Scrapping/services/PlatformInitialization.js";
+import { safeAssertConfirmQueue } from "../../helpers/safeAssertQueue.js";
 
-const log = Logger; 
+const log = Logger;
 
 const workerId = process.env.WORKER_ID ?? "worker-unknown";
 
@@ -32,25 +39,67 @@ async function start(): Promise<void> {
 
   await channel.prefetch(1);
 
+  await channel.assertExchange(scrapeDlx, "direct", {
+    durable: true,
+    autoDelete: false,
+  });
+
+  await channel.assertQueue(scrapeDlq, {
+    durable: true,
+  });
+
+  await channel.bindQueue(scrapeDlq, scrapeDlx, scrapeDlqRoutingKey);
+
   await channel.assertExchange(ScheduleScrape, "direct", {
     durable: true,
     autoDelete: false,
   });
 
-  await channel.assertQueue(ScheduleScrape, {
+  const assertedScrape = await safeAssertConfirmQueue(
+    connection,
+    channel,
+    ScheduleScrape,
+    {
+      durable: true,
+      arguments: {
+        "x-dead-letter-exchange": scrapeDlx,
+        "x-dead-letter-routing-key": scrapeDlqRoutingKey,
+      },
+    },
+  );
+  channel = assertedScrape.channel;
+
+  await channel.bindQueue(ScheduleScrape, ScheduleScrape, "Scrapper");
+
+  await channel.assertExchange(dbSaveDlx, "direct", {
+    durable: true,
+    autoDelete: false,
+  });
+
+  await channel.assertQueue(dbSaveDlq, {
     durable: true,
   });
 
-  await channel.bindQueue(ScheduleScrape, ScheduleScrape, "Scrapper");
+  await channel.bindQueue(dbSaveDlq, dbSaveDlx, dbSaveDlqRoutingKey);
 
   await channel.assertExchange(dbSaveExchange, "direct", {
     durable: true,
     autoDelete: false,
   });
 
-  await channel.assertQueue(dbSave, {
-    durable: true,
-  });
+  const assertedDb = await safeAssertConfirmQueue(
+    connection,
+    channel,
+    dbSave,
+    {
+      durable: true,
+      arguments: {
+        "x-dead-letter-exchange": dbSaveDlx,
+        "x-dead-letter-routing-key": dbSaveDlqRoutingKey,
+      },
+    },
+  );
+  channel = assertedDb.channel;
 
   await channel.bindQueue(dbSave, dbSaveExchange, "Save");
 
@@ -58,6 +107,29 @@ async function start(): Promise<void> {
     if (!message || shuttingDown) {
       return;
     }
+
+    let isSettled = false;
+    const safeChannel = new Proxy(channel!, {
+      get(target, prop, receiver) {
+        if (prop === "ack") {
+          return (msg: Message, allUpTo?: boolean) => {
+            if (isSettled) return;
+            isSettled = true;
+            return target.ack(msg, allUpTo);
+          };
+        }
+        if (prop === "nack") {
+          return (msg: Message, allUpTo?: boolean, requeue?: boolean) => {
+            if (isSettled) return;
+            isSettled = true;
+            return target.nack(msg, allUpTo, requeue);
+          };
+        }
+        return Reflect.get(target, prop, receiver);
+      },
+    }) as ConfirmChannel;
+
+    let platform = "unknown";
 
     try {
       log.debug(`[${workerId}] PID=${process.pid} PPID=${process.ppid}`);
@@ -68,49 +140,24 @@ async function start(): Promise<void> {
       };
       try {
         content = JSON.parse(message.content.toString());
-      } catch (parseErr) {
+      } catch (_parseErr) {
         log.error(
           `[${workerId}] Discarding message: ${message.content.toString()}`,
         );
-        channel?.ack(message);
+        safeChannel.ack(message);
         return;
       }
 
-      const { platform } = content;
-      if (!platform) {
+      if (!content.platform) {
         log.error(
           `[${workerId}] Discarding message with missing platform`,
         );
-        channel?.ack(message);
+        safeChannel.ack(message);
         return;
       }
 
+      platform = content.platform;
       log.info(`[${workerId}] Received scrape task for platform: ${platform}`);
-
-      if (!channel) {
-        throw new Error("RabbitMQ channel is not initialized");
-      }
-
-      let isSettled = false;
-      const safeChannel = new Proxy(channel, {
-        get(target, prop, receiver) {
-          if (prop === "ack") {
-            return (msg: Message, allUpTo?: boolean) => {
-              if (isSettled) return;
-              isSettled = true;
-              return target.ack(msg, allUpTo);
-            };
-          }
-          if (prop === "nack") {
-            return (msg: Message, allUpTo?: boolean, requeue?: boolean) => {
-              if (isSettled) return;
-              isSettled = true;
-              return target.nack(msg, allUpTo, requeue);
-            };
-          }
-          return Reflect.get(target, prop, receiver);
-        },
-      }) as ConfirmChannel;
 
       await PlatformInitialization(
         workerId,
@@ -120,13 +167,43 @@ async function start(): Promise<void> {
       );
     } catch (error) {
       log.error(
-        `[${workerId}] Scraping or DB-queue publishing failed: ${(error as Error).message}`,
+        `[${workerId}] Scraping execution error: ${(error as Error).message}`,
       );
 
-      if (!shuttingDown && channel) {
-        try {
-          channel.nack(message, false, true);
-        } catch {}
+      if (isSettled) {
+        return;
+      }
+
+      const retryCount = Number(message.properties.headers?.["x-retry-count"] || 0) + 1;
+      const maxRetries = 3;
+
+      if (retryCount >= maxRetries) {
+        log.error(
+          `[${workerId}] Scraping task for ${platform} permanently failed after ${maxRetries} attempts. Routing to DLQ (${scrapeDlq}).`,
+        );
+        safeChannel.nack(message, false, false);
+      } else {
+        const backoffMs = retryCount * 3000;
+        log.warn(
+          `[${workerId}] Scraping task for ${platform} failed (Attempt ${retryCount}/${maxRetries}). Retrying in ${backoffMs / 1000}s...`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, backoffMs));
+
+        if (!shuttingDown && channel) {
+          channel.publish(
+            ScheduleScrape,
+            "Scrapper",
+            message.content,
+            {
+              persistent: true,
+              headers: {
+                ...message.properties.headers,
+                "x-retry-count": retryCount,
+              },
+            },
+          );
+          safeChannel.ack(message);
+        }
       }
     }
   });

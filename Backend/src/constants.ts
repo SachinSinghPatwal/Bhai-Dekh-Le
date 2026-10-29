@@ -35,8 +35,16 @@ export const JOB_AUTH_URL = {
 export const SCRAPING_PLATFORMS: string[] = ["naukri"];
 
 export const ScheduleScrape = "TimedScrapping";
+export const scrapeDlx = "timed_scrapping_dlx";
+export const scrapeDlq = "timed_scrapping_dlq";
+export const scrapeDlqRoutingKey = "ScrapeDeadLetter";
+
 export const dbSaveExchange = "db_save_exchange";
 export const dbSave = "db_save";
+export const dbSaveDlx = "db_save_dlx";
+export const dbSaveDlq = "db_save_dlq";
+export const dbSaveDlqRoutingKey = "DbSaveDeadLetter";
+
 export const jdScrapeExchange = "jd_scrape_exchange";
 export const jdScrape = "jd_scrape";
 
