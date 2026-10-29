@@ -140,9 +140,9 @@ async function start(): Promise<void> {
       };
       try {
         content = JSON.parse(message.content.toString());
-      } catch (_parseErr) {
+      } catch (_parseErr:unknown) {
         log.error(
-          `[${workerId}] Discarding message: ${message.content.toString()}`,
+          `[${workerId}] Discarding message: ${message.content.toString()} Reason ${(_parseErr as Error).message}`,
         );
         safeChannel.ack(message);
         return;

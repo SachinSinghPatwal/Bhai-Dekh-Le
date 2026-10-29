@@ -62,7 +62,6 @@ export default async function ScheduleScrapeJob(
         Buffer.from(
           JSON.stringify({
             platform,
-            totalNumberOfJobs: 0,
           }),
         ),
         {
