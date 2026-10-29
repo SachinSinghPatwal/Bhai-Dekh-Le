@@ -25,7 +25,6 @@ export default async function ScheduleJdScrape(): Promise<void> {
       Buffer.from(
         JSON.stringify({
           platform,
-          totalNumberOfJobs: 0,
         }),
       ),
       {
