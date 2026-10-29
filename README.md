@@ -312,6 +312,7 @@ export const JobRatingSchema = z.object({
   jobId: z.string(),
   title: z.string(),
   companyName: z.string(),
+  jdURL: z.string(),
   matchScore: z.number().min(0).max(100),
   fitVerdict: z.enum([
     "Strong Match",

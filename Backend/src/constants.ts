@@ -1,6 +1,5 @@
 import path from "node:path";
 
-
 export const MONGO_DB_NAME = "BhaiDekhLe";
 
 export const NAUKRI_BASE_URL = "https://www.naukri.com";
@@ -33,7 +32,6 @@ export const JOB_AUTH_URL = {
   signUpPath: "registration/createAccount",
 };
 
-// RabbitMQ Constants
 export const SCRAPING_PLATFORMS: string[] = ["naukri"];
 
 export const ScheduleScrape = "TimedScrapping";
@@ -42,28 +40,30 @@ export const dbSave = "db_save";
 export const jdScrapeExchange = "jd_scrape_exchange";
 export const jdScrape = "jd_scrape";
 
-// URL Constants
+export const aiEvaluationExchange = "ai_evaluation_exchange";
+export const aiEvaluationQueue = "ai_evaluation";
+export const aiEvaluationDlx = "ai_evaluation_dlx";
+export const aiEvaluationDlq = "ai_evaluation_dlq";
+export const aiEvaluationRoutingKey = "Evaluate";
+export const aiEvaluationDlqRoutingKey = "AiEvaluationDeadLetter";
+
 export const MatchedURLOfSearch = "/jobapi/v3/search";
 
-// Misc Constants
 export const SNAPSHOT_FOLDER_NAME = "snapShots";
 export const NAUKRI_SNAPSHOT_FOLDER = path.join(SNAPSHOT_FOLDER_NAME, "naukri");
 export const JOB_FOUND_SNAPSHOT_FOLDER = path.join(SNAPSHOT_FOLDER_NAME, "jobFound");
 export const CLIENT_DATA_FOLDER_NAME = "src/Features/Scrapping/data";
 
-// proxies
 export const PROXIES = ["http://62.72.43.79:3129"];
 
-// General TimeOut
 export const GENERAL_TIMEOUT = 1000; 
 
 export const SCRAPING_JITTER = {
-  breatherIntervalPages: 18,
-  jdScrapBaseDelay: 500, 
-  jdScrapMaxJitter: 500,
+  breatherIntervalPages: 100,
+  jdScrapBaseDelay: 0, 
+  jdScrapMaxJitter: 0,
 } as const;
 
-// path
 export const CLIENT_DATA_PATH = path.resolve(
   process.cwd(),
   "src/Features/Scrapping/data/client.encrypted.json",
@@ -79,15 +79,12 @@ export const USER_DETAILS_PATH = path.resolve(
   "data/userDetails.personal.json",
 );
 
-// Authentication and Account Creation Selectors
 export const AUTH_SELECTORS = {
   signedUserField:
     "#usernameField, #signedUserField, input[placeholder*='Username'], input[placeholder*='Email']",
   signedPasswordField:
     "#passwordField, #signedPasswordField, input[type='password']",
   loginSubmit: "button[type='submit']",
-
-  // Scope: Account Creation / Registration Selectors (for future registration workflow)
   nameField: "#name",
   emailField: "#email",
   passwordField: "#password",

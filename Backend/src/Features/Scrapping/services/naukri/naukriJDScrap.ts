@@ -47,6 +47,7 @@ export const JobRatingSchema = z.object({
   jobId: z.string(),
   title: z.string(),
   companyName: z.string(),
+  jdURL: z.string(),
   matchScore: z.number().min(0).max(100),
   fitVerdict: z.enum([
     "Strong Match",
@@ -331,10 +332,6 @@ export async function scrapeJobDescriptions(
 
         scrapedJds.push(jdRecord);
 
-        log.success(
-          `[${workerId}] Scraped JD for ${job.jobId} (${containerText.length} chars)`,
-        );
-
         if (i < validJobs.length - 1) {
           const delay =
             Math.floor(Math.random() * SCRAPING_JITTER.jdScrapMaxJitter) +
@@ -398,6 +395,7 @@ export async function rateResumeAgainstJDs(
     jobId: jd.jobId,
     title: jd.title,
     companyName: jd.companyName,
+    jdURL: jd.jdURL,
     tagsAndSkills: jd.tagsAndSkills,
     description: jd.descriptionText.slice(0, 1500),
   }));
@@ -406,40 +404,41 @@ export async function rateResumeAgainstJDs(
 You are a strict job-matching engine. Analyze the candidate profile against the provided job listings and return ONLY highly relevant jobs.
 
 **Filtering Rules**
-1. Include only jobs with a match score of **75/100 or higher**.
+1. Include only jobs with a match score of **75/100 or higher** (matchScore >= 75).
 2. Exclude jobs requiring mandatory skills the candidate lacks, unrelated technology stacks, or experience significantly beyond the candidate's experience.
-3. Prioritize alignment with the candidate's actual skills, experience level, complete prefix with https://naurki.com/ and target role.
-4. Never inflate match scores. A shared framework or generic skill alone does not establish a strong match.
-5. If no jobs meet the criteria, return "No highly matched jobs found." Never lower the threshold to fill the results.
+3. Prioritize alignment with the candidate's actual skills, experience level, and target role.
+4. For every qualifying job, include the direct job listing link (jdURL) exactly as provided in the input.
+5. Never inflate match scores. A shared framework or generic skill alone does not establish a strong match.
+6. If no jobs meet the criteria, return "No highly matched jobs found." Never lower the threshold to fill the results.
 
 **Output Requirements**
-For each qualifying job, return only:
-
-[#1] Job Title | Company | Match: XX/100
-**Matching Skills:** Up to 5 most relevant skills.
-**Key Gap:** Only the most important missing requirement, if any. Write "None significant" when appropriate.
-**Verdict:** One concise sentence explaining why the job is a strong fit.
+For each qualifying job with matchScore >= 75:
+- jobId: The exact Job ID
+- title: Job Title
+- companyName: Company Name
+- jdURL: The direct job link / URL prefixed witht he plateform base URL
+- matchScore: Numerical score >= 75
+- fitVerdict: Verdict category ("Strong Match" or "Moderate Match")
+- matchingSkills: Up to 5 most relevant matching skills
+- missingSkills: Missing or gap skills
+- summary: Concise explanation of why the candidate fits this job
+- recommendation: Tailored application advice
 
 **Conciseness Rules**
 - Sort by match score, highest first.
-- Remove low-match, moderate-match, and unsuitable jobs entirely.
+- Remove low-match, moderate-match (< 75), and unsuitable jobs entirely.
 - Do not repeat the candidate's skills across multiple sections unnecessarily.
 - Do not include lengthy analysis, application advice, generic recommendations, introductions, conclusions, or summaries.
-- Preserve job titles, company names, and job IDs when available.
+- Preserve job titles, company names, URLs, and job IDs exactly as provided.
 - Use only information supported by the candidate profile and job listing.
-- If a match score is provided by another system, treat it as an estimate and independently check whether the job meets the filtering rules.
 
 Return the qualifying jobs in the specified format. And Above of All provide common skills asked by company in their skills and jd for today's collected jobs
 
 Also provide an 'overallSummary' comparing the candidate's profile against this batch of opportunities.
 
 Job Descriptions to evaluate:
-${JSON.stringify(jobSummariesForPrompt, null, 2)}
+\${JSON.stringify(jobSummariesForPrompt, null, 2)}
 `;
-
-  log.info(
-    `[Naukri JD Scrap] Sending resume and ${jds.length} JDs to Gemini AI (gemini-3.8-flash)...`,
-  );
 
   const response = await ai.models.generateContent({
     model: "gemini-3.8-flash",
@@ -471,6 +470,7 @@ ${JSON.stringify(jobSummariesForPrompt, null, 2)}
                 jobId: { type: "STRING" },
                 title: { type: "STRING" },
                 companyName: { type: "STRING" },
+                jdURL: { type: "STRING" },
                 matchScore: { type: "NUMBER" },
                 fitVerdict: {
                   type: "STRING",
@@ -496,6 +496,7 @@ ${JSON.stringify(jobSummariesForPrompt, null, 2)}
                 "jobId",
                 "title",
                 "companyName",
+                "jdURL",
                 "matchScore",
                 "fitVerdict",
                 "matchingSkills",
@@ -516,7 +517,17 @@ ${JSON.stringify(jobSummariesForPrompt, null, 2)}
   }
 
   const rawJson = JSON.parse(response.text);
-  return BatchJobRatingSchema.parse(rawJson);
+  const parsed = BatchJobRatingSchema.parse(rawJson);
+  const jdsById = new Map(jds.map((j) => [j.jobId, j.jdURL]));
+
+  parsed.ratedJobs = parsed.ratedJobs
+    .filter((job) => job.matchScore >= 75)
+    .map((job) => ({
+      ...job,
+      jdURL: jdsById.get(job.jobId) || job.jdURL,
+    }));
+
+  return parsed;
 }
 
 export function displayRatingReportOnTerminal(
@@ -529,31 +540,29 @@ export function displayRatingReportOnTerminal(
   console.log("\n" + line);
   console.log("GEMINI AI RESUME vs NAUKRI JOB DESCRIPTIONS RATING REPORT");
   console.log(line);
-  console.log(`Candidate Resume Source: ${resumeSource}`);
-  console.log(
-    `Total Opportunities Evaluated: ${ratingResult.ratedJobs.length}`,
-  );
   console.log(`Profile Summary: ${ratingResult.overallSummary}`);
-  console.log(subLine);
 
   ratingResult.ratedJobs.forEach((job, index) => {
     const scoreColor =
       job.matchScore >= 80 ? "Match" : job.matchScore >= 60 ? "Moderate" : "Low";
 
     console.log(
-      `\n[#${index + 1}] ${job.title} | ${job.companyName} (Job ID: ${job.jobId})`,
+      `\n[#\${index + 1}] \${job.title} | \${job.companyName} (Job ID: \${job.jobId})`,
+    );
+    if (job.jdURL) {
+      console.log(`    Link: \${job.jdURL}`);
+    }
+    console.log(
+      `    \${scoreColor} Score: \${job.matchScore}/100 [\${job.fitVerdict}]`,
     );
     console.log(
-      `    ${scoreColor} Score: ${job.matchScore}/100 [${job.fitVerdict}]`,
+      `    Matching Skills: \${job.matchingSkills.join(", ") || "None highlighted"}`,
     );
     console.log(
-      `    Matching Skills: ${job.matchingSkills.join(", ") || "None highlighted"}`,
+      `    Missing / Gap Skills: \${job.missingSkills.join(", ") || "None"}`,
     );
-    console.log(
-      `    Missing / Gap Skills: ${job.missingSkills.join(", ") || "None"}`,
-    );
-    console.log(`    Analysis: ${job.summary}`);
-    console.log(`    Advice: ${job.recommendation}`);
+    console.log(`    Analysis: \${job.summary}`);
+    console.log(`    Advice: \${job.recommendation}`);
   });
 
   console.log("\n" + line + "\n");
