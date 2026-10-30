@@ -7,26 +7,31 @@ interface CandidateStoreState {
   isFormFilled: boolean;
   jobStats: JobMetricStats;
   setProfile: (profile: CandidateProfile) => void;
+  setDraftProfile: (profile: Partial<CandidateProfile>) => void;
+  confirmProfileSaved: (profile: CandidateProfile) => void;
   setIsFormFilled: (filled: boolean) => void;
   clearProfile: () => void;
 }
 
-// Synchronously inspect localStorage so store is hydrated before first frame
 const getInitialProfileState = () => {
   try {
     const raw = localStorage.getItem("cms-candidate-storage");
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed?.state?.profile?.fullName) {
+      if (parsed?.state?.isFormFilled && parsed?.state?.profile?.fullName) {
         return {
           profile: parsed.state.profile as CandidateProfile,
           isFormFilled: true,
         };
       }
+      if (parsed?.state?.profile) {
+        return {
+          profile: parsed.state.profile as CandidateProfile,
+          isFormFilled: false,
+        };
+      }
     }
-  } catch {
-    // Ignore JSON errors
-  }
+  } catch {}
   return {
     profile: null,
     isFormFilled: false,
@@ -48,16 +53,24 @@ export const useCandidateStore = create<CandidateStoreState>()(
         rejectionsCount: 0,
       },
       setProfile: (profile) => set({ profile, isFormFilled: true }),
+      setDraftProfile: (draft) =>
+        set((state) => ({
+          profile: state.profile
+            ? { ...state.profile, ...draft }
+            : (draft as CandidateProfile),
+          isFormFilled: false,
+        })),
+      confirmProfileSaved: (profile) => set({ profile, isFormFilled: true }),
       setIsFormFilled: (isFormFilled) => set({ isFormFilled }),
       clearProfile: () => set({ profile: null, isFormFilled: false }),
     }),
     {
       name: "cms-candidate-storage",
       onRehydrateStorage: () => (state) => {
-        if (state && state.profile && state.profile.fullName) {
-          state.isFormFilled = true;
+        if (!state?.isFormFilled) {
+          if (state) state.isFormFilled = false;
         }
       },
-    }
-  )
+    },
+  ),
 );

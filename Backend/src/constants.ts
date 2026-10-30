@@ -48,6 +48,8 @@ export const dbSaveDlqRoutingKey = "DbSaveDeadLetter";
 export const jdScrapeExchange = "jd_scrape_exchange";
 export const jdScrape = "jd_scrape";
 
+export const QUEUE_MESSAGE_TTL_MS = 600000;
+
 export const aiEvaluationExchange = "ai_evaluation_exchange";
 export const aiEvaluationQueue = "ai_evaluation";
 export const aiEvaluationDlx = "ai_evaluation_dlx";

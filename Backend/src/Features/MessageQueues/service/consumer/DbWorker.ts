@@ -23,6 +23,7 @@ import {
   connectToDb,
   Logger,
   naukriJDScrap,
+  QUEUE_MESSAGE_TTL_MS,
 } from "../../index.js";
 import { safeAssertConfirmQueue } from "../../helpers/safeAssertQueue.js";
 
@@ -76,6 +77,7 @@ async function start(): Promise<void> {
       arguments: {
         "x-dead-letter-exchange": dbSaveDlx,
         "x-dead-letter-routing-key": dbSaveDlqRoutingKey,
+        "x-message-ttl": QUEUE_MESSAGE_TTL_MS,
       },
     },
   );
@@ -211,6 +213,7 @@ async function start(): Promise<void> {
             message.content,
             {
               persistent: true,
+              expiration: String(QUEUE_MESSAGE_TTL_MS),
               headers: {
                 ...message.properties.headers,
                 "x-retry-count": retryCount,

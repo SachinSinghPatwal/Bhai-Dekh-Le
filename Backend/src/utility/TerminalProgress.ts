@@ -56,14 +56,20 @@ function getSessionThresholdMap(
   return map;
 }
 
-export function resetBrailleBarSession(sessionId: string | number = "default"): void {
+export function resetBrailleBarSession(
+  sessionId: string | number = "default",
+): void {
   sessionMap.delete(String(sessionId));
 }
 
-let activeLoaderRenderer: (() => void) | null = null;
-let currentLoaderOutput = "";
+let loaderSeq = 0;
+const activeSpinners = new Map<string, string>();
+const activeDotBars = new Map<string, string>();
+
+let allocatedPinnedLines = 0;
+let lastDrawnContent = "";
+let lastDrawTime = 0;
 let latestLogMessage = "";
-let isTwoLineAllocated = false;
 
 function clampVisible(raw: string, maxLen: number): string {
   if (!raw) return "";
@@ -91,44 +97,115 @@ function clampVisible(raw: string, maxLen: number): string {
   return result + "\x1b[0m";
 }
 
-function draw(): void {
+function getCombinedPinnedLines(): string[] {
+  const maxCols = Math.max((process.stdout.columns || 120) - 1, 20);
+  const lines: string[] = [];
+
+  if (latestLogMessage) {
+    lines.push(clampVisible(latestLogMessage.replace(/[\r\n]+/g, " ").trim(), maxCols));
+  }
+
+  for (const s of activeSpinners.values()) {
+    if (s) {
+      lines.push(clampVisible(s.replace(/[\r\n]+/g, " ").trim(), maxCols));
+    }
+  }
+
+  for (const d of activeDotBars.values()) {
+    if (d) {
+      lines.push(clampVisible(d.replace(/[\r\n]+/g, " ").trim(), maxCols));
+    }
+  }
+
+  return lines;
+}
+
+let scheduledPinnedImmediate: NodeJS.Immediate | null = null;
+
+function schedulePinnedRedraw(): void {
+  if (scheduledPinnedImmediate) {
+    return;
+  }
+  scheduledPinnedImmediate = setImmediate(() => {
+    scheduledPinnedImmediate = null;
+    redrawPinned(true);
+  });
+}
+
+function clearCurrentPinned(): void {
+  if (allocatedPinnedLines <= 0) {
+    return;
+  }
+  if (!process.stdout.isTTY) {
+    allocatedPinnedLines = 0;
+    lastDrawnContent = "";
+    return;
+  }
+  if (allocatedPinnedLines === 1) {
+    process.stdout.write("\r\x1b[2K");
+  } else {
+    process.stdout.write(`\x1b[${allocatedPinnedLines - 1}A\r\x1b[J`);
+  }
+  allocatedPinnedLines = 0;
+  lastDrawnContent = "";
+}
+
+function redrawPinned(force = false): void {
   if (typeof process.send === "function") {
     return;
   }
-  if (!isTwoLineAllocated) {
-    process.stdout.write("\n");
-    isTwoLineAllocated = true;
+  if (!process.stdout.isTTY) {
+    return;
   }
-  const maxCols = Math.max((process.stdout.columns || 120) - 1, 20);
-  const cleanLog = clampVisible(latestLogMessage.replace(/[\r\n]+/g, " ").trim(), maxCols);
-  const cleanLoader = clampVisible(currentLoaderOutput.replace(/[\r\n]+/g, " ").trim(), maxCols);
-  process.stdout.write(`\x1b[1A\r\x1b[2K${cleanLog}\n\r\x1b[2K${cleanLoader}`);
+
+  const now = Date.now();
+  if (!force && now - lastDrawTime < 40) {
+    return;
+  }
+
+  const lines = getCombinedPinnedLines();
+  const content = lines.join("\n");
+
+  if (!force && content === lastDrawnContent && lines.length === allocatedPinnedLines) {
+    return;
+  }
+
+  clearCurrentPinned();
+
+  if (lines.length > 0) {
+    process.stdout.write(content);
+    allocatedPinnedLines = lines.length;
+    lastDrawnContent = content;
+    lastDrawTime = now;
+  }
 }
 
 export function registerActiveLoader(renderer: () => void): () => void {
-  activeLoaderRenderer = renderer;
-  if (typeof process.send !== "function" && !isTwoLineAllocated) {
-    process.stdout.write("\n");
-    isTwoLineAllocated = true;
-  }
   return () => {
-    if (activeLoaderRenderer === renderer) {
-      activeLoaderRenderer = null;
-    }
+    renderer();
   };
 }
 
 export function isLoaderActive(): boolean {
-  return activeLoaderRenderer !== null;
+  return activeSpinners.size > 0 || activeDotBars.size > 0;
 }
 
 export function handleLogWithActiveLoader(formattedMessage: string): boolean {
   if (typeof process.send === "function") {
-    process.send({ type: "TERMINAL_LOG", message: formattedMessage });
+    process.send({
+      type: "TERMINAL_LOG",
+      message: formattedMessage,
+    });
     return true;
   }
+
+  if (!process.stdout.isTTY) {
+    process.stdout.write(`${formattedMessage}\n`);
+    return true;
+  }
+
   latestLogMessage = formattedMessage;
-  draw();
+  schedulePinnedRedraw();
   return true;
 }
 
@@ -136,50 +213,103 @@ export function getLatestLogMessage(): string {
   return latestLogMessage;
 }
 
-export function renderTwoLineOutput(loaderOutput: string): void {
+export function renderTwoLineOutput(
+  loaderOutput: string,
+  id = "default",
+  kind: "spinner" | "dotbar" = "spinner",
+): void {
   if (typeof process.send === "function") {
-    process.send({ type: "TERMINAL_LOADER", output: loaderOutput });
+    process.send({
+      type: "TERMINAL_LOADER",
+      id,
+      output: loaderOutput,
+      kind,
+    });
     return;
   }
-  currentLoaderOutput = loaderOutput;
-  draw();
+
+  if (kind === "dotbar") {
+    activeDotBars.set(id, loaderOutput);
+  } else {
+    activeSpinners.set(id, loaderOutput);
+  }
+
+  redrawPinned();
 }
 
-export function handleLoaderStop(completedText?: string): void {
+export function handleLoaderStop(
+  completedText?: string,
+  id = "default",
+  kind: "spinner" | "dotbar" = "spinner",
+): void {
   if (typeof process.send === "function") {
-    process.send({ type: "TERMINAL_STOP", completedText });
+    process.send({
+      type: "TERMINAL_STOP",
+      id,
+      completedText,
+      kind,
+    });
     return;
   }
+
+  if (kind === "dotbar") {
+    activeDotBars.delete(id);
+  } else {
+    activeSpinners.delete(id);
+  }
+
   if (completedText) {
     latestLogMessage = `\x1b[32m✔\x1b[0m ${completedText}`;
   }
-  currentLoaderOutput = "";
-  draw();
+
+  redrawPinned(true);
 }
 
-export function handleLoaderFail(errorText?: string): void {
+export function handleLoaderFail(
+  errorText?: string,
+  id = "default",
+  kind: "spinner" | "dotbar" = "spinner",
+): void {
   if (typeof process.send === "function") {
-    process.send({ type: "TERMINAL_FAIL", errorText });
+    process.send({
+      type: "TERMINAL_FAIL",
+      id,
+      errorText,
+      kind,
+    });
     return;
   }
-  currentLoaderOutput = "";
-  draw();
-  if (errorText) {
-    process.stdout.write(`\n\x1b[31m✖ Error: ${errorText}\x1b[0m\n`);
-    isTwoLineAllocated = false;
+
+  if (kind === "dotbar") {
+    activeDotBars.delete(id);
+  } else {
+    activeSpinners.delete(id);
   }
+
+  if (errorText) {
+    latestLogMessage = `\x1b[31m✖ Error: ${errorText}\x1b[0m`;
+  }
+
+  redrawPinned(true);
 }
 
 export function handleTerminalIpcMessage(msg: any): void {
   if (!msg || typeof msg !== "object") return;
+
   if (msg.type === "TERMINAL_LOG" && typeof msg.message === "string") {
     handleLogWithActiveLoader(msg.message);
   } else if (msg.type === "TERMINAL_LOADER" && typeof msg.output === "string") {
-    renderTwoLineOutput(msg.output);
+    const id = typeof msg.id === "string" ? msg.id : "worker-loader";
+    const kind = msg.kind === "dotbar" ? "dotbar" : "spinner";
+    renderTwoLineOutput(msg.output, id, kind);
   } else if (msg.type === "TERMINAL_STOP") {
-    handleLoaderStop(msg.completedText);
+    const id = typeof msg.id === "string" ? msg.id : "worker-loader";
+    const kind = msg.kind === "dotbar" ? "dotbar" : "spinner";
+    handleLoaderStop(msg.completedText, id, kind);
   } else if (msg.type === "TERMINAL_FAIL") {
-    handleLoaderFail(msg.errorText);
+    const id = typeof msg.id === "string" ? msg.id : "worker-loader";
+    const kind = msg.kind === "dotbar" ? "dotbar" : "spinner";
+    handleLoaderFail(msg.errorText, id, kind);
   }
 }
 
@@ -189,7 +319,8 @@ export interface SpinnerHandle {
   fail: (errorText?: string) => void;
 }
 
-export function startSpinningLoader(label: string): SpinnerHandle {
+export function startSpinningLoader(label: string, customId?: string): SpinnerHandle {
+  const loaderId = customId || `spinner-${++loaderSeq}`;
   const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
   let frameIndex = 0;
   let currentLabel = label;
@@ -199,15 +330,13 @@ export function startSpinningLoader(label: string): SpinnerHandle {
     if (isStopped) return;
     const frame = frames[frameIndex % frames.length];
     const loaderOutput = `\x1b[38;2;245;158;11m${frame}\x1b[0m ${currentLabel}`;
-    renderTwoLineOutput(loaderOutput);
+    renderTwoLineOutput(loaderOutput, loaderId, "spinner");
   };
-
-  const unregister = registerActiveLoader(render);
 
   const timer = setInterval(() => {
     frameIndex++;
     render();
-  }, 80);
+  }, 160);
 
   render();
 
@@ -220,15 +349,13 @@ export function startSpinningLoader(label: string): SpinnerHandle {
       if (isStopped) return;
       isStopped = true;
       clearInterval(timer);
-      unregister();
-      handleLoaderStop(completedText);
+      handleLoaderStop(completedText, loaderId, "spinner");
     },
     fail(errorText?: string) {
       if (isStopped) return;
       isStopped = true;
       clearInterval(timer);
-      unregister();
-      handleLoaderFail(errorText || currentLabel);
+      handleLoaderFail(errorText || currentLabel, loaderId, "spinner");
     },
   };
 }
@@ -242,51 +369,44 @@ export function formatCustomBrailleBar(
   sessionId?: string | number,
   hasError = false,
 ): string {
-  const currentTick = tick ?? Math.floor(Date.now() / 50);
   const progressRatio = Math.min(Math.max(current / (total || 1), 0), 1);
   const totalX = barWidth * 2;
   const totalY = 4;
   const sessionKey = String(sessionId ?? label ?? "default");
   const thresholdMap = getSessionThresholdMap(sessionKey, totalX, totalY);
-  const errorCol = Math.min(Math.floor(progressRatio * barWidth), barWidth - 1);
+
+  const dotOrder = [
+    [0, 0, 0x01],
+    [0, 1, 0x02],
+    [0, 2, 0x04],
+    [1, 0, 0x08],
+    [1, 1, 0x10],
+    [1, 2, 0x20],
+    [0, 3, 0x40],
+    [1, 3, 0x80],
+  ];
 
   let bar = "";
-  for (let c = 0; c < barWidth; c++) {
-    if (hasError && c === errorCol) {
-      bar += "\x1b[31;1m●\x1b[0m";
-      continue;
-    }
 
+  for (let cell = 0; cell < barWidth; cell++) {
+    const col0 = cell * 2;
+    const col1 = cell * 2 + 1;
     let mask = 0;
-    let activeBits = 0;
 
-    for (let dy = 0; dy < 4; dy++) {
-      for (let dx = 0; dx < 2; dx++) {
-        const gx = c * 2 + dx;
-        const th = thresholdMap[gx * totalY + dy];
+    for (const [dx, dy, bit] of dotOrder) {
+      const gx = dx === 0 ? col0 : col1;
+      const gy = dy;
+      const threshold = thresholdMap[gx * totalY + gy];
 
-        if (progressRatio >= 1 || (progressRatio > 0 && progressRatio >= th)) {
-          const bit =
-            dx === 0 ? (dy === 3 ? 6 : dy) : dy === 3 ? 7 : dy + 3;
-          mask |= 1 << bit;
-          activeBits++;
-        }
+      if (progressRatio >= threshold) {
+        mask |= bit;
       }
     }
 
     if (mask > 0) {
-      const wave = Math.sin(c * 0.45 - currentTick * 0.35);
-      const waveFactor = (wave + 1) / 2;
-      const density = activeBits / 8;
-      const blend = Math.min(
-        Math.max(waveFactor * 0.5 + (1 - density) * 0.4, 0),
-        1,
-      );
-
-      const r = 255;
-      const g = Math.round(110 + blend * 145);
-      const b = Math.round(20 + blend * 235);
-
+      const r = hasError ? 239 : 245;
+      const g = hasError ? 68 : 158;
+      const b = hasError ? 68 : 11;
       bar += `\x1b[38;2;${r};${g};${b}m${String.fromCharCode(0x2800 + mask)}\x1b[0m`;
     } else {
       bar += "\u2800";
@@ -308,20 +428,28 @@ export function CustomBrailleDotBar(
   errorMessage?: string,
 ): void {
   const sessionKey = String(sessionId ?? label ?? "default");
-  const output = formatCustomBrailleBar(current, total, label, barWidth, tick, sessionKey, hasError);
+  const output = formatCustomBrailleBar(
+    current,
+    total,
+    label,
+    barWidth,
+    tick,
+    sessionKey,
+    hasError,
+  );
 
   if (hasError) {
     sessionMap.delete(sessionKey);
-    renderTwoLineOutput(output);
-    handleLoaderFail(errorMessage || "Scrape operation halted");
+    renderTwoLineOutput(output, sessionKey, "dotbar");
+    handleLoaderFail(errorMessage || "Scrape operation halted", sessionKey, "dotbar");
     return;
   }
 
-  renderTwoLineOutput(output);
+  renderTwoLineOutput(output, sessionKey, "dotbar");
 
-  if (current >= total && !isLoaderActive()) {
+  if (current >= total) {
     sessionMap.delete(sessionKey);
-    handleLoaderStop();
+    handleLoaderStop(undefined, sessionKey, "dotbar");
   }
 }
 
@@ -342,23 +470,23 @@ export function startCustomBrailleBar(
   let tot = total;
   let curLabel = label;
   let isFinished = false;
-  let tick = 0;
-  const sessionKey = String(sessionId ?? label ?? "default");
+  const barId = String(sessionId ?? label ?? `dotbar-${++loaderSeq}`);
 
-  const render = () => {
+  const render = (hasErr = false) => {
     if (isFinished) return;
-    tick++;
-    const output = formatCustomBrailleBar(cur, tot, curLabel, barWidth, tick, sessionKey, false);
-    renderTwoLineOutput(output);
+    const output = formatCustomBrailleBar(
+      cur,
+      tot,
+      curLabel,
+      barWidth,
+      0,
+      barId,
+      hasErr,
+    );
+    renderTwoLineOutput(output, barId, "dotbar");
   };
 
-  const unregister = registerActiveLoader(render);
-
-  const timer = setInterval(() => {
-    render();
-  }, 80);
-
-  render();
+  render(false);
 
   return {
     update(newCurrent: number, newTotal?: number, newLabel?: string) {
@@ -366,24 +494,20 @@ export function startCustomBrailleBar(
       cur = newCurrent;
       if (typeof newTotal === "number") tot = newTotal;
       if (newLabel) curLabel = newLabel;
-      render();
+      render(false);
     },
     stop(completedText?: string) {
       if (isFinished) return;
       isFinished = true;
-      clearInterval(timer);
-      unregister();
-      sessionMap.delete(sessionKey);
-      handleLoaderStop(completedText);
+      sessionMap.delete(barId);
+      handleLoaderStop(completedText, barId, "dotbar");
     },
     fail(errorText?: string) {
       if (isFinished) return;
       isFinished = true;
-      clearInterval(timer);
-      unregister();
-      const errorOutput = formatCustomBrailleBar(cur, tot, curLabel, barWidth, tick, sessionKey, true);
-      renderTwoLineOutput(errorOutput);
-      handleLoaderFail(errorText || "Scrape operation halted");
+      render(true);
+      sessionMap.delete(barId);
+      handleLoaderFail(errorText || "Scrape operation halted", barId, "dotbar");
     },
   };
 }
@@ -409,17 +533,15 @@ export function PackageSingleProgressBar(
     },
     cliProgress.Presets.rect,
   );
-
-  if (options.total) {
-    bar.start(options.total, 0);
-  }
-
   return bar;
 }
 
-export function PackageMultiProgressBar(): cliProgress.MultiBar {
+export function PackageMultiProgressBar(
+  options: cliProgress.Options = {},
+): cliProgress.MultiBar {
   return new cliProgress.MultiBar(
     {
+      ...options,
       format:
         "{worker} [{platform}] |\x1b[38;2;245;158;11m{bar}\x1b[0m| {percentage}% | ETA: {eta}s | {value}/{total}",
       barCompleteChar: "⣿",

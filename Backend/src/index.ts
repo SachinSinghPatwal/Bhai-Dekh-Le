@@ -22,7 +22,10 @@ import {
 import { ensureBasicUserInformation } from "./Features/UserInteractions/index.js";
 import cleanupStaleSnapshots from "./helper/cleanupStaleSnapshots.js";
 import { startSpinningLoader } from "./utility/TerminalProgress.js";
-import ScheduleScrapeJob from "./Features/MessageQueues/service/producer/ScheduleScrape.js";
+import {
+  initScrapeScheduler,
+  stopScrapeScheduler,
+} from "./Features/Scheduler/ScrapeScheduler.js";
 
 await ensureBasicUserInformation();
 await cleanupStaleSnapshots();
@@ -43,6 +46,7 @@ async function handleShutdown(): Promise<void> {
   log.debug("Application shutting down...");
 
   try {
+    stopScrapeScheduler();
     await handleScrapWorkerShutdown();
     await handleDbWorkerShutdown();
     await handleAiWorkerShutdown();
@@ -79,8 +83,8 @@ connectToMongoDb()
     await startAiWorkers();
     initLoader.stop("All Scrap, DB, and AI workers initialized and listening to queues.");
 
-    if (process.env.AUTO_SCRAPE !== "false") {
-      await ScheduleScrapeJob();
+    if (connected && process.env.MONGO_URI) {
+      await initScrapeScheduler();
     }
   })
   .catch((err: unknown) => {

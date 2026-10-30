@@ -20,6 +20,7 @@ import {
   scrapeDlx,
   scrapeDlq,
   scrapeDlqRoutingKey,
+  QUEUE_MESSAGE_TTL_MS,
 } from "../../../../constants.js";
 import Logger from "../../../../utility/Logger.js";
 import PlatformInitialization from "../../../Scrapping/services/PlatformInitialization.js";
@@ -64,6 +65,7 @@ async function start(): Promise<void> {
       arguments: {
         "x-dead-letter-exchange": scrapeDlx,
         "x-dead-letter-routing-key": scrapeDlqRoutingKey,
+        "x-message-ttl": QUEUE_MESSAGE_TTL_MS,
       },
     },
   );
@@ -96,6 +98,7 @@ async function start(): Promise<void> {
       arguments: {
         "x-dead-letter-exchange": dbSaveDlx,
         "x-dead-letter-routing-key": dbSaveDlqRoutingKey,
+        "x-message-ttl": QUEUE_MESSAGE_TTL_MS,
       },
     },
   );
@@ -196,6 +199,7 @@ async function start(): Promise<void> {
             message.content,
             {
               persistent: true,
+              expiration: String(QUEUE_MESSAGE_TTL_MS),
               headers: {
                 ...message.properties.headers,
                 "x-retry-count": retryCount,

@@ -1,12 +1,17 @@
 export interface CandidateProfile {
   fullName: string;
   role: string;
-  skills: string[];    // extracted from resume or added manually
-  platforms?: string[]; // optional legacy
+  skills: string[];
+  email?: string;
+  phone?: string;
+  links?: string[];
+  resumeUrl?: string;
   resumeFileName?: string;
+  sizeBytes?: number;
+  uploadedAt?: string;
+  platforms?: string[];
   searchKeywords?: string[];
 }
-
 
 export interface JobMetricStats {
   appliedCount: number;

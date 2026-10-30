@@ -1,22 +1,26 @@
 import * as pdfjsLib from "pdfjs-dist";
 import pdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
-// Set worker source to Vite-bundled worker asset
 try {
   if (typeof window !== "undefined" && pdfjsLib?.GlobalWorkerOptions) {
     pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
   }
-} catch {
-  // Ignore in non-browser environment
-}
+} catch {}
 
 export interface SkillDefinition {
   canonical: string;
   patterns: (string | RegExp)[];
 }
 
+export interface ParsedResumeResult {
+  text: string;
+  skills: string[];
+  email?: string;
+  phone?: string;
+  links: string[];
+}
+
 export const IT_SKILLS_CATALOG: SkillDefinition[] = [
-  // Languages
   { canonical: "JavaScript", patterns: ["javascript", "js", "ecmascript"] },
   { canonical: "TypeScript", patterns: ["typescript", "ts"] },
   { canonical: "Python", patterns: ["python", "python3", "py"] },
@@ -33,7 +37,6 @@ export const IT_SKILLS_CATALOG: SkillDefinition[] = [
   { canonical: "Dart", patterns: [/\bdart\b/i] },
   { canonical: "SQL", patterns: [/\bsql\b/i] },
 
-  // Frontend & UI
   { canonical: "React", patterns: ["react", "react.js", "reactjs"] },
   { canonical: "Next.js", patterns: ["next.js", "nextjs", "next js"] },
   { canonical: "Vue.js", patterns: ["vue", "vue.js", "vuejs"] },
@@ -50,7 +53,6 @@ export const IT_SKILLS_CATALOG: SkillDefinition[] = [
   { canonical: "Webpack", patterns: ["webpack"] },
   { canonical: "Vite", patterns: [/\bvite\b/i, /\bvitejs\b/i] },
 
-  // Backend & Runtime
   { canonical: "Node.js", patterns: ["node.js", "nodejs", "node js", /\bnode\b/i] },
   { canonical: "Express.js", patterns: ["express", "express.js", "expressjs"] },
   { canonical: "NestJS", patterns: ["nestjs", "nest.js"] },
@@ -63,7 +65,6 @@ export const IT_SKILLS_CATALOG: SkillDefinition[] = [
   { canonical: "Ruby on Rails", patterns: ["ruby on rails", "rails"] },
   { canonical: ".NET Core", patterns: [".net", ".net core", "asp.net", "dotnet"] },
 
-  // Databases & Caching
   { canonical: "MongoDB", patterns: ["mongodb", "mongo", "mongoose"] },
   { canonical: "PostgreSQL", patterns: ["postgresql", "postgres", "psql"] },
   { canonical: "MySQL", patterns: ["mysql"] },
@@ -75,7 +76,6 @@ export const IT_SKILLS_CATALOG: SkillDefinition[] = [
   { canonical: "Firebase", patterns: ["firebase", "firestore"] },
   { canonical: "Supabase", patterns: ["supabase"] },
 
-  // APIs & Architecture
   { canonical: "REST API", patterns: ["rest api", "rest apis", "restful", "restful api"] },
   { canonical: "GraphQL", patterns: ["graphql"] },
   { canonical: "gRPC", patterns: ["grpc"] },
@@ -83,7 +83,6 @@ export const IT_SKILLS_CATALOG: SkillDefinition[] = [
   { canonical: "Microservices", patterns: ["microservices", "microservice architecture"] },
   { canonical: "System Design", patterns: ["system design", "distributed systems"] },
 
-  // Cloud & DevOps
   { canonical: "AWS", patterns: [/\baws\b/i, "amazon web services", "s3", "ec2", "lambda"] },
   { canonical: "Azure", patterns: [/\bazure\b/i, "microsoft azure"] },
   { canonical: "GCP", patterns: [/\bgcp\b/i, "google cloud", "google cloud platform"] },
@@ -94,13 +93,11 @@ export const IT_SKILLS_CATALOG: SkillDefinition[] = [
   { canonical: "Linux", patterns: [/\blinux\b/i, "ubuntu", "debian", "centos"] },
   { canonical: "Git", patterns: [/\bgit\b/i, "github", "gitlab"] },
 
-  // Mobile
   { canonical: "React Native", patterns: ["react native", "react-native"] },
   { canonical: "Flutter", patterns: ["flutter"] },
   { canonical: "Android", patterns: [/\bandroid\b/i, "android studio"] },
   { canonical: "iOS", patterns: [/\bios\b/i, "xcode"] },
 
-  // AI & Data
   { canonical: "Machine Learning", patterns: ["machine learning", /\bml\b/i] },
   { canonical: "Deep Learning", patterns: ["deep learning", /\bdl\b/i] },
   { canonical: "Artificial Intelligence", patterns: [/\bai\b/i, "artificial intelligence"] },
@@ -109,7 +106,6 @@ export const IT_SKILLS_CATALOG: SkillDefinition[] = [
   { canonical: "Pandas", patterns: [/\bpandas\b/i] },
   { canonical: "NumPy", patterns: ["numpy"] },
 
-  // Testing & Quality
   { canonical: "Jest", patterns: [/\bjest\b/i] },
   { canonical: "Cypress", patterns: [/\bcypress\b/i] },
   { canonical: "Playwright", patterns: [/\bplaywright\b/i] },
@@ -117,21 +113,73 @@ export const IT_SKILLS_CATALOG: SkillDefinition[] = [
   { canonical: "Unit Testing", patterns: ["unit testing", "unit tests", "tdd"] },
 ];
 
-/**
- * Robust fallback extractor that extracts printable strings and matches skills
- * even if PDF.js fails or runs into worker/eval issues.
- */
-function fallbackTextExtraction(buffer: ArrayBuffer): string {
+export function cleanUrl(raw: string): string {
+  let url = raw.trim().replace(/[.,;:)>\]]+$/, "");
+  if (url.startsWith("mailto:")) {
+    return "";
+  }
+  if (!/^https?:\/\//i.test(url)) {
+    url = `https://${url.replace(/^\/+/, "")}`;
+  }
+  return url;
+}
+
+export function extractEmailFromText(text: string): string | undefined {
+  if (!text) return undefined;
+  const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/i;
+  const match = text.match(emailRegex);
+  return match ? match[0].toLowerCase().trim() : undefined;
+}
+
+export function extractPhoneFromText(text: string): string | undefined {
+  if (!text) return undefined;
+  const phoneRegex = /(?:(?:\+|00)\d{1,3}[\s.-]?)?(?:\(?\d{2,5}\)?[\s.-]?)?\d{3,5}[\s.-]?\d{3,5}/g;
+  const matches = text.match(phoneRegex);
+  if (!matches) return undefined;
+  for (const m of matches) {
+    const digitsOnly = m.replace(/\D/g, "");
+    if (digitsOnly.length >= 10 && digitsOnly.length <= 15) {
+      return m.trim();
+    }
+  }
+  return undefined;
+}
+
+export function extractLinksFromText(text: string): string[] {
+  if (!text) return [];
+  const found = new Set<string>();
+
+  const standardUrlRegex = /https?:\/\/[^\s,;"'()<>\\]+/gi;
+  let match;
+  while ((match = standardUrlRegex.exec(text)) !== null) {
+    const cleaned = cleanUrl(match[0]);
+    if (cleaned) found.add(cleaned);
+  }
+
+  const domainUrlRegex = /\b(?:github\.com\/[^\s,;"'()<>\\]+|linkedin\.com\/in\/[^\s,;"'()<>\\]+|gitlab\.com\/[^\s,;"'()<>\\]+|[a-zA-Z0-9-]+\.(?:vercel\.app|netlify\.app|github\.io)\/?[^\s,;"'()<>\\]*)/gi;
+  while ((match = domainUrlRegex.exec(text)) !== null) {
+    const cleaned = cleanUrl(match[0]);
+    if (cleaned) found.add(cleaned);
+  }
+
+  return Array.from(found);
+}
+
+function fallbackTextExtraction(buffer: ArrayBuffer): { text: string; links: string[] } {
   try {
     const bytes = new Uint8Array(buffer);
     const latin1 = new TextDecoder("latin1").decode(bytes);
-    
-    // Extract textual chunks from PDF stream operators like (text) Tj or [(t) -10 (e)] TJ
-    const textPieces: string[] = [];
-    
-    // Match literal strings: (String Here)
-    const literalRegex = /\(([^()]{1,200})\)/g;
+    const links = new Set<string>();
+
+    const uriRegex = /\/URI\s*\(([^()]+)\)/g;
     let match;
+    while ((match = uriRegex.exec(latin1)) !== null) {
+      const cleaned = cleanUrl(match[1]);
+      if (cleaned) links.add(cleaned);
+    }
+
+    const textPieces: string[] = [];
+    const literalRegex = /\(([^()]{1,200})\)/g;
     while ((match = literalRegex.exec(latin1)) !== null) {
       const cleaned = match[1].replace(/\\[nrtbf\\()]/g, " ").trim();
       if (cleaned.length > 1) {
@@ -139,57 +187,73 @@ function fallbackTextExtraction(buffer: ArrayBuffer): string {
       }
     }
 
-    // Also include words from plain ASCII scan
     const asciiWords = latin1.match(/[A-Za-z0-9#+.]{2,30}/g) || [];
     textPieces.push(...asciiWords);
 
-    return textPieces.join(" ");
+    const fullText = textPieces.join(" ");
+    const textLinks = extractLinksFromText(fullText);
+    textLinks.forEach((l) => links.add(l));
+
+    return { text: fullText, links: Array.from(links) };
   } catch {
-    return "";
+    return { text: "", links: [] };
   }
 }
 
-/**
- * Extracts plain text from a PDF file using PDF.js with automated fallback.
- */
-export async function extractTextFromPDF(file: File): Promise<string> {
+export async function extractTextAndLinksFromPDF(
+  file: File,
+): Promise<{ text: string; links: string[] }> {
   const arrayBuffer = await file.arrayBuffer();
   let fullText = "";
+  const collectedLinks = new Set<string>();
 
-  // Attempt 1: PDF.js
   try {
     const data = new Uint8Array(arrayBuffer);
     const loadingTask = pdfjsLib.getDocument({
       data,
       useSystemFonts: true,
     });
-    
+
     const pdf = await loadingTask.promise;
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
+
       const content = await page.getTextContent();
       const pageText = content.items
         .map((item: any) => ("str" in item ? item.str : ""))
         .join(" ");
       fullText += pageText + " ";
+
+      try {
+        const annotations = await page.getAnnotations();
+        for (const annot of annotations) {
+          if (annot?.subtype === "Link" && typeof annot?.url === "string") {
+            const cleaned = cleanUrl(annot.url);
+            if (cleaned) collectedLinks.add(cleaned);
+          }
+        }
+      } catch {}
     }
   } catch (pdfErr) {
     console.warn("[PDF Parser] PDF.js standard parse failed, using fallback:", pdfErr);
   }
 
-  // If PDF.js produced meaningful text (>20 chars), return it
-  if (fullText.trim().length > 20) {
-    return fullText;
+  const rawFallback = fallbackTextExtraction(arrayBuffer);
+  rawFallback.links.forEach((l) => collectedLinks.add(l));
+
+  if (!fullText || fullText.trim().length <= 20) {
+    fullText = rawFallback.text;
   }
 
-  // Attempt 2: Direct stream & ASCII fallback
-  const fallbackText = fallbackTextExtraction(arrayBuffer);
-  return fallbackText;
+  const textLinks = extractLinksFromText(fullText);
+  textLinks.forEach((l) => collectedLinks.add(l));
+
+  return {
+    text: fullText,
+    links: Array.from(collectedLinks),
+  };
 }
 
-/**
- * Matches detected skills against the IT skills catalog.
- */
 export function extractSkillsFromText(text: string): string[] {
   if (!text || text.trim().length === 0) return [];
   const foundSkills = new Set<string>();
@@ -215,14 +279,14 @@ export function extractSkillsFromText(text: string): string[] {
   return Array.from(foundSkills);
 }
 
-/**
- * Parses any uploaded resume file (.pdf, .txt, .md, etc.) and extracts skills.
- */
-export async function parseResumeFile(file: File): Promise<{ text: string; skills: string[] }> {
+export async function parseResumeFile(file: File): Promise<ParsedResumeResult> {
   let text = "";
+  let links: string[] = [];
 
   if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
-    text = await extractTextFromPDF(file);
+    const result = await extractTextAndLinksFromPDF(file);
+    text = result.text;
+    links = result.links;
   } else if (
     file.type.startsWith("text/") ||
     file.name.endsWith(".txt") ||
@@ -230,12 +294,17 @@ export async function parseResumeFile(file: File): Promise<{ text: string; skill
     file.name.endsWith(".json")
   ) {
     text = await file.text();
+    links = extractLinksFromText(text);
   } else {
-    // Other binary formats (e.g. .docx or unclassified)
     const buffer = await file.arrayBuffer();
-    text = fallbackTextExtraction(buffer);
+    const fallback = fallbackTextExtraction(buffer);
+    text = fallback.text;
+    links = fallback.links;
   }
 
   const skills = extractSkillsFromText(text);
-  return { text, skills };
+  const email = extractEmailFromText(text);
+  const phone = extractPhoneFromText(text);
+
+  return { text, skills, email, phone, links };
 }

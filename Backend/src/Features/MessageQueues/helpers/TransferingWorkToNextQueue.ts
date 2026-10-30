@@ -6,6 +6,7 @@ import {
   dbSaveExchange,
   SaveSnapShots,
   cleanupStaleSnapshots,
+  QUEUE_MESSAGE_TTL_MS,
 } from "../index.js";
 
 export default async function TransferingWorkToNextQueue(
@@ -46,6 +47,7 @@ export default async function TransferingWorkToNextQueue(
     ),
     {
       persistent: true,
+      expiration: String(QUEUE_MESSAGE_TTL_MS),
     },
   );
   await channel.waitForConfirms();

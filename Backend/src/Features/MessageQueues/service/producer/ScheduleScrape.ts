@@ -6,6 +6,7 @@ import {
   scrapeDlq,
   scrapeDlqRoutingKey,
   SCRAPING_PLATFORMS,
+  QUEUE_MESSAGE_TTL_MS,
 } from "../../index.js";
 import { safeAssertConfirmQueue } from "../../helpers/safeAssertQueue.js";
 
@@ -48,6 +49,7 @@ export default async function ScheduleScrapeJob(
         arguments: {
           "x-dead-letter-exchange": scrapeDlx,
           "x-dead-letter-routing-key": scrapeDlqRoutingKey,
+          "x-message-ttl": QUEUE_MESSAGE_TTL_MS,
         },
       },
     );
@@ -62,10 +64,12 @@ export default async function ScheduleScrapeJob(
         Buffer.from(
           JSON.stringify({
             platform,
+            totalNumberOfJobs: 0,
           }),
         ),
         {
           persistent: true,
+          expiration: String(QUEUE_MESSAGE_TTL_MS),
         },
       );
     }

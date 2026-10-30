@@ -8,7 +8,7 @@ export const JobsPage: React.FC = () => {
   const { profile } = useCandidateStore();
 
   return (
-    <div className="space-y-8  px-16 mx-10">
+    <div className="space-y-8 px-1 sm:px-4 md:px-8 mx-0">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6">
         <div>
           <h1 className="app-heading-page flex items-center gap-2.5">
@@ -22,7 +22,7 @@ export const JobsPage: React.FC = () => {
 
         <button
           type="button"
-          onClick={() => navigate("/details")}
+          onClick={() => navigate("/profile")}
           className="px-3.5 py-2 rounded bg-zinc-800/80 hover:bg-zinc-700/80 text-zinc-200 border border-white/10 app-sub font-medium flex items-center gap-2 transition-colors cursor-pointer"
         >
           <FiEdit3 className="text-zinc-400" />
@@ -30,8 +30,7 @@ export const JobsPage: React.FC = () => {
         </button>
       </div>
 
-      {/* Keywords Quick Search Links */}
-      <div className="glass-panel p-6 sm:p-8 space-y-6">
+      <div className="glass-panel p-4 sm:p-6 md:p-8 space-y-6">
         <h2 className="app-card-title text-zinc-300 flex items-center gap-2">
           <FiSearch className="text-zinc-400" />
           <span>Active Search Portal Queries</span>
@@ -93,8 +92,7 @@ export const JobsPage: React.FC = () => {
         })()}
       </div>
 
-      {/* Empty Jobs List Placeholder */}
-      <div className="glass-panel p-8 border border-white/[0.07] text-center space-y-3">
+      <div className="glass-panel p-5 sm:p-8 border border-white/[0.07] text-center space-y-3">
         <span className="app-card-title text-zinc-400">
           Job Applications Queue
         </span>

@@ -5,86 +5,199 @@ import { User } from "../models/Mongo/user.models.js";
 import { getUserDataFromFile, saveUserDataToFile } from "../helper/userDataHelper.js";
 import log from "../utility/Logger.js";
 
+function extractEmailFromBuffer(text: string): string {
+  const match = text.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/i);
+  return match ? match[0].toLowerCase().trim() : "";
+}
+
+function extractPhoneFromBuffer(text: string): string {
+  const matches = text.match(/(?:(?:\+|00)\d{1,3}[\s.-]?)?(?:\(?\d{2,5}\)?[\s.-]?)?\d{3,5}[\s.-]?\d{3,5}/g);
+  if (!matches) return "";
+  for (const m of matches) {
+    const digitsOnly = m.replace(/\D/g, "");
+    if (digitsOnly.length >= 10 && digitsOnly.length <= 15) {
+      return m.trim();
+    }
+  }
+  return "";
+}
+
+function extractLinksFromBuffer(text: string): string[] {
+  const found = new Set<string>();
+  const uriRegex = /\/URI\s*\(([^()]+)\)/g;
+  let match;
+  while ((match = uriRegex.exec(text)) !== null) {
+    const url = match[1].trim();
+    if (url.startsWith("http://") || url.startsWith("https://")) {
+      found.add(url);
+    }
+  }
+
+  const standardUrlRegex = /https?:\/\/[^\s,;"'()<>\\]+/gi;
+  while ((match = standardUrlRegex.exec(text)) !== null) {
+    const clean = match[0].replace(/[.,;:)]+$/, "").trim();
+    if (clean) found.add(clean);
+  }
+
+  const domainUrlRegex = /\b(?:github\.com|linkedin\.com\/in|gitlab\.com)[^\s,;"'()<>\\]*/gi;
+  while ((match = domainUrlRegex.exec(text)) !== null) {
+    const clean = match[0].replace(/[.,;:)]+$/, "").trim();
+    if (clean) found.add(`https://${clean}`);
+  }
+
+  return Array.from(found);
+}
+
+function safeParseArray(val: unknown): string[] {
+  if (Array.isArray(val)) {
+    return val.map((s) => String(s).trim()).filter(Boolean);
+  }
+  if (typeof val === "string" && val.trim().length > 0) {
+    try {
+      const parsed = JSON.parse(val);
+      if (Array.isArray(parsed)) {
+        return parsed.map((s) => String(s).trim()).filter(Boolean);
+      }
+    } catch {
+      return val.split(",").map((s) => s.trim()).filter(Boolean);
+    }
+  }
+  return [];
+}
+
 export async function uploadResumeController(
   req: Request,
   res: Response,
   next: NextFunction,
 ): Promise<void> {
   try {
-    if (!req.file) {
-      res.status(400).json({
-        success: false,
-        message: "No resume file provided. Please upload a PDF or Word document (.pdf, .doc, .docx).",
+    const body = req.body || {};
+    let resumeUrl = body.resumeUrl || "";
+    let fileName = body.resumeFileName || "";
+    let sizeBytes = Number(body.sizeBytes) || 0;
+    let uploadedAt = new Date();
+
+    let extractedEmail = "";
+    let extractedPhone = "";
+    let extractedLinks: string[] = [];
+
+    if (req.file) {
+      log.info(
+        `[Resume Upload] Processing resume: ${req.file.originalname} (${req.file.size} bytes, ${req.file.mimetype})`,
+      );
+
+      const bufferText = req.file.buffer.toString("latin1");
+      extractedEmail = extractEmailFromBuffer(bufferText);
+      extractedPhone = extractPhoneFromBuffer(bufferText);
+      extractedLinks = extractLinksFromBuffer(bufferText);
+
+      const uploadResult = await uploadToCloudinary(req.file.buffer, {
+        folder: "bhaidekhle/resumes",
+        resource_type: "raw",
+        filename_override: req.file.originalname,
       });
-      return;
+
+      resumeUrl = uploadResult.secure_url;
+      fileName = req.file.originalname;
+      sizeBytes = req.file.size;
+      uploadedAt = new Date();
     }
 
-    log.info(
-      `[Resume Upload] Processing resume: ${req.file.originalname} (${req.file.size} bytes, ${req.file.mimetype})`,
-    );
+    const providedSkills = safeParseArray(body.skills);
+    const providedLinks = safeParseArray(body.links);
 
-    // Upload to Cloudinary with proper folder structure
-    const uploadResult = await uploadToCloudinary(req.file.buffer, {
-      folder: "bhaidekhle/resumes",
-      resource_type: "raw",
-      filename_override: req.file.originalname,
-    });
+    const resolvedFullname = (body.fullName || body.fullname || "Candidate").trim();
+    const resolvedRole = (body.role || "").trim();
+    const resolvedEmail = (body.email || extractedEmail || "").trim();
+    const resolvedPhone = (body.phone || body.phoneNumber || extractedPhone || "").trim();
+    const resolvedLinks = Array.from(new Set([...providedLinks, ...extractedLinks]));
+    const resolvedSkills = providedSkills;
 
-    const resumeUrl = uploadResult.secure_url;
-    const uploadedAt = new Date();
-
-    // 1. If MongoDB is connected, save to DB User model
     if (mongoose.connection.readyState === 1) {
       try {
-        const user = await User.findOne();
+        let user = await User.findOne();
         if (user) {
-          user.resume = {
-            path: resumeUrl,
-            fileName: req.file.originalname,
-            uploadedAt,
-          };
+          user.fullname = resolvedFullname;
+          user.role = resolvedRole;
+          if (resolvedEmail) user.email = resolvedEmail;
+          if (resolvedPhone) user.phone = resolvedPhone;
+          if (resolvedLinks.length > 0) user.links = resolvedLinks;
+          if (resolvedSkills.length > 0) user.skills = resolvedSkills;
+          if (resumeUrl) {
+            user.resume = {
+              path: resumeUrl,
+              fileName: fileName || user.resume?.fileName,
+              uploadedAt,
+              sizeBytes: sizeBytes || user.resume?.sizeBytes,
+            };
+          }
           await user.save();
         } else {
-          await User.create({
-            fullname: "Candidate",
-            email: "candidate@bhaidekhle.local",
-            password: "defaultPassword123",
-            resume: {
-              path: resumeUrl,
-              fileName: req.file.originalname,
-              uploadedAt,
-            },
+          user = await User.create({
+            fullname: resolvedFullname,
+            role: resolvedRole,
+            email: resolvedEmail,
+            phone: resolvedPhone,
+            links: resolvedLinks,
+            skills: resolvedSkills,
+            resume: resumeUrl
+              ? {
+                  path: resumeUrl,
+                  fileName,
+                  uploadedAt,
+                  sizeBytes,
+                }
+              : undefined,
           });
         }
-        log.info("[Resume Upload] Synced resume URL to MongoDB User document");
+        log.info("[Resume Upload] Synced user profile and resume URL to MongoDB User document");
       } catch (dbErr) {
         log.warn("[Resume Upload] Could not update MongoDB User record:", dbErr);
       }
     }
 
-    // 2. Persist to local personal/user details JSON
     const fileData = (await getUserDataFromFile()) ?? { personalDetails: {} };
     if (!fileData.personalDetails) {
       fileData.personalDetails = {};
     }
-    fileData.personalDetails.resumePath = resumeUrl;
-    fileData.personalDetails.resumeLink = resumeUrl;
-    fileData.personalDetails.resumeFileName = req.file.originalname;
+    fileData.personalDetails.name = resolvedFullname;
+    fileData.personalDetails.fullName = resolvedFullname;
+    fileData.personalDetails.role = resolvedRole;
+    if (resolvedEmail) fileData.personalDetails.email = resolvedEmail;
+    if (resolvedPhone) fileData.personalDetails.phone = resolvedPhone;
+    if (resolvedLinks.length > 0) fileData.personalDetails.links = resolvedLinks;
+    if (resolvedSkills.length > 0) fileData.personalDetails.skills = resolvedSkills;
+    if (resumeUrl) {
+      fileData.personalDetails.resumePath = resumeUrl;
+      fileData.personalDetails.resumeLink = resumeUrl;
+      fileData.personalDetails.resumeFileName = fileName;
+    }
     fileData.updatedAt = new Date().toISOString();
 
     await saveUserDataToFile(fileData);
 
     res.status(200).json({
       success: true,
-      message: "Resume successfully uploaded to Cloudinary",
-      resumeUrl,
-      fileName: req.file.originalname,
-      sizeBytes: req.file.size,
-      uploadedAt,
+      message: "Profile and resume successfully saved to Cloudinary and database",
+      data: {
+        fullName: resolvedFullname,
+        role: resolvedRole,
+        email: resolvedEmail,
+        phone: resolvedPhone,
+        links: resolvedLinks,
+        skills: resolvedSkills,
+        resumeUrl,
+        resumeFileName: fileName,
+        uploadedAt,
+        sizeBytes,
+      },
     });
   } catch (error: any) {
     log.error("[Resume Upload] Error during upload:", error);
-    next(error);
+    res.status(500).json({
+      success: false,
+      message: error?.message || "Failed to upload resume to Cloudinary or save profile",
+    });
   }
 }
 
@@ -94,7 +207,6 @@ export async function getUserController(
   next: NextFunction,
 ): Promise<void> {
   try {
-    // 1. Try DB first if connected
     if (mongoose.connection.readyState === 1) {
       const dbUser = await User.findOne();
       if (dbUser) {
@@ -107,7 +219,6 @@ export async function getUserController(
       }
     }
 
-    // 2. Fallback to file storage
     const fileData = await getUserDataFromFile();
     if (fileData) {
       res.status(200).json({
@@ -122,8 +233,11 @@ export async function getUserController(
       success: false,
       message: "No user details found in database or local file storage",
     });
-  } catch (error) {
-    next(error);
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error?.message || "Failed to update user details",
+    });
   }
 }
 
@@ -135,20 +249,28 @@ export async function updateUserController(
   try {
     const updatePayload = req.body;
 
-    // 1. If MongoDB connected, update or create User
-    if (mongoose.connection.readyState === 1 && updatePayload.email) {
+    if (mongoose.connection.readyState === 1) {
       try {
-        await User.findOneAndUpdate(
-          { email: updatePayload.email },
-          { $set: updatePayload },
-          { upsert: true, new: true },
-        );
+        const existingUser = await User.findOne();
+        if (existingUser) {
+          Object.assign(existingUser, updatePayload);
+          await existingUser.save();
+        } else if (updatePayload.fullname || updatePayload.fullName) {
+          await User.create({
+            fullname: updatePayload.fullName || updatePayload.fullname,
+            role: updatePayload.role || "",
+            email: updatePayload.email || "",
+            phone: updatePayload.phone || "",
+            links: updatePayload.links || [],
+            skills: updatePayload.skills || [],
+            resume: updatePayload.resume,
+          });
+        }
       } catch (dbErr) {
         log.warn("[User Controller] DB update error:", dbErr);
       }
     }
 
-    // 2. Save to JSON files
     const existing = (await getUserDataFromFile()) ?? {};
     const merged = { ...existing, ...updatePayload, updatedAt: new Date().toISOString() };
     await saveUserDataToFile(merged);
@@ -158,7 +280,10 @@ export async function updateUserController(
       message: "User details updated successfully",
       data: merged,
     });
-  } catch (error) {
-    next(error);
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error?.message || "Failed to update user details",
+    });
   }
 }

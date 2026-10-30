@@ -18,6 +18,7 @@ import {
   aiEvaluationDlq,
   aiEvaluationRoutingKey,
   aiEvaluationDlqRoutingKey,
+  QUEUE_MESSAGE_TTL_MS,
 } from "../../index.js";
 import {
   loadResumeBuffer,
@@ -26,6 +27,7 @@ import {
   type ScrapedJobDescription,
 } from "../../../Scrapping/services/naukri/naukriJDScrap.js";
 import { startSpinningLoader } from "../../../../utility/TerminalProgress.js";
+import { safeAssertQueue } from "../../helpers/safeAssertQueue.js";
 
 const log = Logger;
 const workerId = process.env.WORKER_ID ?? "ai-worker-1";
@@ -60,13 +62,20 @@ async function start(): Promise<void> {
     autoDelete: false,
   });
 
-  await channel.assertQueue(aiEvaluationQueue, {
-    durable: true,
-    arguments: {
-      "x-dead-letter-exchange": aiEvaluationDlx,
-      "x-dead-letter-routing-key": aiEvaluationDlqRoutingKey,
+  const asserted = await safeAssertQueue(
+    connection!,
+    channel,
+    aiEvaluationQueue,
+    {
+      durable: true,
+      arguments: {
+        "x-dead-letter-exchange": aiEvaluationDlx,
+        "x-dead-letter-routing-key": aiEvaluationDlqRoutingKey,
+        "x-message-ttl": QUEUE_MESSAGE_TTL_MS,
+      },
     },
-  });
+  );
+  channel = asserted.channel;
 
   await channel.bindQueue(
     aiEvaluationQueue,

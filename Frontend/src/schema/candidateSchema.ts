@@ -6,7 +6,11 @@ export const candidateSchema = z.object({
   skills: z
     .array(z.string())
     .min(1, "At least one skill is required — upload your resume or add manually"),
+  email: z.string().optional(),
+  phone: z.string().optional(),
+  links: z.array(z.string()).optional(),
   resumeFileName: z.string().optional(),
+  resumeUrl: z.string().optional(),
 });
 
 export type CandidateFormValues = z.infer<typeof candidateSchema>;
