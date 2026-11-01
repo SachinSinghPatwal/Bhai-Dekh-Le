@@ -1,59 +1,58 @@
-import cliProgress from "cli-progress";
+const sessionMap = new Map<string, Int32Array>();
 
-const sessionMap = new Map<string, Float32Array>();
+const RANDOM_BUFFER_RATIO = 0.2; // 20% random constellation dots buffer
 
-function getSessionThresholdMap(
+function getSessionDotRanks(
   sessionKey: string,
   totalX: number,
   totalY: number,
-): Float32Array {
+): Int32Array {
   const existing = sessionMap.get(sessionKey);
   if (existing && existing.length === totalX * totalY) {
     return existing;
   }
 
   const totalDots = totalX * totalY;
-  const numSeeds = Math.max(14, Math.floor(totalX / 2.5));
-  const seeds: { x: number; y: number; t: number }[] = [];
+  const numSeeds = Math.max(1, Math.floor(totalDots * RANDOM_BUFFER_RATIO));
 
-  for (let i = 0; i < numSeeds; i++) {
-    seeds.push({
-      x: Math.floor(Math.random() * totalX),
-      y: Math.floor(Math.random() * totalY),
-      t: (i / numSeeds) * 0.1,
-    });
+  // Distinct indices for all dot positions
+  const allIndices = Array.from({ length: totalDots }, (_, i) => i);
+  for (let i = allIndices.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [allIndices[i], allIndices[j]] = [allIndices[j], allIndices[i]];
   }
 
-  const map = new Float32Array(totalDots);
-  const nonSeedDots: { gx: number; gy: number; score: number }[] = [];
+  const seedIndices = allIndices.slice(0, numSeeds);
+  const nonSeedIndices = allIndices.slice(numSeeds);
 
-  for (let gx = 0; gx < totalX; gx++) {
-    for (let gy = 0; gy < totalY; gy++) {
-      const seedIndex = seeds.findIndex((s) => s.x === gx && s.y === gy);
-      if (seedIndex !== -1) {
-        map[gx * totalY + gy] = seeds[seedIndex].t;
-      } else {
-        let minD = 999;
-        for (const s of seeds) {
-          const d = Math.hypot(gx - s.x, (gy - s.y) * 2.5);
-          if (d < minD) {
-            minD = d;
-          }
-        }
-        const jitter = Math.random() * 0.25;
-        nonSeedDots.push({ gx, gy, score: minD + jitter });
-      }
+  const seeds = seedIndices.map((idx) => ({
+    gx: Math.floor(idx / totalY),
+    gy: idx % totalY,
+  }));
+
+  const nonSeeds = nonSeedIndices.map((idx) => {
+    const gx = Math.floor(idx / totalY);
+    const gy = idx % totalY;
+    let minD = 999;
+    for (const s of seeds) {
+      const d = Math.hypot(gx - s.gx, (gy - s.gy) * 2.5);
+      if (d < minD) minD = d;
     }
-  }
+    return { idx, score: minD + Math.random() * 0.25 };
+  });
 
-  nonSeedDots.sort((a, b) => a.score - b.score);
-  for (let rank = 0; rank < nonSeedDots.length; rank++) {
-    const { gx, gy } = nonSeedDots[rank];
-    map[gx * totalY + gy] = 0.1 + (rank / nonSeedDots.length) * 0.899;
-  }
+  nonSeeds.sort((a, b) => a.score - b.score);
 
-  sessionMap.set(sessionKey, map);
-  return map;
+  const ranks = new Int32Array(totalDots);
+  seedIndices.forEach((idx, r) => {
+    ranks[idx] = r;
+  });
+  nonSeeds.forEach((item, r) => {
+    ranks[item.idx] = numSeeds + r;
+  });
+
+  sessionMap.set(sessionKey, ranks);
+  return ranks;
 }
 
 export function resetBrailleBarSession(
@@ -70,12 +69,13 @@ let allocatedPinnedLines = 0;
 let lastDrawnContent = "";
 let lastDrawTime = 0;
 let latestLogMessage = "";
+let scheduledImmediate: NodeJS.Immediate | null = null;
 
 function clampVisible(raw: string, maxLen: number): string {
   if (!raw) return "";
-  const str = raw.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, (match) => {
-    return match.endsWith("m") ? match : "";
-  });
+  const str = raw.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, (match) =>
+    match.endsWith("m") ? match : "",
+  );
   let visible = 0;
   let inEscape = false;
   let result = "";
@@ -85,9 +85,7 @@ function clampVisible(raw: string, maxLen: number): string {
       result += str[i];
     } else if (inEscape) {
       result += str[i];
-      if (/[a-zA-Z]/.test(str[i])) {
-        inEscape = false;
-      }
+      if (/[a-zA-Z]/.test(str[i])) inEscape = false;
     } else {
       if (visible >= maxLen) break;
       visible++;
@@ -102,40 +100,24 @@ function getCombinedPinnedLines(): string[] {
   const lines: string[] = [];
 
   if (latestLogMessage) {
-    lines.push(clampVisible(latestLogMessage.replace(/[\r\n]+/g, " ").trim(), maxCols));
+    lines.push(
+      clampVisible(latestLogMessage.replace(/[\r\n]+/g, " ").trim(), maxCols),
+    );
   }
 
   for (const s of activeSpinners.values()) {
-    if (s) {
-      lines.push(clampVisible(s.replace(/[\r\n]+/g, " ").trim(), maxCols));
-    }
+    if (s) lines.push(clampVisible(s.replace(/[\r\n]+/g, " ").trim(), maxCols));
   }
 
   for (const d of activeDotBars.values()) {
-    if (d) {
-      lines.push(clampVisible(d.replace(/[\r\n]+/g, " ").trim(), maxCols));
-    }
+    if (d) lines.push(clampVisible(d.replace(/[\r\n]+/g, " ").trim(), maxCols));
   }
 
   return lines;
 }
 
-let scheduledPinnedImmediate: NodeJS.Immediate | null = null;
-
-function schedulePinnedRedraw(): void {
-  if (scheduledPinnedImmediate) {
-    return;
-  }
-  scheduledPinnedImmediate = setImmediate(() => {
-    scheduledPinnedImmediate = null;
-    redrawPinned(true);
-  });
-}
-
 function clearCurrentPinned(): void {
-  if (allocatedPinnedLines <= 0) {
-    return;
-  }
+  if (allocatedPinnedLines <= 0) return;
   if (!process.stdout.isTTY) {
     allocatedPinnedLines = 0;
     lastDrawnContent = "";
@@ -151,22 +133,19 @@ function clearCurrentPinned(): void {
 }
 
 function redrawPinned(force = false): void {
-  if (typeof process.send === "function") {
-    return;
-  }
-  if (!process.stdout.isTTY) {
-    return;
-  }
+  if (typeof process.send === "function" || !process.stdout.isTTY) return;
 
   const now = Date.now();
-  if (!force && now - lastDrawTime < 40) {
-    return;
-  }
+  if (!force && now - lastDrawTime < 40) return;
 
   const lines = getCombinedPinnedLines();
   const content = lines.join("\n");
 
-  if (!force && content === lastDrawnContent && lines.length === allocatedPinnedLines) {
+  if (
+    !force &&
+    content === lastDrawnContent &&
+    lines.length === allocatedPinnedLines
+  ) {
     return;
   }
 
@@ -180,22 +159,17 @@ function redrawPinned(force = false): void {
   }
 }
 
-export function registerActiveLoader(renderer: () => void): () => void {
-  return () => {
-    renderer();
-  };
-}
-
-export function isLoaderActive(): boolean {
-  return activeSpinners.size > 0 || activeDotBars.size > 0;
+function schedulePinnedRedraw(): void {
+  if (scheduledImmediate) return;
+  scheduledImmediate = setImmediate(() => {
+    scheduledImmediate = null;
+    redrawPinned(true);
+  });
 }
 
 export function handleLogWithActiveLoader(formattedMessage: string): boolean {
   if (typeof process.send === "function") {
-    process.send({
-      type: "TERMINAL_LOG",
-      message: formattedMessage,
-    });
+    process.send({ type: "TERMINAL_LOG", message: formattedMessage });
     return true;
   }
 
@@ -209,22 +183,13 @@ export function handleLogWithActiveLoader(formattedMessage: string): boolean {
   return true;
 }
 
-export function getLatestLogMessage(): string {
-  return latestLogMessage;
-}
-
 export function renderTwoLineOutput(
   loaderOutput: string,
   id = "default",
   kind: "spinner" | "dotbar" = "spinner",
 ): void {
   if (typeof process.send === "function") {
-    process.send({
-      type: "TERMINAL_LOADER",
-      id,
-      output: loaderOutput,
-      kind,
-    });
+    process.send({ type: "TERMINAL_LOADER", id, output: loaderOutput, kind });
     return;
   }
 
@@ -243,12 +208,7 @@ export function handleLoaderStop(
   kind: "spinner" | "dotbar" = "spinner",
 ): void {
   if (typeof process.send === "function") {
-    process.send({
-      type: "TERMINAL_STOP",
-      id,
-      completedText,
-      kind,
-    });
+    process.send({ type: "TERMINAL_STOP", id, completedText, kind });
     return;
   }
 
@@ -271,12 +231,7 @@ export function handleLoaderFail(
   kind: "spinner" | "dotbar" = "spinner",
 ): void {
   if (typeof process.send === "function") {
-    process.send({
-      type: "TERMINAL_FAIL",
-      id,
-      errorText,
-      kind,
-    });
+    process.send({ type: "TERMINAL_FAIL", id, errorText, kind });
     return;
   }
 
@@ -295,20 +250,16 @@ export function handleLoaderFail(
 
 export function handleTerminalIpcMessage(msg: any): void {
   if (!msg || typeof msg !== "object") return;
+  const id = typeof msg.id === "string" ? msg.id : "worker-loader";
+  const kind = msg.kind === "dotbar" ? "dotbar" : "spinner";
 
   if (msg.type === "TERMINAL_LOG" && typeof msg.message === "string") {
     handleLogWithActiveLoader(msg.message);
   } else if (msg.type === "TERMINAL_LOADER" && typeof msg.output === "string") {
-    const id = typeof msg.id === "string" ? msg.id : "worker-loader";
-    const kind = msg.kind === "dotbar" ? "dotbar" : "spinner";
     renderTwoLineOutput(msg.output, id, kind);
   } else if (msg.type === "TERMINAL_STOP") {
-    const id = typeof msg.id === "string" ? msg.id : "worker-loader";
-    const kind = msg.kind === "dotbar" ? "dotbar" : "spinner";
     handleLoaderStop(msg.completedText, id, kind);
   } else if (msg.type === "TERMINAL_FAIL") {
-    const id = typeof msg.id === "string" ? msg.id : "worker-loader";
-    const kind = msg.kind === "dotbar" ? "dotbar" : "spinner";
     handleLoaderFail(msg.errorText, id, kind);
   }
 }
@@ -319,7 +270,10 @@ export interface SpinnerHandle {
   fail: (errorText?: string) => void;
 }
 
-export function startSpinningLoader(label: string, customId?: string): SpinnerHandle {
+export function startSpinningLoader(
+  label: string,
+  customId?: string,
+): SpinnerHandle {
   const loaderId = customId || `spinner-${++loaderSeq}`;
   const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
   let frameIndex = 0;
@@ -360,45 +314,61 @@ export function startSpinningLoader(label: string, customId?: string): SpinnerHa
   };
 }
 
+const DOT_ORDER = [
+  [0, 0, 0x01],
+  [0, 1, 0x02],
+  [0, 2, 0x04],
+  [1, 0, 0x08],
+  [1, 1, 0x10],
+  [1, 2, 0x20],
+  [0, 3, 0x40],
+  [1, 3, 0x80],
+] as const;
+
 export function formatCustomBrailleBar(
   current: number,
   total: number,
   label = "",
   barWidth = 24,
-  tick?: number,
   sessionId?: string | number,
   hasError = false,
 ): string {
-  const progressRatio = Math.min(Math.max(current / (total || 1), 0), 1);
-  const totalX = barWidth * 2;
-  const totalY = 4;
-  const sessionKey = String(sessionId ?? label ?? "default");
-  const thresholdMap = getSessionThresholdMap(sessionKey, totalX, totalY);
+  const validTotal = Math.max(1, total || 1);
+  const clampedCurrent = Math.min(Math.max(current, 0), validTotal);
 
-  const dotOrder = [
-    [0, 0, 0x01],
-    [0, 1, 0x02],
-    [0, 2, 0x04],
-    [1, 0, 0x08],
-    [1, 1, 0x10],
-    [1, 2, 0x20],
-    [0, 3, 0x40],
-    [1, 3, 0x80],
-  ];
+  // Dynamically scale barWidth so totalDots <= validTotal, ensuring work increments never add 2 dots
+  const effectiveWidth =
+    validTotal > 0 && barWidth * 8 > validTotal
+      ? Math.min(barWidth, Math.max(1, Math.floor(validTotal / 8)))
+      : barWidth;
+
+  const totalX = effectiveWidth * 2;
+  const totalY = 4;
+  const totalDots = totalX * totalY;
+  const maxAllowedDots = Math.min(totalDots, validTotal);
+
+  // Exact dot count guaranteed to increment by at most 1 dot per unit of work done
+  const activeDots =
+    clampedCurrent >= validTotal
+      ? totalDots
+      : Math.min(
+          maxAllowedDots,
+          Math.floor((clampedCurrent * maxAllowedDots + 1e-6) / validTotal),
+        );
+
+  const sessionKey = String(sessionId ?? label ?? "default");
+  const dotRanks = getSessionDotRanks(sessionKey, totalX, totalY);
 
   let bar = "";
-
-  for (let cell = 0; cell < barWidth; cell++) {
+  for (let cell = 0; cell < effectiveWidth; cell++) {
     const col0 = cell * 2;
     const col1 = cell * 2 + 1;
     let mask = 0;
 
-    for (const [dx, dy, bit] of dotOrder) {
+    for (const [dx, dy, bit] of DOT_ORDER) {
       const gx = dx === 0 ? col0 : col1;
       const gy = dy;
-      const threshold = thresholdMap[gx * totalY + gy];
-
-      if (progressRatio >= threshold) {
+      if (dotRanks[gx * totalY + gy] < activeDots) {
         mask |= bit;
       }
     }
@@ -413,7 +383,11 @@ export function formatCustomBrailleBar(
     }
   }
 
-  const percent = (progressRatio * 100).toFixed(0);
+  const percent = Math.min(
+    100,
+    Math.max(0, (clampedCurrent / validTotal) * 100),
+  ).toFixed(0);
+
   return `\x1b[1m${label}\x1b[0m  \x1b[90m[\x1b[0m${bar}\x1b[90m]\x1b[0m  \x1b[38;2;255;180;60m${percent}%\x1b[0m \x1b[90m(${current}/${total})\x1b[0m`;
 }
 
@@ -422,18 +396,37 @@ export function CustomBrailleDotBar(
   total: number,
   label = "",
   barWidth = 24,
-  tick?: number,
-  sessionId?: string | number,
-  hasError = false,
-  errorMessage?: string,
+  arg5?: number | string,
+  arg6?: string | number | boolean,
+  arg7?: boolean | string,
+  arg8?: string,
 ): void {
+  let sessionId: string | number | undefined;
+  let hasError = false;
+  let errorMessage: string | undefined;
+
+  // Flexible argument handling supporting both (current, total, label, barWidth, sessionId, hasError, errorMessage)
+  // and legacy (current, total, label, barWidth, tick, sessionId, hasError, errorMessage)
+  if (typeof arg5 === "number") {
+    sessionId = typeof arg6 === "string" || typeof arg6 === "number" ? arg6 : undefined;
+    hasError = Boolean(arg7);
+    errorMessage = arg8;
+  } else if (arg5 === undefined && typeof arg6 === "string") {
+    sessionId = arg6;
+    hasError = Boolean(arg7);
+    errorMessage = arg8;
+  } else {
+    sessionId = typeof arg5 === "string" ? arg5 : undefined;
+    hasError = Boolean(arg6);
+    errorMessage = typeof arg7 === "string" ? arg7 : undefined;
+  }
+
   const sessionKey = String(sessionId ?? label ?? "default");
   const output = formatCustomBrailleBar(
     current,
     total,
     label,
     barWidth,
-    tick,
     sessionKey,
     hasError,
   );
@@ -441,7 +434,11 @@ export function CustomBrailleDotBar(
   if (hasError) {
     sessionMap.delete(sessionKey);
     renderTwoLineOutput(output, sessionKey, "dotbar");
-    handleLoaderFail(errorMessage || "Scrape operation halted", sessionKey, "dotbar");
+    handleLoaderFail(
+      errorMessage || "Scrape operation halted",
+      sessionKey,
+      "dotbar",
+    );
     return;
   }
 
@@ -479,7 +476,6 @@ export function startCustomBrailleBar(
       tot,
       curLabel,
       barWidth,
-      0,
       barId,
       hasErr,
     );
@@ -512,56 +508,11 @@ export function startCustomBrailleBar(
   };
 }
 
-export interface SingleBarOptions {
-  label?: string;
-  total?: number;
-  barCompleteChar?: string;
-  barIncompleteChar?: string;
-}
-
-export function PackageSingleProgressBar(
-  options: SingleBarOptions = {},
-): cliProgress.SingleBar {
-  const label = options.label ?? "Progress";
-  const bar = new cliProgress.SingleBar(
-    {
-      format: `${label} |\x1b[38;2;245;158;11m{bar}\x1b[0m| {percentage}% | ETA: {eta}s | {value}/{total}`,
-      barCompleteChar: options.barCompleteChar ?? "⣿",
-      barIncompleteChar: options.barIncompleteChar ?? "⣀",
-      hideCursor: true,
-      clearOnComplete: false,
-    },
-    cliProgress.Presets.rect,
-  );
-  return bar;
-}
-
-export function PackageMultiProgressBar(
-  options: cliProgress.Options = {},
-): cliProgress.MultiBar {
-  return new cliProgress.MultiBar(
-    {
-      ...options,
-      format:
-        "{worker} [{platform}] |\x1b[38;2;245;158;11m{bar}\x1b[0m| {percentage}% | ETA: {eta}s | {value}/{total}",
-      barCompleteChar: "⣿",
-      barIncompleteChar: "⣀",
-      hideCursor: true,
-      clearOnComplete: false,
-    },
-    cliProgress.Presets.rect,
-  );
-}
-
 export const TerminalProgress = {
   custom: {
     startSpinner: startSpinningLoader,
     renderBrailleBar: CustomBrailleDotBar,
     resetSession: resetBrailleBarSession,
-  },
-  package: {
-    createSingleBar: PackageSingleProgressBar,
-    createMultiBar: PackageMultiProgressBar,
   },
 };
 

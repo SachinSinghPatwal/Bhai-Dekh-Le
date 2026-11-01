@@ -955,6 +955,310 @@ export const ProfilePage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* SECTION 2: Professional & Social Links */}
+      <div className="glass-panel p-5 sm:p-6 space-y-4">
+        <div className="pb-2 border-b border-white/5">
+          <h2 className="app-card-title text-zinc-100 flex items-center gap-2">
+            <FiGlobe className="text-zinc-400" />
+            <span>Professional &amp; Social Links ({links.length})</span>
+          </h2>
+          <p className="app-sub text-zinc-500 mt-0.5">
+            Attached GitHub, LinkedIn, portfolio, and personal links.
+          </p>
+        </div>
+
+        {isEditing && (
+          <div className="flex gap-2">
+            <input
+              type="url"
+              value={newLinkInput}
+              onChange={(e) => setNewLinkInput(e.target.value)}
+              onKeyDown={handleLinkKeyDown}
+              placeholder="https://github.com/your-handle or https://linkedin.com/in/..."
+              className="flex-1 h-10 px-3.5 app-input rounded glass-input placeholder-zinc-500 transition-all border border-white/10"
+            />
+            <button
+              type="button"
+              onClick={() => addLink(newLinkInput)}
+              className="h-10 px-4 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded text-xs font-medium cursor-pointer transition-colors flex items-center gap-1.5 shrink-0"
+            >
+              <FiPlus size={13} />
+              <span>Add Link</span>
+            </button>
+          </div>
+        )}
+
+        {links.length > 0 ? (
+          <div className="space-y-2 pt-1">
+            {links.map((link) => {
+              const isGithub = link.includes("github.com");
+              const isLinkedin = link.includes("linkedin.com");
+              return (
+                <div
+                  key={link}
+                  className="flex items-center justify-between p-3 rounded bg-zinc-900/60 border border-white/5 text-xs"
+                >
+                  <div className="flex items-center gap-2.5 truncate mr-3">
+                    {isGithub ? (
+                      <FaGithub className="text-zinc-300 shrink-0" size={15} />
+                    ) : isLinkedin ? (
+                      <FaLinkedin
+                        className="text-blue-400 shrink-0"
+                        size={15}
+                      />
+                    ) : (
+                      <FiGlobe className="text-zinc-400 shrink-0" size={15} />
+                    )}
+                    <span className="font-mono text-zinc-200 truncate">
+                      {link}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <a
+                      href={link}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="p-1 text-zinc-400 hover:text-zinc-200 transition-colors"
+                      title="Open link in new tab"
+                    >
+                      <FiExternalLink size={13} />
+                    </a>
+                    {isEditing && (
+                      <button
+                        type="button"
+                        onClick={() => removeLink(link)}
+                        className="p-1 text-zinc-500 hover:text-red-400 transition-colors cursor-pointer"
+                        title="Remove link"
+                      >
+                        <FiTrash2 size={13} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="p-4 rounded bg-zinc-900/40 border border-white/[0.04] text-center text-xs text-zinc-500">
+            No professional links attached yet.
+          </div>
+        )}
+      </div>
+
+      {/* SECTION 3: Resume Document Management */}
+      <div className="glass-panel p-5 sm:p-6 space-y-4">
+        <div className="pb-2 border-b border-white/5">
+          <h2 className="app-card-title text-zinc-100 flex items-center gap-2">
+            <FiFileText className="text-emerald-400" />
+            <span>Resume Document Management</span>
+          </h2>
+          <p className="app-sub text-zinc-500 mt-0.5">
+            Upload or replace your resume. Files are saved to Cloudinary and scanned for technical skills.
+          </p>
+        </div>
+
+        {/* Current Active Resume Details */}
+        {(resumeFileName || resumeUrl) && (
+          <div className="p-4 rounded bg-zinc-900/70 border border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded bg-emerald-950/40 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
+                <FiFileText size={18} />
+              </div>
+              <div>
+                <h4 className="text-xs font-semibold text-zinc-200 truncate max-w-sm">
+                  {resumeFileName || "Candidate Resume.pdf"}
+                </h4>
+                <p className="text-[11px] text-zinc-500 font-mono">
+                  Cloudinary Managed • Extracted &amp; Linked
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {resumeUrl && (
+                <a
+                  href={resumeUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium border border-white/10 flex items-center gap-1.5 transition-colors"
+                >
+                  <FiExternalLink size={12} />
+                  <span>View File</span>
+                </a>
+              )}
+
+              {isEditing && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setResumeUrl("");
+                    setResumeFileName("");
+                    setSelectedResumeFile(null);
+                    notifyInfo("Resume unlinked. Save changes at bottom to commit.");
+                  }}
+                  className="px-3 py-1.5 rounded bg-red-950/30 hover:bg-red-900/40 text-red-300 text-xs font-medium border border-red-900/40 flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <FiTrash2 size={12} />
+                  <span>Remove</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Resume Upload Dropzone */}
+        {isEditing ? (
+          <label
+            className={`relative flex items-center justify-center gap-2.5 h-32 w-full rounded-lg border-2 border-dashed transition-all cursor-pointer group ${
+              selectedResumeFile
+                ? "border-emerald-500/50 bg-emerald-500/10 hover:border-emerald-500/70"
+                : "border-zinc-700/60 bg-zinc-900/30 hover:border-zinc-500/60 hover:bg-zinc-800/20"
+            }`}
+          >
+            <input
+              type="file"
+              accept=".pdf,.doc,.docx,.txt"
+              className="sr-only"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void handleResumeSelection(file);
+              }}
+            />
+            {isExtractingResume ? (
+              <div className="flex flex-col items-center gap-2">
+                <FiLoader size={22} className="text-zinc-300 animate-spin" />
+                <span className="text-xs text-zinc-300 font-medium">
+                  Scanning resume &amp; extracting skills...
+                </span>
+              </div>
+            ) : selectedResumeFile ? (
+              <div className="flex flex-col items-center gap-1">
+                <FiCheck size={22} className="text-emerald-400" />
+                <span className="text-xs text-emerald-300 font-medium truncate max-w-xs">
+                  {selectedResumeFile.name} (Ready to upload on save)
+                </span>
+                <span className="text-[11px] text-zinc-500">
+                  Click to choose a different resume file
+                </span>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-1.5">
+                <FiUpload
+                  size={22}
+                  className="text-zinc-500 group-hover:text-zinc-300 transition-colors"
+                />
+                <span className="text-xs text-zinc-400 group-hover:text-zinc-200 font-medium transition-colors">
+                  Click or drop new resume to update (.pdf, .docx, .txt)
+                </span>
+                <span className="text-[11px] text-zinc-600">
+                  Uploads to Cloudinary and merges newly discovered skills
+                </span>
+              </div>
+            )}
+          </label>
+        ) : (
+          <div className="p-4 rounded border border-white/5 bg-zinc-950/40 text-center text-xs text-zinc-500">
+            Resume document is locked in read-only mode. Click Edit Profile below to upload or replace resume.
+          </div>
+        )}
+      </div>
+
+      {/* SECTION 4: Verified Technical Skills */}
+      <div className="glass-panel p-5 sm:p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-white/5">
+          <div>
+            <h2 className="app-card-title text-zinc-100 flex items-center gap-2">
+              <FiCheck className="text-emerald-400" />
+              <span>Verified Technical Skills ({skills.length})</span>
+            </h2>
+            <p className="app-sub text-zinc-500 mt-0.5">
+              Job scraping algorithms match portal postings against these skills.
+            </p>
+          </div>
+          <span className="app-caption px-2.5 py-1 rounded bg-zinc-900 border border-white/10 font-mono text-zinc-400 self-start sm:self-auto">
+            {skills.length} active tags
+          </span>
+        </div>
+
+        {isEditing && (
+          <>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newSkillInput}
+                onChange={(e) => setNewSkillInput(e.target.value)}
+                onKeyDown={handleSkillKeyDown}
+                placeholder="Add skill (e.g. React, Docker, Kubernetes) — press Enter or comma"
+                className="flex-1 h-10 px-3.5 app-input rounded glass-input placeholder-zinc-500 transition-all border border-white/10"
+              />
+              <button
+                type="button"
+                onClick={() => addSkill(newSkillInput)}
+                className="h-10 px-4 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded text-xs font-medium cursor-pointer transition-colors flex items-center gap-1.5 shrink-0"
+              >
+                <FiPlus size={13} />
+                <span>Add Skill</span>
+              </button>
+            </div>
+
+            {/* Quick Add Suggestions */}
+            <div className="space-y-1.5 pt-1">
+              <span className="text-[11px] text-zinc-500">
+                Quick-add common skills:
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {POPULAR_SKILLS.filter(
+                  (s) =>
+                    !skills.some(
+                      (existing) => existing.toLowerCase() === s.toLowerCase(),
+                    ),
+                )
+                  .slice(0, 10)
+                  .map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => addSkill(s)}
+                      className="px-2.5 py-1 rounded bg-zinc-900/60 hover:bg-zinc-800 text-[11px] text-zinc-400 hover:text-zinc-200 border border-white/5 cursor-pointer transition-colors"
+                    >
+                      + {s}
+                    </button>
+                  ))}
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Active Skills List */}
+        {skills.length > 0 ? (
+          <div className="flex flex-wrap gap-2 p-3.5 rounded bg-zinc-900/50 border border-white/[0.06] max-h-56 overflow-y-auto">
+            {skills.map((skill) => (
+              <span
+                key={skill}
+                className="h-8 pl-3 pr-2 rounded text-xs font-medium inline-flex items-center gap-1.5 bg-zinc-800/90 text-zinc-200 border border-white/10 group hover:border-white/20 transition-colors"
+              >
+                <span>{skill}</span>
+                {isEditing && (
+                  <button
+                    type="button"
+                    onClick={() => removeSkill(skill)}
+                    className="text-zinc-400 hover:text-red-400 cursor-pointer transition-colors leading-none p-0.5"
+                    title={`Remove ${skill}`}
+                  >
+                    ✕
+                  </button>
+                )}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <div className="p-4 rounded bg-zinc-900/40 border border-white/[0.04] text-center text-xs text-zinc-500">
+            No technical skills configured yet. Click Edit Profile below to add skills.
+          </div>
+        )}
+      </div>
       <div className="glass-panel p-5 sm:p-6 space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/5">
           <div>

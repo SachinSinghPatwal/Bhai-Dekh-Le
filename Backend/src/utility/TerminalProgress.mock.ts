@@ -16,7 +16,6 @@ async function runMock() {
   initSpinner.stop("All Scrap and DB workers initialized and listening to queues.");
 
   console.log("\n--- Scenario 2: Site Scrape with Random Constellation & Early Stop Snap ---");
-  const totalSitePages = 600;
   const earlyStopPage = 65;
   const siteSession = "mock-naukri";
   let tick = 0;
