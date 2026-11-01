@@ -1,17 +1,24 @@
-const sessionMap = new Map<string, Int32Array>();
-
 const RANDOM_BUFFER_RATIO = 0.2; // 20% random constellation dots buffer
 
-function getSessionDotRanks(
-  sessionKey: string,
+interface BrailleSession {
+  ranks: Int32Array;
+  currentDots: number;
+  targetDots: number;
+  tickerTimer: NodeJS.Timeout | null;
+  lastCurrent: number;
+  lastTotal: number;
+  label: string;
+  barWidth: number;
+  hasError: boolean;
+  errorMessage?: string;
+}
+
+const brailleSessions = new Map<string, BrailleSession>();
+
+function generateSessionDotRanks(
   totalX: number,
   totalY: number,
 ): Int32Array {
-  const existing = sessionMap.get(sessionKey);
-  if (existing && existing.length === totalX * totalY) {
-    return existing;
-  }
-
   const totalDots = totalX * totalY;
   const numSeeds = Math.max(1, Math.floor(totalDots * RANDOM_BUFFER_RATIO));
 
@@ -51,14 +58,51 @@ function getSessionDotRanks(
     ranks[item.idx] = numSeeds + r;
   });
 
-  sessionMap.set(sessionKey, ranks);
   return ranks;
+}
+
+function getOrCreateBrailleSession(
+  sessionKey: string,
+  barWidth: number,
+): BrailleSession {
+  const existing = brailleSessions.get(sessionKey);
+  if (existing && existing.barWidth === barWidth) {
+    return existing;
+  }
+
+  if (existing?.tickerTimer) {
+    clearInterval(existing.tickerTimer);
+  }
+
+  const totalX = barWidth * 2;
+  const totalY = 4;
+  const ranks = generateSessionDotRanks(totalX, totalY);
+
+  const session: BrailleSession = {
+    ranks,
+    currentDots: 0,
+    targetDots: 0,
+    tickerTimer: null,
+    lastCurrent: 0,
+    lastTotal: 0,
+    label: "",
+    barWidth,
+    hasError: false,
+  };
+
+  brailleSessions.set(sessionKey, session);
+  return session;
 }
 
 export function resetBrailleBarSession(
   sessionId: string | number = "default",
 ): void {
-  sessionMap.delete(String(sessionId));
+  const key = String(sessionId);
+  const session = brailleSessions.get(key);
+  if (session?.tickerTimer) {
+    clearInterval(session.tickerTimer);
+  }
+  brailleSessions.delete(key);
 }
 
 let loaderSeq = 0;
@@ -136,7 +180,7 @@ function redrawPinned(force = false): void {
   if (typeof process.send === "function" || !process.stdout.isTTY) return;
 
   const now = Date.now();
-  if (!force && now - lastDrawTime < 40) return;
+  if (!force && now - lastDrawTime < 30) return;
 
   const lines = getCombinedPinnedLines();
   const content = lines.join("\n");
@@ -187,6 +231,7 @@ export function renderTwoLineOutput(
   loaderOutput: string,
   id = "default",
   kind: "spinner" | "dotbar" = "spinner",
+  forceRedraw = false,
 ): void {
   if (typeof process.send === "function") {
     process.send({ type: "TERMINAL_LOADER", id, output: loaderOutput, kind });
@@ -199,7 +244,7 @@ export function renderTwoLineOutput(
     activeSpinners.set(id, loaderOutput);
   }
 
-  redrawPinned();
+  redrawPinned(forceRedraw);
 }
 
 export function handleLoaderStop(
@@ -256,7 +301,7 @@ export function handleTerminalIpcMessage(msg: any): void {
   if (msg.type === "TERMINAL_LOG" && typeof msg.message === "string") {
     handleLogWithActiveLoader(msg.message);
   } else if (msg.type === "TERMINAL_LOADER" && typeof msg.output === "string") {
-    renderTwoLineOutput(msg.output, id, kind);
+    renderTwoLineOutput(msg.output, id, kind, true);
   } else if (msg.type === "TERMINAL_STOP") {
     handleLoaderStop(msg.completedText, id, kind);
   } else if (msg.type === "TERMINAL_FAIL") {
@@ -332,35 +377,25 @@ export function formatCustomBrailleBar(
   barWidth = 24,
   sessionId?: string | number,
   hasError = false,
+  activeDotOverride?: number,
 ): string {
   const validTotal = Math.max(1, total || 1);
   const clampedCurrent = Math.min(Math.max(current, 0), validTotal);
+  const totalDots = barWidth * 8;
 
-  // Dynamically scale barWidth so totalDots <= validTotal, ensuring work increments never add 2 dots
-  const effectiveWidth =
-    validTotal > 0 && barWidth * 8 > validTotal
-      ? Math.min(barWidth, Math.max(1, Math.floor(validTotal / 8)))
-      : barWidth;
-
-  const totalX = effectiveWidth * 2;
-  const totalY = 4;
-  const totalDots = totalX * totalY;
-  const maxAllowedDots = Math.min(totalDots, validTotal);
-
-  // Exact dot count guaranteed to increment by at most 1 dot per unit of work done
   const activeDots =
-    clampedCurrent >= validTotal
-      ? totalDots
-      : Math.min(
-          maxAllowedDots,
-          Math.floor((clampedCurrent * maxAllowedDots + 1e-6) / validTotal),
-        );
+    typeof activeDotOverride === "number"
+      ? Math.min(totalDots, Math.max(0, activeDotOverride))
+      : clampedCurrent >= validTotal
+        ? totalDots
+        : Math.floor((clampedCurrent / validTotal) * totalDots);
 
   const sessionKey = String(sessionId ?? label ?? "default");
-  const dotRanks = getSessionDotRanks(sessionKey, totalX, totalY);
+  const session = getOrCreateBrailleSession(sessionKey, barWidth);
+  const dotRanks = session.ranks;
 
   let bar = "";
-  for (let cell = 0; cell < effectiveWidth; cell++) {
+  for (let cell = 0; cell < barWidth; cell++) {
     const col0 = cell * 2;
     const col1 = cell * 2 + 1;
     let mask = 0;
@@ -368,7 +403,7 @@ export function formatCustomBrailleBar(
     for (const [dx, dy, bit] of DOT_ORDER) {
       const gx = dx === 0 ? col0 : col1;
       const gy = dy;
-      if (dotRanks[gx * totalY + gy] < activeDots) {
+      if (dotRanks[gx * 4 + gy] < activeDots) {
         mask |= bit;
       }
     }
@@ -389,6 +424,103 @@ export function formatCustomBrailleBar(
   ).toFixed(0);
 
   return `\x1b[1m${label}\x1b[0m  \x1b[90m[\x1b[0m${bar}\x1b[90m]\x1b[0m  \x1b[38;2;255;180;60m${percent}%\x1b[0m \x1b[90m(${current}/${total})\x1b[0m`;
+}
+
+function renderOutputForSession(
+  session: BrailleSession,
+  sessionKey: string,
+  forceRedraw = false,
+): void {
+  const output = formatCustomBrailleBar(
+    session.lastCurrent,
+    session.lastTotal,
+    session.label,
+    session.barWidth,
+    sessionKey,
+    session.hasError,
+    session.currentDots,
+  );
+  renderTwoLineOutput(output, sessionKey, "dotbar", forceRedraw);
+}
+
+function updateBrailleSession(
+  sessionKey: string,
+  current: number,
+  total: number,
+  label: string,
+  barWidth = 24,
+  hasError = false,
+  errorMessage?: string,
+): void {
+  const session = getOrCreateBrailleSession(sessionKey, barWidth);
+  const validTotal = Math.max(1, total || 1);
+  const clampedCurrent = Math.min(Math.max(current, 0), validTotal);
+  const totalDots = barWidth * 8;
+
+  session.lastCurrent = current;
+  session.lastTotal = total;
+  session.label = label;
+  session.hasError = hasError;
+  session.errorMessage = errorMessage;
+
+  if (hasError) {
+    if (session.tickerTimer) {
+      clearInterval(session.tickerTimer);
+      session.tickerTimer = null;
+    }
+    renderOutputForSession(session, sessionKey, true);
+    handleLoaderFail(
+      errorMessage || "Scrape operation halted",
+      sessionKey,
+      "dotbar",
+    );
+    brailleSessions.delete(sessionKey);
+    return;
+  }
+
+  if (clampedCurrent >= validTotal) {
+    if (session.tickerTimer) {
+      clearInterval(session.tickerTimer);
+      session.tickerTimer = null;
+    }
+    session.currentDots = totalDots;
+    session.targetDots = totalDots;
+    renderOutputForSession(session, sessionKey, true);
+    handleLoaderStop(undefined, sessionKey, "dotbar");
+    brailleSessions.delete(sessionKey);
+    return;
+  }
+
+  // Calculate target dot count in the full 24-character grid
+  const targetDots = Math.floor((clampedCurrent / validTotal) * totalDots);
+  session.targetDots = targetDots;
+
+  if (session.currentDots < targetDots) {
+    // Smooth Micro-Ticker: Add 1 dot immediately so progress updates instantly without lag
+    session.currentDots++;
+    renderOutputForSession(session, sessionKey, true);
+
+    if (session.currentDots < session.targetDots) {
+      if (session.tickerTimer) {
+        clearInterval(session.tickerTimer);
+        session.tickerTimer = null;
+      }
+
+      session.tickerTimer = setInterval(() => {
+        if (session.currentDots < session.targetDots) {
+          session.currentDots++;
+          renderOutputForSession(session, sessionKey, true);
+        } else {
+          if (session.tickerTimer) {
+            clearInterval(session.tickerTimer);
+            session.tickerTimer = null;
+          }
+        }
+      }, 1000);
+    }
+  } else {
+    renderOutputForSession(session, sessionKey);
+  }
 }
 
 export function CustomBrailleDotBar(
@@ -422,32 +554,7 @@ export function CustomBrailleDotBar(
   }
 
   const sessionKey = String(sessionId ?? label ?? "default");
-  const output = formatCustomBrailleBar(
-    current,
-    total,
-    label,
-    barWidth,
-    sessionKey,
-    hasError,
-  );
-
-  if (hasError) {
-    sessionMap.delete(sessionKey);
-    renderTwoLineOutput(output, sessionKey, "dotbar");
-    handleLoaderFail(
-      errorMessage || "Scrape operation halted",
-      sessionKey,
-      "dotbar",
-    );
-    return;
-  }
-
-  renderTwoLineOutput(output, sessionKey, "dotbar");
-
-  if (current >= total) {
-    sessionMap.delete(sessionKey);
-    handleLoaderStop(undefined, sessionKey, "dotbar");
-  }
+  updateBrailleSession(sessionKey, current, total, label, barWidth, hasError, errorMessage);
 }
 
 export interface ActiveBrailleBar {
@@ -463,47 +570,28 @@ export function startCustomBrailleBar(
   barWidth = 24,
   sessionId?: string | number,
 ): ActiveBrailleBar {
-  let cur = initialCurrent;
-  let tot = total;
-  let curLabel = label;
-  let isFinished = false;
   const barId = String(sessionId ?? label ?? `dotbar-${++loaderSeq}`);
+  let isFinished = false;
 
-  const render = (hasErr = false) => {
-    if (isFinished) return;
-    const output = formatCustomBrailleBar(
-      cur,
-      tot,
-      curLabel,
-      barWidth,
-      barId,
-      hasErr,
-    );
-    renderTwoLineOutput(output, barId, "dotbar");
-  };
-
-  render(false);
+  updateBrailleSession(barId, initialCurrent, total, label, barWidth, false);
 
   return {
     update(newCurrent: number, newTotal?: number, newLabel?: string) {
       if (isFinished) return;
-      cur = newCurrent;
-      if (typeof newTotal === "number") tot = newTotal;
-      if (newLabel) curLabel = newLabel;
-      render(false);
+      const tot = typeof newTotal === "number" ? newTotal : total;
+      const lbl = typeof newLabel === "string" ? newLabel : label;
+      updateBrailleSession(barId, newCurrent, tot, lbl, barWidth, false);
     },
     stop(completedText?: string) {
       if (isFinished) return;
       isFinished = true;
-      sessionMap.delete(barId);
+      resetBrailleBarSession(barId);
       handleLoaderStop(completedText, barId, "dotbar");
     },
     fail(errorText?: string) {
       if (isFinished) return;
       isFinished = true;
-      render(true);
-      sessionMap.delete(barId);
-      handleLoaderFail(errorText || "Scrape operation halted", barId, "dotbar");
+      updateBrailleSession(barId, total, total, label, barWidth, true, errorText);
     },
   };
 }
