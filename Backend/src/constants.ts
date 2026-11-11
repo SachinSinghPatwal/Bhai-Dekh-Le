@@ -49,6 +49,7 @@ export const jdScrapeExchange = "jd_scrape_exchange";
 export const jdScrape = "jd_scrape";
 
 export const QUEUE_MESSAGE_TTL_MS = 600000;
+export const SCRAPE_INTERVAL_MINUTES = 5;
 
 export const aiEvaluationExchange = "ai_evaluation_exchange";
 export const aiEvaluationQueue = "ai_evaluation";

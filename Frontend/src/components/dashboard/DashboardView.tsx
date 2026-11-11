@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   AreaChart,
   Area,
@@ -17,28 +17,13 @@ import {
   FiClock,
   FiActivity,
   FiHelpCircle,
-  FiChevronDown,
 } from "react-icons/fi";
 import { useCandidateStore } from "../../store/useCandidateStore";
-import { notifySuccess, notifyError } from "../../utils/toast";
 
-export type ScrapeDurationMinutes = 10 | 15 | 20 | 30 | 45 | 60;
-
-const SCHEDULE_OPTIONS: { label: string; value: ScrapeDurationMinutes }[] = [
-  { label: "Every 10 min", value: 10 },
-  { label: "Every 15 min", value: 15 },
-  { label: "Every 20 min (Default)", value: 20 },
-  { label: "Every 30 min", value: 30 },
-  { label: "Every 45 min", value: 45 },
-  { label: "Every 1 hour", value: 60 },
-];
+const SCRAPE_INTERVAL_MINUTES = 5;
 
 export const DashboardView: React.FC = () => {
   const { profile, jobStats } = useCandidateStore();
-
-  const apiUrl =
-    (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env
-      ?.VITE_API_URL || "http://localhost:8000";
 
   const searchKeywords = profile?.searchKeywords?.filter(Boolean) || [];
   const currentScrapeJob =
@@ -51,192 +36,42 @@ export const DashboardView: React.FC = () => {
         ? "Full Stack Developer"
         : "Backend Developer");
 
-  const [intervalMinutes, setIntervalMinutes] =
-    useState<ScrapeDurationMinutes>(20);
-  const [nextScrapeAt, setNextScrapeAt] = useState<Date | null>(null);
-  const [countdownSeconds, setCountdownSeconds] = useState<number>(1200);
-  const [isScrapingNow, setIsScrapingNow] = useState(false);
-  const [isUpdatingSchedule, setIsUpdatingSchedule] = useState(false);
-  const [isConfigured, setIsConfigured] = useState(false);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [nextScrapeAt, setNextScrapeAt] = useState<Date>(
+    () => new Date(Date.now() + SCRAPE_INTERVAL_MINUTES * 60 * 1000),
+  );
+  const [countdownSeconds, setCountdownSeconds] = useState<number>(
+    SCRAPE_INTERVAL_MINUTES * 60,
+  );
 
   const formatScheduleDateTime = (date: Date): string => {
-    const hours = String(date.getHours()).padStart(2, "0");
+    const hours24 = date.getHours();
+    const period = hours24 >= 12 ? "PM" : "AM";
+    const hours = String(hours24 % 12 || 12).padStart(2, "0");
     const minutes = String(date.getMinutes()).padStart(2, "0");
     const day = String(date.getDate()).padStart(2, "0");
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const year = date.getFullYear();
-    return `${hours}:${minutes} ${day}-${month}-${year}`;
+    return `${hours}:${minutes} ${period} ${day}-${month}-${year}`;
   };
-
-  useEffect(() => {
-    let eventSource: EventSource | null = null;
-    let isMounted = true;
-    let retryTimer: ReturnType<typeof setTimeout> | null = null;
-
-    const fetchInitialSchedule = async () => {
-      try {
-        const res = await fetch(`${apiUrl}/api/v1/job/schedule`);
-        if (res.ok) {
-          const json = await res.json();
-          if (isMounted && json.data) {
-            if (json.data.intervalMinutes) {
-              setIntervalMinutes(
-                json.data.intervalMinutes as ScrapeDurationMinutes,
-              );
-            }
-            if (json.data.nextScrapeAt) {
-              const target = new Date(json.data.nextScrapeAt);
-              setNextScrapeAt(target);
-              setCountdownSeconds(
-                Math.max(0, Math.floor((target.getTime() - Date.now()) / 1000)),
-              );
-            }
-            if (typeof json.data.isRunning === "boolean") {
-              setIsScrapingNow(json.data.isRunning);
-            }
-            if (typeof json.data.isConfigured === "boolean") {
-              setIsConfigured(json.data.isConfigured);
-            }
-          }
-        }
-      } catch {}
-    };
-
-    const setupSse = () => {
-      try {
-        eventSource = new EventSource(`${apiUrl}/api/v1/job/schedule/stream`);
-        eventSource.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            if (isMounted && data) {
-              if (data.intervalMinutes) {
-                setIntervalMinutes(
-                  data.intervalMinutes as ScrapeDurationMinutes,
-                );
-              }
-              if (data.nextScrapeAt) {
-                const target = new Date(data.nextScrapeAt);
-                setNextScrapeAt(target);
-                setCountdownSeconds(
-                  Math.max(
-                    0,
-                    Math.floor((target.getTime() - Date.now()) / 1000),
-                  ),
-                );
-              }
-              if (typeof data.isRunning === "boolean") {
-                setIsScrapingNow(data.isRunning);
-              }
-              if (typeof data.isConfigured === "boolean") {
-                setIsConfigured(data.isConfigured);
-              }
-            }
-          } catch {}
-        };
-        eventSource.onerror = () => {
-          eventSource?.close();
-          if (isMounted) {
-            retryTimer = setTimeout(() => {
-              if (isMounted) setupSse();
-            }, 3000);
-          }
-        };
-      } catch {}
-    };
-
-    void fetchInitialSchedule();
-    setupSse();
-
-    return () => {
-      isMounted = false;
-      if (eventSource) {
-        eventSource.close();
-      }
-      if (retryTimer) {
-        clearTimeout(retryTimer);
-      }
-    };
-  }, [apiUrl]);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target as Node)
-      ) {
-        setIsDropdownOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => {
-      if (nextScrapeAt) {
-        const remaining = Math.max(
-          0,
-          Math.floor((nextScrapeAt.getTime() - Date.now()) / 1000),
+      const remaining = Math.max(
+        0,
+        Math.floor((nextScrapeAt.getTime() - Date.now()) / 1000),
+      );
+      if (remaining === 0) {
+        const nextTarget = new Date(
+          Date.now() + SCRAPE_INTERVAL_MINUTES * 60 * 1000,
         );
-        setCountdownSeconds(remaining);
-        if (remaining === 0) {
-          fetch(`${apiUrl}/api/v1/job/schedule`)
-            .then((r) => r.json())
-            .then((json) => {
-              if (json?.data?.nextScrapeAt) {
-                setNextScrapeAt(new Date(json.data.nextScrapeAt));
-              }
-              if (typeof json?.data?.isRunning === "boolean") {
-                setIsScrapingNow(json.data.isRunning);
-              }
-            })
-            .catch(() => {});
-        }
+        setNextScrapeAt(nextTarget);
+        setCountdownSeconds(SCRAPE_INTERVAL_MINUTES * 60);
       } else {
-        setCountdownSeconds((prev) => (prev > 0 ? prev - 1 : 0));
+        setCountdownSeconds(remaining);
       }
     }, 1000);
     return () => clearInterval(timer);
-  }, [nextScrapeAt, apiUrl]);
-
-  const handleScheduleChange = async (minutes: ScrapeDurationMinutes) => {
-    setIsDropdownOpen(false);
-
-    setIsUpdatingSchedule(true);
-    try {
-      const res = await fetch(`${apiUrl}/api/v1/job/schedule`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ intervalMinutes: minutes }),
-      });
-
-      const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json.message || "Failed to update schedule");
-      }
-
-      setIntervalMinutes(minutes);
-      setIsConfigured(true);
-      if (json.data?.nextScrapeAt) {
-        const target = new Date(json.data.nextScrapeAt);
-        setNextScrapeAt(target);
-        setCountdownSeconds(
-          Math.max(0, Math.floor((target.getTime() - Date.now()) / 1000)),
-        );
-      }
-      notifySuccess(
-        `Scraping frequency set to every ${minutes === 60 ? "1 hour" : `${minutes} minutes`} and session dispatched immediately`,
-      );
-    } catch (err: unknown) {
-      const msg =
-        err instanceof Error ? err.message : "Failed to update schedule";
-      notifyError(msg);
-    } finally {
-      setIsUpdatingSchedule(false);
-    }
-  };
+  }, [nextScrapeAt]);
 
   const formatCountdown = (totalSeconds: number) => {
     const mins = Math.floor(totalSeconds / 60);
@@ -301,84 +136,25 @@ export const DashboardView: React.FC = () => {
                 <h3 className="app-heading-section text-zinc-100">Scraper</h3>
               </div>
               <span className="app-caption text-emerald-400 px-2.5 py-0.5 rounded bg-emerald-950/40 border border-emerald-800/40 font-medium">
-                {isScrapingNow
-                  ? "Active Dispatch..."
-                  : "Active (3/4 Workers Running)"}
+                Active (3/4 Workers Running)
               </span>
             </div>
-            {nextScrapeAt && (
-              <div className="text-[11px] font-mono text-zinc-400">
-                Next scheduled:{" "}
-                <span className="text-zinc-200">
-                  {formatScheduleDateTime(nextScrapeAt)}
-                </span>
-              </div>
-            )}
+            <div className="text-[11px] font-mono text-zinc-400">
+              Next scheduled:{" "}
+              <span className="text-zinc-200">
+                {formatScheduleDateTime(nextScrapeAt)}
+              </span>
+            </div>
           </div>
 
           <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
-            {!isConfigured ? (
-              <div className="relative z-50" ref={dropdownRef}>
-                <button
-                  type="button"
-                  disabled={isUpdatingSchedule}
-                  onClick={() => setIsDropdownOpen((prev) => !prev)}
-                  className="h-8 px-3 rounded bg-zinc-900/90 hover:bg-zinc-800 text-zinc-200 border border-white/10 hover:border-white/20 text-xs font-medium flex items-center gap-2 transition-all cursor-pointer shadow-sm disabled:opacity-50"
-                >
-                  <FiClock className="text-emerald-400 text-xs shrink-0" />
-                  <span>
-                    Select Frequency: Every{" "}
-                    {intervalMinutes === 60 ? "1 hr" : `${intervalMinutes}m`}
-                  </span>
-                  <FiChevronDown
-                    className={`text-xs text-zinc-400 transition-transform ${
-                      isDropdownOpen ? "rotate-180" : ""
-                    }`}
-                  />
-                </button>
-
-                {isDropdownOpen && (
-                  <div className="absolute right-0 top-full mt-2 w-64 max-h-80 overflow-y-auto rounded-lg bg-zinc-950/98 border border-white/20 backdrop-blur-2xl shadow-2xl py-1 z-[100] animate-in fade-in zoom-in-95 duration-150">
-                    <div className="px-3 py-1.5 border-b border-white/10 text-[10px] font-mono uppercase tracking-wider text-zinc-400">
-                      Select Scraping Interval
-                    </div>
-                    {SCHEDULE_OPTIONS.map((opt) => (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => handleScheduleChange(opt.value)}
-                        className={`w-full px-3 py-2.5 text-left text-xs flex items-center justify-between gap-2 transition-colors cursor-pointer border-b border-white/[0.04] last:border-b-0 ${
-                          intervalMinutes === opt.value
-                            ? "bg-white/10 text-emerald-300 font-semibold"
-                            : "text-zinc-300 hover:bg-white/[0.06] hover:text-white"
-                        }`}
-                      >
-                        <div className="flex flex-col">
-                          <span className="font-medium">{opt.label}</span>
-                          <span className="text-[10px] font-mono text-zinc-400 mt-0.5">
-                            Immediate scrape + every {opt.value}m
-                          </span>
-                        </div>
-                        {intervalMinutes === opt.value && (
-                          <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div
-                className="h-8 px-3 rounded bg-zinc-900/80 border border-white/10 text-xs font-mono text-zinc-300 flex items-center gap-1.5"
-                title="Configured scraping interval. You can adjust this in Profile & Settings."
-              >
-                <FiClock className="text-emerald-400 text-xs shrink-0" />
-                <span>
-                  Every{" "}
-                  {intervalMinutes === 60 ? "1 hr" : `${intervalMinutes}m`}
-                </span>
-              </div>
-            )}
+            <div
+              className="h-8 px-3 rounded bg-zinc-900/80 border border-white/10 text-xs font-mono text-zinc-300 flex items-center gap-1.5"
+              title="Fixed automated scraping interval"
+            >
+              <FiClock className="text-emerald-400 text-xs shrink-0" />
+              <span>Every {SCRAPE_INTERVAL_MINUTES}m</span>
+            </div>
 
             <div className="bg-zinc-900/80 border border-white/10 rounded px-3 py-1.5 flex items-center gap-2 h-8">
               <span className="text-[13px] font-bold font-mono tracking-tight text-zinc-100 leading-tight">
@@ -386,11 +162,7 @@ export const DashboardView: React.FC = () => {
               </span>
               <span
                 className="text-zinc-400 hover:text-zinc-200 transition-colors relative cursor-help inline-flex items-center"
-                title={
-                  nextScrapeAt
-                    ? `Next scrape: ${nextScrapeAt.toISOString()} (${formatScheduleDateTime(nextScrapeAt)})`
-                    : "Calculating next scrape schedule..."
-                }
+                title={`Next scrape: ${nextScrapeAt.toISOString()} (${formatScheduleDateTime(nextScrapeAt)})`}
               >
                 <FiHelpCircle className="text-xs" />
               </span>

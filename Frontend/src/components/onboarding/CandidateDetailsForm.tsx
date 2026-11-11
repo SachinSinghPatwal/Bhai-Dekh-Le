@@ -16,8 +16,6 @@ import {
   FiCheck,
   FiLoader,
   FiPlus,
-  FiClock,
-  FiRadio,
 } from "react-icons/fi";
 import { parseResumeFile } from "../../utils/resumeParser";
 
@@ -106,49 +104,9 @@ const POPULAR_SKILLS = [
   "Git",
 ];
 
-export type ScrapeDurationMinutes = 10 | 15 | 20 | 30 | 45 | 60;
-
-const SCHEDULE_INTERVAL_OPTIONS: {
-  value: ScrapeDurationMinutes;
-  label: string;
-  description: string;
-}[] = [
-  {
-    value: 10,
-    label: "Every 10 minutes",
-    description: "High frequency live monitoring",
-  },
-  {
-    value: 15,
-    label: "Every 15 minutes",
-    description: "Active session tracking",
-  },
-  {
-    value: 20,
-    label: "Every 20 minutes (Recommended)",
-    description: "Balanced scraping pace",
-  },
-  {
-    value: 30,
-    label: "Every 30 minutes",
-    description: "Steady automated intervals",
-  },
-  {
-    value: 45,
-    label: "Every 45 minutes",
-    description: "Low frequency polling",
-  },
-  {
-    value: 60,
-    label: "Every 1 hour",
-    description: "Conservative hourly batch",
-  },
-];
-
 const SLIDE_STEPS = [
   { id: 0, title: "Personal Info" },
   { id: 1, title: "Resume & Skills" },
-  { id: 2, title: "Scrape Schedule" },
 ];
 
 interface TagChipProps {
@@ -333,23 +291,6 @@ export const CandidateDetailsForm: React.FC<CandidateDetailsFormProps> = ({
   const [isExtractingSkills, setIsExtractingSkills] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [manualSkillInput, setManualSkillInput] = useState("");
-  const [selectedInterval, setSelectedInterval] =
-    useState<ScrapeDurationMinutes>(20);
-
-  useEffect(() => {
-    const apiUrl =
-      (import.meta as any).env?.VITE_API_URL || "http://localhost:8000";
-    fetch(`${apiUrl}/api/v1/job/schedule`)
-      .then((r) => r.json())
-      .then((json) => {
-        if (json?.data?.intervalMinutes) {
-          setSelectedInterval(
-            json.data.intervalMinutes as ScrapeDurationMinutes,
-          );
-        }
-      })
-      .catch(() => {});
-  }, []);
 
   const {
     handleSubmit,
@@ -383,12 +324,10 @@ export const CandidateDetailsForm: React.FC<CandidateDetailsFormProps> = ({
     (vals.role?.trim() || "").length >= 2;
   const isStep1Complete = (vals: Partial<CandidateFormValues>) =>
     (vals.skills || []).length >= 1;
-  const isStep2Complete = () => Boolean(selectedInterval);
 
   const step0Valid = isStep0Complete(formValues);
   const step1Valid = isStep1Complete(formValues);
-  const step2Valid = isStep2Complete();
-  const isAllValid = step0Valid && step1Valid && step2Valid;
+  const isAllValid = step0Valid && step1Valid;
 
   const stepHasError = (stepId: number) => {
     if (stepId === 0)
@@ -400,14 +339,12 @@ export const CandidateDetailsForm: React.FC<CandidateDetailsFormProps> = ({
       return (
         Boolean(errors.skills) || Boolean(attemptedSteps[1] && !step1Valid)
       );
-    if (stepId === 2) return Boolean(attemptedSteps[2] && !step2Valid);
     return false;
   };
 
   const stepIsComplete = (stepId: number) => {
     if (stepId === 0) return step0Valid;
     if (stepId === 1) return step1Valid;
-    if (stepId === 2) return step2Valid;
     return false;
   };
 
@@ -501,14 +438,6 @@ export const CandidateDetailsForm: React.FC<CandidateDetailsFormProps> = ({
       if (!valid) {
         setAttemptedSteps((p) => ({ ...p, 1: true }));
         notifyError("Please add at least one skill.");
-        return false;
-      }
-      return true;
-    }
-    if (stepId === 2) {
-      if (!selectedInterval) {
-        setAttemptedSteps((p) => ({ ...p, 2: true }));
-        notifyError("Please select a scraping frequency.");
         return false;
       }
       return true;
@@ -654,17 +583,7 @@ export const CandidateDetailsForm: React.FC<CandidateDetailsFormProps> = ({
         searchKeywords: [data.role.trim(), ...data.skills.slice(0, 3)],
       });
 
-      try {
-        await fetch(`${apiUrl}/api/v1/job/schedule`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ intervalMinutes: selectedInterval }),
-        });
-      } catch {}
-
-      notifySuccess(
-        "Profile and scraping schedule saved! Initial scrape dispatched.",
-      );
+      notifySuccess("Profile saved successfully!");
       onCompleted();
     } catch (err: any) {
       notifyError(err?.message || "Something went wrong. Please try again.");
@@ -983,75 +902,6 @@ export const CandidateDetailsForm: React.FC<CandidateDetailsFormProps> = ({
             </div>
           </div>
 
-          <div
-            className={
-              currentSlide === 2
-                ? "block slide-content-active space-y-5"
-                : "hidden"
-            }
-          >
-            <div className="glass-panel p-3.5 sm:p-6 space-y-4 sm:space-y-5">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-white/5">
-                <div>
-                  <h2 className="app-card-title flex items-center gap-2">
-                    <FiClock className="text-emerald-400" />
-                    <span>3. Automated Scraping Schedule</span>
-                  </h2>
-                  <p className="app-sub text-zinc-500 mt-1">
-                    Select how frequently the background fleet scrapes job
-                    portals. An initial scrape runs immediately.
-                  </p>
-                </div>
-                <span className="app-caption px-2.5 py-1 rounded bg-zinc-900 border border-white/10 font-mono text-zinc-300 self-start sm:self-auto shrink-0">
-                  Every{" "}
-                  {selectedInterval === 60 ? "1 hr" : `${selectedInterval}m`}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {SCHEDULE_INTERVAL_OPTIONS.map((opt) => {
-                  const isSelected = selectedInterval === opt.value;
-                  return (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => setSelectedInterval(opt.value)}
-                      className={`p-3.5 rounded-lg border text-left transition-all cursor-pointer flex flex-col justify-between gap-2 ${
-                        isSelected
-                          ? "bg-emerald-950/30 border-emerald-500/50 shadow-sm"
-                          : "bg-zinc-900/50 hover:bg-zinc-900/80 border-white/5 hover:border-white/15"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span
-                          className={`text-xs font-semibold ${
-                            isSelected ? "text-emerald-300" : "text-zinc-200"
-                          }`}
-                        >
-                          {opt.label}
-                        </span>
-                        {isSelected ? (
-                          <FiCheck className="text-emerald-400 text-sm" />
-                        ) : (
-                          <FiRadio className="text-zinc-600 text-sm" />
-                        )}
-                      </div>
-                      <p className="text-[11px] text-zinc-400 leading-relaxed">
-                        {opt.description}
-                      </p>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="p-3 rounded bg-zinc-900/40 border border-white/[0.04] text-[11px] font-mono text-zinc-400 flex items-center justify-between">
-                <span>First Scrape Session:</span>
-                <span className="text-emerald-400 font-semibold">
-                  Immediate upon profile completion
-                </span>
-              </div>
-            </div>
-          </div>
         </div>
 
         <div className="flex items-center justify-between gap-3 mt-6">
@@ -1073,9 +923,7 @@ export const CandidateDetailsForm: React.FC<CandidateDetailsFormProps> = ({
               onClick={nextSlide}
               className="h-9 px-5 rounded bg-zinc-100 hover:bg-white text-zinc-950 font-semibold text-xs transition-colors cursor-pointer active:scale-[0.99]"
             >
-              {currentSlide === 0
-                ? "Continue to Resume & Skills"
-                : "Continue to Scrape Schedule"}
+              Continue to Resume &amp; Skills
             </button>
           ) : (
             <div className="flex flex-col items-end gap-1">

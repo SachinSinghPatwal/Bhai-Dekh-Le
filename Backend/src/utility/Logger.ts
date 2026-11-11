@@ -25,7 +25,7 @@ interface AppLogger extends winston.Logger {
 }
 
 const consoleFormat = winston.format.combine(
-  winston.format.timestamp({ format: "HH:mm:ss" }),
+  winston.format.timestamp({ format: "hh:mm:ss A" }),
   winston.format.printf(({ timestamp, level, message, ...meta }) => {
     let msg = `${timestamp} [${level}]: ${message}`;
 

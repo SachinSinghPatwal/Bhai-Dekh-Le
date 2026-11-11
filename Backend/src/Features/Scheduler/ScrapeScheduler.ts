@@ -1,96 +1,22 @@
 import cron, { type ScheduledTask } from "node-cron";
-import type { Response } from "express";
-import {
-  ScrapeScheduleModel,
-  type ScrapeIntervalMinutes,
-} from "../../models/Mongo/schedule.models.js";
+import { ScrapeScheduleModel } from "../../models/Mongo/schedule.models.js";
+import { SCRAPE_INTERVAL_MINUTES } from "../../constants.js";
 import ScheduleScrapeJob from "../MessageQueues/service/producer/ScheduleScrape.js";
 import log from "../../utility/Logger.js";
 
-export const VALID_INTERVALS: readonly ScrapeIntervalMinutes[] = [
-  10, 15, 20, 30, 45, 60,
-] as const;
-
-export function isValidInterval(val: number): val is ScrapeIntervalMinutes {
-  return VALID_INTERVALS.includes(val as ScrapeIntervalMinutes);
-}
-
 export function formatScheduleDateTime(date: Date): string {
-  const hours = String(date.getHours()).padStart(2, "0");
+  const hours24 = date.getHours();
+  const period = hours24 >= 12 ? "PM" : "AM";
+  const hours = String(hours24 % 12 || 12).padStart(2, "0");
   const minutes = String(date.getMinutes()).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const year = date.getFullYear();
-  return `${hours}:${minutes} ${day}-${month}-${year}`;
-}
-
-export interface ScheduleStatusPayload extends Record<string, unknown> {
-  intervalMinutes: ScrapeIntervalMinutes;
-  nextScrapeAt: string;
-  nextScrapeFormatted: string;
-  lastScheduledAt: string | null;
-  lastStartedAt: string | null;
-  isRunning: boolean;
-  isConfigured: boolean;
-  serverTime: string;
+  return `${hours}:${minutes} ${period} ${day}-${month}-${year}`;
 }
 
 let activeCronTask: ScheduledTask | null = null;
 let activeTicker: NodeJS.Timeout | null = null;
-let currentInterval: ScrapeIntervalMinutes = 20;
-const sseClients = new Set<Response>();
-
-export function registerSseClient(res: Response): () => void {
-  sseClients.add(res);
-
-  void getSchedulePayload().then((payload) => {
-    if (payload && !res.writableEnded) {
-      res.write(`data: ${JSON.stringify(payload)}\n\n`);
-    }
-  });
-
-  return () => {
-    sseClients.delete(res);
-  };
-}
-
-export function broadcastSchedule(payload: ScheduleStatusPayload): void {
-  const message = `data: ${JSON.stringify(payload)}\n\n`;
-  for (const client of sseClients) {
-    if (!client.writableEnded) {
-      client.write(message);
-    } else {
-      sseClients.delete(client);
-    }
-  }
-}
-
-export async function getSchedulePayload(): Promise<ScheduleStatusPayload> {
-  const doc = await ScrapeScheduleModel.findOne({
-    key: "default_scrape_schedule",
-  }).lean();
-
-  const now = new Date();
-  const interval = (doc?.intervalMinutes ?? currentInterval) as ScrapeIntervalMinutes;
-  const nextAt = doc?.nextScrapeAt
-    ? new Date(doc.nextScrapeAt)
-    : new Date(now.getTime() + interval * 60 * 1000);
-
-  return {
-    intervalMinutes: interval,
-    nextScrapeAt: nextAt.toISOString(),
-    nextScrapeFormatted: formatScheduleDateTime(nextAt),
-    lastScheduledAt: doc?.lastScheduledAt
-      ? new Date(doc.lastScheduledAt).toISOString()
-      : null,
-    lastStartedAt: doc?.lastStartedAt
-      ? new Date(doc.lastStartedAt).toISOString()
-      : null,
-    isRunning: Boolean(doc?.isRunning),
-    isConfigured: Boolean(doc?.isConfigured),
-    serverTime: now.toISOString(),
-  };
-}
 
 export async function executeScheduledScrape(
   triggeredBy: string,
@@ -99,14 +25,9 @@ export async function executeScheduledScrape(
   const lockDurationMs = 5 * 60 * 1000;
   const lockExpiration = new Date(now.getTime() + lockDurationMs);
   const replicaId = `worker-pid-${process.pid}-${Date.now()}`;
-
-  const currentDoc = await ScrapeScheduleModel.findOne({
-    key: "default_scrape_schedule",
-  });
-  const interval = (currentDoc?.intervalMinutes ?? currentInterval) as ScrapeIntervalMinutes;
-  currentInterval = interval;
-
-  const nextTarget = new Date(now.getTime() + interval * 60 * 1000);
+  const nextTarget = new Date(
+    now.getTime() + SCRAPE_INTERVAL_MINUTES * 60 * 1000,
+  );
 
   const lockedDoc = await ScrapeScheduleModel.findOneAndUpdate(
     {
@@ -122,11 +43,13 @@ export async function executeScheduledScrape(
         lockUntil: lockExpiration,
         lockedBy: replicaId,
         isRunning: true,
+        isConfigured: true,
+        intervalMinutes: SCRAPE_INTERVAL_MINUTES,
         lastScheduledAt: now,
         nextScrapeAt: nextTarget,
       },
     },
-    { returnDocument: "after" },
+    { returnDocument: "after", upsert: true },
   );
 
   if (!lockedDoc) {
@@ -143,19 +66,6 @@ export async function executeScheduledScrape(
   );
 
   try {
-    broadcastSchedule({
-      intervalMinutes: currentInterval,
-      nextScrapeAt: nextIso,
-      nextScrapeFormatted: nextFormatted,
-      lastScheduledAt: now.toISOString(),
-      lastStartedAt: lockedDoc.lastStartedAt
-        ? new Date(lockedDoc.lastStartedAt).toISOString()
-        : null,
-      isRunning: true,
-      isConfigured: true,
-      serverTime: new Date().toISOString(),
-    });
-
     await ScheduleScrapeJob();
 
     await ScrapeScheduleModel.updateOne(
@@ -180,9 +90,6 @@ export async function executeScheduledScrape(
         },
       },
     );
-  } finally {
-    const updated = await getSchedulePayload();
-    broadcastSchedule(updated);
   }
 }
 
@@ -190,7 +97,7 @@ export async function checkAndTriggerSchedule(): Promise<void> {
   const doc = await ScrapeScheduleModel.findOne({
     key: "default_scrape_schedule",
   });
-  if (!doc || !doc.isConfigured) {
+  if (!doc) {
     return;
   }
 
@@ -200,9 +107,8 @@ export async function checkAndTriggerSchedule(): Promise<void> {
   }
 }
 
-export async function triggerManualScrape(): Promise<ScheduleStatusPayload> {
+export async function triggerManualScrape(): Promise<void> {
   await executeScheduledScrape("user-manual-trigger");
-  return getSchedulePayload();
 }
 
 function restartSchedulerWatchers(): void {
@@ -224,76 +130,34 @@ function restartSchedulerWatchers(): void {
   }, 5000);
 }
 
-export async function setScrapeSchedule(
-  intervalMinutes: ScrapeIntervalMinutes,
-): Promise<ScheduleStatusPayload> {
-  if (!isValidInterval(intervalMinutes)) {
-    throw new Error(
-      `Invalid interval: ${intervalMinutes}. Must be 10, 15, 20, 30, 45, or 60.`,
-    );
-  }
-
-  currentInterval = intervalMinutes;
-  const now = new Date();
-  const nextScrape = new Date(now.getTime() + intervalMinutes * 60 * 1000);
-
-  const doc = await ScrapeScheduleModel.findOneAndUpdate(
-    { key: "default_scrape_schedule" },
-    {
-      $set: {
-        intervalMinutes,
-        nextScrapeAt: nextScrape,
-        isConfigured: true,
-        lockUntil: new Date(0),
-        isRunning: false,
-      },
-    },
-    { returnDocument: "after", upsert: true },
-  );
-
-  restartSchedulerWatchers();
-
-  log.success(
-    `Scrape schedule updated to every ${intervalMinutes} minutes, next at ${formatScheduleDateTime(doc.nextScrapeAt)}`,
-  );
-
-  void executeScheduledScrape("schedule-interval-updated");
-
-  return getSchedulePayload();
-}
-
 export async function initScrapeScheduler(): Promise<void> {
   const existing = await ScrapeScheduleModel.findOne({
     key: "default_scrape_schedule",
   });
 
   const now = new Date();
+  const intervalMs = SCRAPE_INTERVAL_MINUTES * 60 * 1000;
+  const maxNextScrape = new Date(now.getTime() + intervalMs);
 
-  let targetInterval: ScrapeIntervalMinutes = 20;
-  let nextScrape = new Date(now.getTime() + 20 * 60 * 1000);
+  let nextScrape = maxNextScrape;
   let shouldReconcile = false;
-  let isConfigured = false;
 
   if (existing) {
-    targetInterval = existing.intervalMinutes;
-    isConfigured = Boolean(existing.isConfigured);
-    if (isConfigured && existing.nextScrapeAt <= now) {
+    if (existing.nextScrapeAt <= now) {
       shouldReconcile = true;
-      nextScrape = new Date(now.getTime() + targetInterval * 60 * 1000);
-    } else {
+      nextScrape = maxNextScrape;
+    } else if (existing.nextScrapeAt <= maxNextScrape) {
       nextScrape = existing.nextScrapeAt;
     }
   }
-
-  currentInterval = targetInterval;
 
   await ScrapeScheduleModel.findOneAndUpdate(
     { key: "default_scrape_schedule" },
     {
       $set: {
-        intervalMinutes: targetInterval,
+        intervalMinutes: SCRAPE_INTERVAL_MINUTES,
         nextScrapeAt: nextScrape,
-        isConfigured,
+        isConfigured: true,
         lockUntil: new Date(0),
         isRunning: false,
       },
@@ -305,10 +169,10 @@ export async function initScrapeScheduler(): Promise<void> {
 
   const nextFormatted = formatScheduleDateTime(nextScrape);
   log.info(
-    `Scrape cron scheduler initialized: every ${targetInterval}m, next at ${nextFormatted} (Configured: ${isConfigured})`,
+    `Scrape cron scheduler initialized: every ${SCRAPE_INTERVAL_MINUTES}m, next at ${nextFormatted}`,
   );
 
-  if (shouldReconcile && isConfigured) {
+  if (shouldReconcile) {
     log.info(`Reconciling missed scrape schedule from previous session...`);
     void executeScheduledScrape("startup-reconcile");
   }

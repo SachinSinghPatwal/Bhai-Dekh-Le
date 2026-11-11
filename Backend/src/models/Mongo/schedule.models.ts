@@ -1,10 +1,9 @@
 import mongoose, { Schema, type Document, type Model } from "mongoose";
-
-export type ScrapeIntervalMinutes = 10 | 15 | 20 | 30 | 45 | 60;
+import { SCRAPE_INTERVAL_MINUTES } from "../../constants.js";
 
 export interface IScrapeSchedule extends Document {
   key: string;
-  intervalMinutes: ScrapeIntervalMinutes;
+  intervalMinutes: number;
   nextScrapeAt: Date;
   lastScheduledAt?: Date;
   lastStartedAt?: Date;
@@ -27,8 +26,7 @@ const scrapeScheduleSchema = new Schema<IScrapeSchedule>(
     intervalMinutes: {
       type: Number,
       required: true,
-      default: 20,
-      enum: [10, 15, 20, 30, 45, 60],
+      default: SCRAPE_INTERVAL_MINUTES,
     },
     nextScrapeAt: {
       type: Date,

@@ -16,7 +16,6 @@ import {
   FiPhone,
   FiGlobe,
   FiRefreshCw,
-  FiRadio,
   FiArrowLeft,
   FiLoader,
   FiEdit3,
@@ -28,44 +27,7 @@ import { notifySuccess, notifyError, notifyInfo } from "../utils/toast";
 import { parseResumeFile } from "../utils/resumeParser";
 import type { CandidateProfile } from "../types/candidate";
 
-export type ScrapeDurationMinutes = 10 | 15 | 20 | 30 | 45 | 60;
-
-const SCHEDULE_OPTIONS: readonly {
-  value: ScrapeDurationMinutes;
-  label: string;
-  description: string;
-}[] = [
-  {
-    value: 10,
-    label: "Every 10 minutes",
-    description: "High frequency live monitoring",
-  },
-  {
-    value: 15,
-    label: "Every 15 minutes",
-    description: "Active session tracking",
-  },
-  {
-    value: 20,
-    label: "Every 20 minutes (Recommended)",
-    description: "Balanced scraping pace",
-  },
-  {
-    value: 30,
-    label: "Every 30 minutes",
-    description: "Steady automated intervals",
-  },
-  {
-    value: 45,
-    label: "Every 45 minutes",
-    description: "Low frequency polling",
-  },
-  {
-    value: 60,
-    label: "Every 1 hour",
-    description: "Conservative hourly batch",
-  },
-] as const;
+const SCRAPE_INTERVAL_MINUTES = 5;
 
 const POPULAR_SKILLS = [
   "React",
@@ -185,15 +147,6 @@ export const ProfilePage: React.FC = () => {
   );
   const roleDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Schedule State (merged from Settings)
-  const [intervalMinutes, setIntervalMinutes] =
-    useState<ScrapeDurationMinutes>(20);
-  const [savedIntervalMinutes, setSavedIntervalMinutes] =
-    useState<ScrapeDurationMinutes>(20);
-  const [nextScrapeAt, setNextScrapeAt] = useState<Date | null>(null);
-  const [nextScrapeFormatted, setNextScrapeFormatted] = useState<string>("");
-  const [isScheduleRunning, setIsScheduleRunning] = useState<boolean>(false);
-
   // Sync roleSearchTerm with role
   useEffect(() => {
     setRoleSearchTerm(role);
@@ -222,7 +175,6 @@ export const ProfilePage: React.FC = () => {
     if (phone.trim() !== savedData.phone.trim()) return true;
     if (resumeUrl !== savedData.resumeUrl) return true;
     if (resumeFileName !== savedData.resumeFileName) return true;
-    if (intervalMinutes !== savedIntervalMinutes) return true;
 
     if (links.length !== savedData.links.length) return true;
     for (let i = 0; i < links.length; i++) {
@@ -245,9 +197,7 @@ export const ProfilePage: React.FC = () => {
     resumeUrl,
     resumeFileName,
     selectedResumeFile,
-    intervalMinutes,
     savedData,
-    savedIntervalMinutes,
   ]);
 
   // Fetch initial profile from backend
@@ -351,75 +301,6 @@ export const ProfilePage: React.FC = () => {
 
     return () => {
       isMounted = false;
-    };
-  }, [apiUrl]);
-
-  // Fetch Schedule & setup SSE Stream
-  useEffect(() => {
-    let eventSource: EventSource | null = null;
-    let isMounted = true;
-
-    const fetchCurrentSchedule = async () => {
-      try {
-        const res = await fetch(`${apiUrl}/api/v1/job/schedule`);
-        if (res.ok) {
-          const json = await res.json();
-          if (isMounted && json.data) {
-            if (json.data.intervalMinutes) {
-              const minutes = json.data
-                .intervalMinutes as ScrapeDurationMinutes;
-              setIntervalMinutes(minutes);
-              setSavedIntervalMinutes(minutes);
-            }
-            if (json.data.nextScrapeAt) {
-              setNextScrapeAt(new Date(json.data.nextScrapeAt));
-            }
-            if (json.data.nextScrapeFormatted) {
-              setNextScrapeFormatted(json.data.nextScrapeFormatted);
-            }
-            if (typeof json.data.isRunning === "boolean") {
-              setIsScheduleRunning(json.data.isRunning);
-            }
-          }
-        }
-      } catch {}
-    };
-
-    const setupSse = () => {
-      try {
-        eventSource = new EventSource(`${apiUrl}/api/v1/job/schedule/stream`);
-        eventSource.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            if (isMounted && data) {
-              if (data.intervalMinutes) {
-                const minutes = data.intervalMinutes as ScrapeDurationMinutes;
-                setIntervalMinutes(minutes);
-                setSavedIntervalMinutes(minutes);
-              }
-              if (data.nextScrapeAt) {
-                setNextScrapeAt(new Date(data.nextScrapeAt));
-              }
-              if (data.nextScrapeFormatted) {
-                setNextScrapeFormatted(data.nextScrapeFormatted);
-              }
-              if (typeof data.isRunning === "boolean") {
-                setIsScheduleRunning(data.isRunning);
-              }
-            }
-          } catch {}
-        };
-      } catch {}
-    };
-
-    void fetchCurrentSchedule();
-    setupSse();
-
-    return () => {
-      isMounted = false;
-      if (eventSource) {
-        eventSource.close();
-      }
     };
   }, [apiUrl]);
 
@@ -541,7 +422,6 @@ export const ProfilePage: React.FC = () => {
     setResumeUrl(savedData.resumeUrl);
     setResumeFileName(savedData.resumeFileName);
     setSelectedResumeFile(null);
-    setIntervalMinutes(savedIntervalMinutes);
     setIsEditing(false);
     notifyInfo("Edits discarded. Reverted to saved details.");
   };
@@ -639,16 +519,6 @@ export const ProfilePage: React.FC = () => {
             resData?.message || "Failed to update profile details on backend",
           );
         }
-      }
-
-      // If schedule option changed, sync schedule endpoint too
-      if (intervalMinutes !== savedIntervalMinutes) {
-        await fetch(`${apiUrl}/api/v1/job/schedule`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ intervalMinutes }),
-        });
-        setSavedIntervalMinutes(intervalMinutes);
       }
 
       setResumeUrl(updatedResumeUrl);
@@ -1267,83 +1137,21 @@ export const ProfilePage: React.FC = () => {
               <span>Automated Scraping Schedule</span>
             </h2>
             <p className="app-sub text-zinc-400 mt-1">
-              Configure background job scraping frequency. Selecting an interval
-              updates option and can be saved to backend.
+              Background job scraping runs automatically at a fixed {SCRAPE_INTERVAL_MINUTES}-minute interval.
             </p>
           </div>
 
           <div className="flex items-center gap-2">
             <span className="app-caption px-2.5 py-1 rounded bg-zinc-900 border border-white/10 font-mono text-zinc-300">
-              Current: Every{" "}
-              {intervalMinutes === 60 ? "1 hr" : `${intervalMinutes}m`}
+              Every {SCRAPE_INTERVAL_MINUTES}m
             </span>
-            <span
-              className={`app-caption px-2.5 py-1 rounded border font-medium ${
-                isScheduleRunning
-                  ? "bg-amber-950/40 border-amber-800/40 text-amber-400"
-                  : "bg-emerald-950/40 border-emerald-800/40 text-emerald-400"
-              }`}
-            >
-              {isScheduleRunning ? "Dispatching..." : "Active"}
+            <span className="app-caption px-2.5 py-1 rounded border font-medium bg-emerald-950/40 border-emerald-800/40 text-emerald-400">
+              Active
             </span>
           </div>
         </div>
 
-        {nextScrapeFormatted && (
-          <div className="flex items-center justify-between p-3.5 rounded bg-zinc-950/70 border border-white/5 text-xs font-mono">
-            <span className="text-zinc-400">Next Planned Run:</span>
-            <span
-              className="text-emerald-400 font-semibold cursor-help"
-              title={nextScrapeAt ? nextScrapeAt.toISOString() : undefined}
-            >
-              {nextScrapeFormatted}
-            </span>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-          {SCHEDULE_OPTIONS.map((opt) => {
-            const isSelected = intervalMinutes === opt.value;
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                disabled={isSaving}
-                onClick={() => {
-                  if (!isEditing) {
-                    setIsEditing(true);
-                  }
-                  setIntervalMinutes(opt.value);
-                }}
-                className={`p-3.5 rounded-lg border text-left transition-all cursor-pointer flex flex-col justify-between gap-2.5 ${
-                  isSelected
-                    ? "bg-emerald-950/30 border-emerald-500/50 shadow-sm"
-                    : "bg-zinc-900/50 hover:bg-zinc-900/80 border-white/5 hover:border-white/15"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span
-                    className={`text-xs font-semibold ${
-                      isSelected ? "text-emerald-300" : "text-zinc-200"
-                    }`}
-                  >
-                    {opt.label}
-                  </span>
-                  {isSelected ? (
-                    <FiCheck className="text-emerald-400 text-sm" />
-                  ) : (
-                    <FiRadio className="text-zinc-600 text-sm" />
-                  )}
-                </div>
-                <p className="text-[11px] text-zinc-400 leading-relaxed">
-                  {opt.description}
-                </p>
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-white/5">
+        <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="text-xs text-zinc-400">
             Want to run an ad-hoc scraping cycle right now?
           </div>
