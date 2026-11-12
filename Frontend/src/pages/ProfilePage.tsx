@@ -1,10 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   FiUser,
   FiFileText,
-  FiClock,
-  FiSliders,
   FiSave,
   FiUpload,
   FiCheck,
@@ -15,8 +12,6 @@ import {
   FiMail,
   FiPhone,
   FiGlobe,
-  FiRefreshCw,
-  FiArrowLeft,
   FiLoader,
   FiEdit3,
   FiX,
@@ -25,58 +20,11 @@ import { FaGithub, FaLinkedin } from "react-icons/fa6";
 import { useCandidateStore } from "../store/useCandidateStore";
 import { notifySuccess, notifyError, notifyInfo } from "../utils/toast";
 import { parseResumeFile } from "../utils/resumeParser";
+import { getApiUrl } from "../lib/api";
+import { FALLBACK_IT_ROLES, POPULAR_SKILLS } from "../lib/candidateOptions";
 import type { CandidateProfile } from "../types/candidate";
 
-const SCRAPE_INTERVAL_MINUTES = 5;
-
-const POPULAR_SKILLS = [
-  "React",
-  "Node.js",
-  "TypeScript",
-  "JavaScript",
-  "Python",
-  "Tailwind CSS",
-  "Next.js",
-  "MongoDB",
-  "PostgreSQL",
-  "Docker",
-  "AWS",
-  "Redux",
-  "Zustand",
-  "REST API",
-  "GraphQL",
-  "Git",
-  "CI/CD",
-  "Express.js",
-];
-
-const FALLBACK_IT_ROLES = [
-  "Frontend Developer",
-  "Backend Developer",
-  "Full Stack Developer",
-  "React Developer",
-  "Node.js Developer",
-  "Python Developer",
-  "Java Developer",
-  "DevOps Engineer",
-  "Cloud Engineer",
-  "Data Scientist",
-  "Data Analyst",
-  "Machine Learning Engineer",
-  "AI Engineer",
-  "Mobile Developer",
-  "Android Developer",
-  "iOS Developer",
-  "QA Engineer",
-  "Site Reliability Engineer (SRE)",
-  "Database Administrator",
-  "UI/UX Designer",
-  "Product Manager",
-  "Software Architect",
-  "Security Engineer",
-];
-
-interface SavedProfileState {
+interface ProfileSnapshot {
   fullName: string;
   role: string;
   email: string;
@@ -87,72 +35,40 @@ interface SavedProfileState {
   resumeFileName: string;
 }
 
-const getApiUrl = () =>
-  import.meta.env.VITE_BACKEND_URL ||
-  import.meta.env.VITE_API_URL ||
-  (typeof window !== "undefined"
-    ? `http://${window.location.hostname}:8000`
-    : "http://localhost:8000");
+const buildSnapshot = (profile: CandidateProfile | null): ProfileSnapshot => ({
+  fullName: profile?.fullName || "",
+  role: profile?.role || "",
+  email: profile?.email || "",
+  phone: profile?.phone || "",
+  links: profile?.links || [],
+  skills: profile?.skills || [],
+  resumeUrl: profile?.resumeUrl || "",
+  resumeFileName: profile?.resumeFileName || "",
+});
 
 export const ProfilePage: React.FC = () => {
-  const navigate = useNavigate();
-  const { profile, setProfile } = useCandidateStore();
+  const { profile, setProfile, hydrateFromBackend } = useCandidateStore();
   const apiUrl = getApiUrl();
 
-  const [isLoadingBackend, setIsLoadingBackend] = useState<boolean>(false);
-  const [isSaving, setIsSaving] = useState<boolean>(false);
-  const [isScrapingNow, setIsScrapingNow] = useState<boolean>(false);
-
-  // Edit Mode Toggle
-  const [isEditing, setIsEditing] = useState<boolean>(false);
-
-  // Baseline Saved State for Dirty Checking
-  const [savedData, setSavedData] = useState<SavedProfileState>({
-    fullName: profile?.fullName || "",
-    role: profile?.role || "",
-    email: profile?.email || "",
-    phone: profile?.phone || "",
-    links: profile?.links || [],
-    skills: profile?.skills || [],
-    resumeUrl: profile?.resumeUrl || "",
-    resumeFileName: profile?.resumeFileName || "",
-  });
-
-  // Active Form State
-  const [fullName, setFullName] = useState<string>(profile?.fullName || "");
-  const [role, setRole] = useState<string>(profile?.role || "");
-  const [email, setEmail] = useState<string>(profile?.email || "");
-  const [phone, setPhone] = useState<string>(profile?.phone || "");
-  const [links, setLinks] = useState<string[]>(profile?.links || []);
-  const [skills, setSkills] = useState<string[]>(profile?.skills || []);
-  const [resumeUrl, setResumeUrl] = useState<string>(profile?.resumeUrl || "");
-  const [resumeFileName, setResumeFileName] = useState<string>(
-    profile?.resumeFileName || "",
-  );
-
-  // Resume Upload & Extraction State
+  const savedSnapshot = useMemo(() => buildSnapshot(profile), [profile]);
+  const [draft, setDraft] = useState<ProfileSnapshot | null>(null);
   const [selectedResumeFile, setSelectedResumeFile] = useState<File | null>(
     null,
   );
-  const [isExtractingResume, setIsExtractingResume] = useState<boolean>(false);
-
-  // Helper Inputs
-  const [newSkillInput, setNewSkillInput] = useState<string>("");
-  const [newLinkInput, setNewLinkInput] = useState<string>("");
-
-  // Role Dropdown State
-  const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState<boolean>(false);
-  const [roleSearchTerm, setRoleSearchTerm] = useState<string>(
-    profile?.role || "",
-  );
+  const [isSaving, setIsSaving] = useState(false);
+  const [isExtractingResume, setIsExtractingResume] = useState(false);
+  const [newSkillInput, setNewSkillInput] = useState("");
+  const [newLinkInput, setNewLinkInput] = useState("");
+  const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
   const roleDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Sync roleSearchTerm with role
-  useEffect(() => {
-    setRoleSearchTerm(role);
-  }, [role]);
+  const isEditing = draft !== null;
+  const current = draft ?? savedSnapshot;
 
-  // Handle outside click for role dropdown
+  useEffect(() => {
+    void hydrateFromBackend();
+  }, [hydrateFromBackend]);
+
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
       if (
@@ -166,809 +82,489 @@ export const ProfilePage: React.FC = () => {
     return () => document.removeEventListener("mousedown", handleOutsideClick);
   }, []);
 
-  // Dirty State Detection
   const isDirty = useMemo(() => {
+    if (!draft) return false;
     if (selectedResumeFile !== null) return true;
-    if (fullName.trim() !== savedData.fullName.trim()) return true;
-    if (role.trim() !== savedData.role.trim()) return true;
-    if (email.trim() !== savedData.email.trim()) return true;
-    if (phone.trim() !== savedData.phone.trim()) return true;
-    if (resumeUrl !== savedData.resumeUrl) return true;
-    if (resumeFileName !== savedData.resumeFileName) return true;
-
-    if (links.length !== savedData.links.length) return true;
-    for (let i = 0; i < links.length; i++) {
-      if (links[i] !== savedData.links[i]) return true;
-    }
-
-    if (skills.length !== savedData.skills.length) return true;
-    for (let i = 0; i < skills.length; i++) {
-      if (skills[i] !== savedData.skills[i]) return true;
-    }
-
+    if (draft.fullName.trim() !== savedSnapshot.fullName.trim()) return true;
+    if (draft.role.trim() !== savedSnapshot.role.trim()) return true;
+    if (draft.email.trim() !== savedSnapshot.email.trim()) return true;
+    if (draft.phone.trim() !== savedSnapshot.phone.trim()) return true;
+    if (draft.resumeUrl !== savedSnapshot.resumeUrl) return true;
+    if (draft.resumeFileName !== savedSnapshot.resumeFileName) return true;
+    if (draft.links.length !== savedSnapshot.links.length) return true;
+    if (draft.links.some((l, i) => l !== savedSnapshot.links[i])) return true;
+    if (draft.skills.length !== savedSnapshot.skills.length) return true;
+    if (draft.skills.some((s, i) => s !== savedSnapshot.skills[i])) return true;
     return false;
-  }, [
-    fullName,
-    role,
-    email,
-    phone,
-    links,
-    skills,
-    resumeUrl,
-    resumeFileName,
-    selectedResumeFile,
-    savedData,
-  ]);
+  }, [draft, savedSnapshot, selectedResumeFile]);
 
-  // Fetch initial profile from backend
-  useEffect(() => {
-    let isMounted = true;
-    const fetchUserProfile = async () => {
-      try {
-        setIsLoadingBackend(true);
-        const res = await fetch(`${apiUrl}/api/v1/user/profile`);
-        if (!res.ok) return;
-        const resJson = await res.json();
-        const data = resJson?.data;
-        if (isMounted && data) {
-          const personal = data.personalDetails || data;
-          const remoteFullName =
-            data.fullname ||
-            personal.fullName ||
-            personal.fullname ||
-            personal.name ||
-            "";
-          const remoteRole = data.role || personal.role || "";
-          const remoteEmail = data.email || personal.email || "";
-          const remotePhone = data.phone || personal.phone || "";
-          const remoteSkills = Array.isArray(data.skills)
-            ? data.skills
-            : Array.isArray(personal.skills)
-              ? personal.skills
-              : [];
-          const remoteLinks = Array.isArray(data.links)
-            ? data.links
-            : Array.isArray(personal.links)
-              ? personal.links
-              : [];
-          const remoteResumeUrl =
-            data.resume?.path ||
-            personal.resumePath ||
-            personal.resumeLink ||
-            personal.resumeUrl ||
-            "";
-          const remoteResumeFileName =
-            data.resume?.fileName || personal.resumeFileName || "";
+  const updateDraft = (patch: Partial<ProfileSnapshot>) => {
+    setDraft((prev) => (prev ? { ...prev, ...patch } : prev));
+  };
 
-          if (remoteFullName) setFullName(remoteFullName);
-          if (remoteRole) {
-            setRole(remoteRole);
-            setRoleSearchTerm(remoteRole);
-          }
-          if (remoteEmail) setEmail(remoteEmail);
-          if (remotePhone) setPhone(remotePhone);
-          if (remoteSkills.length > 0) setSkills(remoteSkills);
-          if (remoteLinks.length > 0) setLinks(remoteLinks);
-          if (remoteResumeUrl) setResumeUrl(remoteResumeUrl);
-          if (remoteResumeFileName) setResumeFileName(remoteResumeFileName);
-
-          // Update saved baseline
-          setSavedData({
-            fullName: remoteFullName || profile?.fullName || "",
-            role: remoteRole || profile?.role || "",
-            email: remoteEmail || profile?.email || "",
-            phone: remotePhone || profile?.phone || "",
-            links: remoteLinks.length > 0 ? remoteLinks : profile?.links || [],
-            skills:
-              remoteSkills.length > 0 ? remoteSkills : profile?.skills || [],
-            resumeUrl: remoteResumeUrl || profile?.resumeUrl || "",
-            resumeFileName:
-              remoteResumeFileName || profile?.resumeFileName || "",
-          });
-
-          // Sync Zustand store
-          if (remoteFullName) {
-            setProfile({
-              fullName: remoteFullName,
-              role: remoteRole || profile?.role || "",
-              email: remoteEmail || profile?.email || "",
-              phone: remotePhone || profile?.phone || "",
-              skills:
-                remoteSkills.length > 0 ? remoteSkills : profile?.skills || [],
-              links:
-                remoteLinks.length > 0 ? remoteLinks : profile?.links || [],
-              resumeUrl: remoteResumeUrl || profile?.resumeUrl || "",
-              resumeFileName:
-                remoteResumeFileName || profile?.resumeFileName || "",
-              searchKeywords: [
-                remoteRole || profile?.role || "",
-                ...(remoteSkills.length > 0
-                  ? remoteSkills
-                  : profile?.skills || []
-                ).slice(0, 3),
-              ].filter(Boolean),
-            });
-          }
-        }
-      } catch {
-        // Fall back gracefully to local store
-      } finally {
-        if (isMounted) setIsLoadingBackend(false);
-      }
-    };
-
-    void fetchUserProfile();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [apiUrl]);
-
-  // Skill Handlers
   const addSkill = (skillToAdd: string) => {
-    if (!isEditing) {
-      notifyInfo("Click 'Edit Profile' at the bottom to modify skills.");
-      return;
-    }
+    if (!draft) return;
     const clean = skillToAdd.trim();
     if (!clean) return;
-    if (skills.some((s) => s.toLowerCase() === clean.toLowerCase())) {
+    if (draft.skills.some((s) => s.toLowerCase() === clean.toLowerCase())) {
       notifyInfo(`"${clean}" is already added.`);
       return;
     }
-    setSkills((prev) => [...prev, clean]);
+    updateDraft({ skills: [...draft.skills, clean] });
     setNewSkillInput("");
   };
 
-  const removeSkill = (skillToRemove: string) => {
-    if (!isEditing) return;
-    setSkills((prev) => prev.filter((s) => s !== skillToRemove));
-  };
-
-  const handleSkillKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" || e.key === ",") {
-      e.preventDefault();
-      addSkill(newSkillInput);
-    }
-  };
-
-  // Link Handlers
   const addLink = (linkToAdd: string) => {
-    if (!isEditing) {
-      notifyInfo("Click 'Edit Profile' at the bottom to add links.");
-      return;
-    }
+    if (!draft) return;
     let clean = linkToAdd.trim().replace(/[.,;:)>\]]+$/, "");
     if (!clean) return;
     if (!/^https?:\/\//i.test(clean)) {
       clean = `https://${clean.replace(/^\/+/, "")}`;
     }
-    if (links.includes(clean)) {
-      notifyInfo("Link is already present in your list.");
+    if (draft.links.includes(clean)) {
+      notifyInfo("Link is already added.");
       return;
     }
-    setLinks((prev) => [...prev, clean]);
+    updateDraft({ links: [...draft.links, clean] });
     setNewLinkInput("");
   };
 
-  const removeLink = (linkToRemove: string) => {
-    if (!isEditing) return;
-    setLinks((prev) => prev.filter((l) => l !== linkToRemove));
-  };
-
-  const handleLinkKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      addLink(newLinkInput);
-    }
-  };
-
-  // Resume File Selection & Extraction
   const handleResumeSelection = async (file: File) => {
-    if (!isEditing) {
-      notifyInfo("Click 'Edit Profile' at the bottom to upload a new resume.");
-      return;
-    }
+    if (!draft) return;
     setSelectedResumeFile(file);
-    setResumeFileName(file.name);
+    updateDraft({ resumeFileName: file.name });
     setIsExtractingResume(true);
-    notifyInfo("Scanning resume for skills, contact details, and links...");
 
     try {
       const parsed = await parseResumeFile(file);
-
-      if (parsed.skills.length > 0) {
-        const mergedSkills = Array.from(new Set([...skills, ...parsed.skills]));
-        setSkills(mergedSkills);
-      }
-
-      if (parsed.email && !email) {
-        setEmail(parsed.email);
-      }
-
-      if (parsed.phone && !phone) {
-        setPhone(parsed.phone);
-      }
-
-      if (parsed.links && parsed.links.length > 0) {
-        const mergedLinks = Array.from(new Set([...links, ...parsed.links]));
-        setLinks(mergedLinks);
-      }
-
+      setDraft((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          skills:
+            parsed.skills.length > 0
+              ? Array.from(new Set([...prev.skills, ...parsed.skills]))
+              : prev.skills,
+          email: !prev.email && parsed.email ? parsed.email : prev.email,
+          phone: !prev.phone && parsed.phone ? parsed.phone : prev.phone,
+          links:
+            parsed.links && parsed.links.length > 0
+              ? Array.from(new Set([...prev.links, ...parsed.links]))
+              : prev.links,
+        };
+      });
       notifySuccess(
-        `Parsed "${file.name}": extracted ${parsed.skills.length} skills and ${parsed.links.length} links.`,
+        `Parsed "${file.name}" (${parsed.skills.length} skills extracted).`,
       );
     } catch {
-      notifyInfo("Resume attached. You can continue adding skills manually.");
+      notifyInfo("Resume attached. You can adjust skills manually.");
     } finally {
       setIsExtractingResume(false);
     }
   };
 
-  // Edit Mode Controls
-  const handleStartEditing = () => {
-    setIsEditing(true);
-    notifyInfo("Edit mode enabled. You can now modify your details.");
-  };
-
   const handleCancelEdit = () => {
-    setFullName(savedData.fullName);
-    setRole(savedData.role);
-    setRoleSearchTerm(savedData.role);
-    setEmail(savedData.email);
-    setPhone(savedData.phone);
-    setLinks(savedData.links);
-    setSkills(savedData.skills);
-    setResumeUrl(savedData.resumeUrl);
-    setResumeFileName(savedData.resumeFileName);
+    setDraft(null);
     setSelectedResumeFile(null);
-    setIsEditing(false);
-    notifyInfo("Edits discarded. Reverted to saved details.");
+    setNewSkillInput("");
+    setNewLinkInput("");
   };
 
-  // Save All Profile & Account Settings to Backend
   const handleSaveProfile = async () => {
-    if (!isEditing) {
-      notifyInfo("Click 'Edit Profile' first to make changes.");
-      return;
-    }
+    if (!draft || !isDirty) return;
 
-    if (!isDirty) {
-      notifyInfo("No changes detected to save.");
-      return;
-    }
-
-    if (!fullName.trim()) {
+    if (!draft.fullName.trim()) {
       notifyError("Full Name is required.");
       return;
     }
-
-    if (!role.trim()) {
+    if (!draft.role.trim()) {
       notifyError("Target Role is required.");
       return;
     }
-
-    if (skills.length === 0) {
-      notifyError("Please add at least one technical skill.");
+    if (draft.skills.length === 0) {
+      notifyError("Add at least one technical skill.");
       return;
     }
 
     setIsSaving(true);
-    notifyInfo("Saving changes to backend...");
-
     try {
-      let updatedResumeUrl = resumeUrl;
-      let updatedResumeFileName = resumeFileName;
+      let updatedResumeUrl = draft.resumeUrl;
+      let updatedResumeFileName = draft.resumeFileName;
 
-      // If a new resume file is chosen, upload via multipart /upload-resume
       if (selectedResumeFile) {
         const formData = new FormData();
         formData.append("resume", selectedResumeFile);
-        formData.append("fullName", fullName.trim());
-        formData.append("fullname", fullName.trim());
-        formData.append("role", role.trim());
-        formData.append("email", email.trim());
-        formData.append("phone", phone.trim());
-        formData.append("skills", JSON.stringify(skills));
-        formData.append("links", JSON.stringify(links));
+        formData.append("fullName", draft.fullName.trim());
+        formData.append("fullname", draft.fullName.trim());
+        formData.append("role", draft.role.trim());
+        formData.append("email", draft.email.trim());
+        formData.append("phone", draft.phone.trim());
+        formData.append("skills", JSON.stringify(draft.skills));
+        formData.append("links", JSON.stringify(draft.links));
 
         const res = await fetch(`${apiUrl}/api/v1/user/upload-resume`, {
           method: "POST",
           body: formData,
         });
-
         const resData = await res.json();
         if (!res.ok || resData.success !== true) {
-          throw new Error(
-            resData?.message || "Failed to upload resume to Cloudinary",
-          );
+          throw new Error(resData?.message || "Failed to upload resume");
         }
 
         updatedResumeUrl =
-          resData?.data?.resumeUrl || resData?.resumeUrl || resumeUrl;
+          resData?.data?.resumeUrl || resData?.resumeUrl || draft.resumeUrl;
         updatedResumeFileName =
           resData?.data?.resumeFileName ||
           resData?.fileName ||
           selectedResumeFile.name;
-        setSelectedResumeFile(null);
       } else {
-        // Update user profile via PUT /api/v1/user/profile
-        const updatePayload = {
-          fullName: fullName.trim(),
-          fullname: fullName.trim(),
-          role: role.trim(),
-          email: email.trim(),
-          phone: phone.trim(),
-          skills,
-          links,
-          resume: {
-            path: resumeUrl,
-            fileName: resumeFileName,
-          },
-        };
-
         const res = await fetch(`${apiUrl}/api/v1/user/profile`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(updatePayload),
+          body: JSON.stringify({
+            fullName: draft.fullName.trim(),
+            fullname: draft.fullName.trim(),
+            role: draft.role.trim(),
+            email: draft.email.trim(),
+            phone: draft.phone.trim(),
+            skills: draft.skills,
+            links: draft.links,
+            resume: {
+              path: draft.resumeUrl,
+              fileName: draft.resumeFileName,
+            },
+          }),
         });
-
         const resData = await res.json();
         if (!res.ok || resData.success !== true) {
-          throw new Error(
-            resData?.message || "Failed to update profile details on backend",
-          );
+          throw new Error(resData?.message || "Failed to update profile");
         }
       }
 
-      setResumeUrl(updatedResumeUrl);
-      setResumeFileName(updatedResumeFileName);
-
-      // Update baseline state so isDirty resets
-      const newSavedData: SavedProfileState = {
-        fullName: fullName.trim(),
-        role: role.trim(),
-        skills,
-        email: email.trim(),
-        phone: phone.trim(),
-        links,
-        resumeUrl: updatedResumeUrl,
-        resumeFileName: updatedResumeFileName,
-      };
-      setSavedData(newSavedData);
-
-      // Sync Zustand State
       const updatedProfile: CandidateProfile = {
-        fullName: fullName.trim(),
-        role: role.trim(),
-        skills,
-        email: email.trim(),
-        phone: phone.trim(),
-        links,
+        fullName: draft.fullName.trim(),
+        role: draft.role.trim(),
+        skills: draft.skills,
+        email: draft.email.trim(),
+        phone: draft.phone.trim(),
+        links: draft.links,
         resumeUrl: updatedResumeUrl,
         resumeFileName: updatedResumeFileName,
-        searchKeywords: [role.trim(), ...skills.slice(0, 3)].filter(Boolean),
+        searchKeywords: [
+          draft.role.trim(),
+          ...draft.skills.slice(0, 3),
+        ].filter(Boolean),
       };
 
       setProfile(updatedProfile);
-      setIsEditing(false);
-      notifySuccess("Profile and preferences saved successfully!");
+      setSelectedResumeFile(null);
+      setDraft(null);
+      notifySuccess("Profile updated.");
     } catch (err: unknown) {
-      const msg =
-        err instanceof Error ? err.message : "Failed to update profile data";
-      notifyError(msg);
+      notifyError(
+        err instanceof Error ? err.message : "Failed to update profile",
+      );
     } finally {
       setIsSaving(false);
     }
   };
 
-  // Immediate Scraping Trigger
-  const handleTriggerScrapeNow = async () => {
-    if (isScrapingNow) return;
-    setIsScrapingNow(true);
-    notifyInfo("Triggering immediate job portal scrape...");
-    try {
-      const res = await fetch(`${apiUrl}/api/v1/job/trigger-now`, {
-        method: "POST",
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json.message || "Failed to trigger instant scrape");
-      }
-      notifySuccess("Scrape triggered successfully! Fleet is active.");
-    } catch (err: unknown) {
-      const msg =
-        err instanceof Error ? err.message : "Could not trigger scrape";
-      notifyError(msg);
-    } finally {
-      setIsScrapingNow(false);
-    }
-  };
-
-  // Filtered Roles for Dropdown
-  const filteredRoles = roleSearchTerm.trim()
+  const filteredRoles = current.role.trim()
     ? FALLBACK_IT_ROLES.filter((r) =>
-        r.toLowerCase().includes(roleSearchTerm.trim().toLowerCase()),
+        r.toLowerCase().includes(current.role.trim().toLowerCase()),
       )
     : FALLBACK_IT_ROLES;
 
   const canSave = isEditing && isDirty && !isSaving;
 
   return (
-    <div className="space-y-8 px-1 sm:px-4 md:px-8 mx-0 max-w-5xl mx-auto pb-24">
-      {/* Top Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-white/[0.08]">
+    <div className="space-y-6 px-1 sm:px-4 md:px-8 max-w-5xl mx-auto">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/[0.08]">
         <div>
-          <div className="flex items-center gap-3">
-            <h1 className="app-heading-page flex items-center gap-2.5">
-              <FiUser className="text-zinc-400" />
-              <span>General Settings &amp; Profile</span>
-            </h1>
-            {isLoadingBackend && (
-              <span className="app-caption text-zinc-500 flex items-center gap-1.5 font-mono text-xs">
-                <FiRefreshCw className="animate-spin text-zinc-400" size={12} />
-                Syncing...
-              </span>
-            )}
-          </div>
-          <p className="app-sub text-zinc-400 mt-1">
-            Manage your personal profile, credentials, automated job scraping,
-            and system preferences.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => navigate("/dashboard")}
-          className="h-9 px-3.5 rounded bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 border border-white/10 text-xs font-medium cursor-pointer transition-colors flex items-center gap-1.5 self-start sm:self-auto"
-        >
-          <FiArrowLeft size={13} />
-          <span>Dashboard</span>
-        </button>
-      </div>
-
-      {/* Editing Mode Banner */}
-      {isEditing && (
-        <div className="flex items-center justify-between p-3.5 rounded-lg bg-emerald-950/30 border border-emerald-500/30 text-xs">
-          <div className="flex items-center gap-2 text-emerald-300 font-medium">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Editing Mode Active</span>
-            <span className="text-zinc-400 font-normal">
-              — Modify fields, resume, skills, or scraping interval below. Save
-              at the bottom.
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {isDirty ? (
-              <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-mono text-[11px]">
-                ● Unsaved Changes
-              </span>
-            ) : (
-              <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono text-[11px]">
-                No changes yet
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Identity Overview Card */}
-      <div className="glass-panel p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-zinc-800 to-zinc-700 border border-white/15 flex items-center justify-center text-lg font-bold text-zinc-100 shadow-inner shrink-0">
-            {fullName
-              ? fullName
-                  .split(" ")
-                  .map((n) => n[0])
-                  .slice(0, 2)
-                  .join("")
-                  .toUpperCase()
-              : "U"}
-          </div>
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <h3 className="app-card-title text-zinc-100">
-                {fullName || "Candidate"}
-              </h3>
-              <span className="app-caption px-2 py-0.5 rounded-full bg-emerald-950/50 border border-emerald-800/50 text-emerald-400 text-[10px] font-medium">
-                Profile Active
-              </span>
-            </div>
-            <p className="app-sub text-zinc-400">
-              {role || "Target role not specified"}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 font-mono text-xs text-zinc-400">
-          <span className="px-2.5 py-1 rounded bg-zinc-900 border border-white/5">
-            {skills.length} skills tracked
-          </span>
-          <span className="px-2.5 py-1 rounded bg-zinc-900 border border-white/5">
-            {links.length} links connected
-          </span>
-        </div>
-      </div>
-
-      {/* SECTION 1: Personal & Job Targeting Details */}
-      <div className="glass-panel p-5 sm:p-6 space-y-5">
-        <div className="pb-2 border-b border-white/5">
-          <h2 className="app-card-title text-zinc-100 flex items-center gap-2">
+          <h1 className="app-heading-page flex items-center gap-2.5">
             <FiUser className="text-zinc-400" />
-            <span>Personal &amp; Job Targeting Details</span>
-          </h2>
-          <p className="app-sub text-zinc-500 mt-0.5">
-            Stored in database and used for automated job scraping and
-            evaluation.
+            <span>Profile &amp; Resume</span>
+          </h1>
+          <p className="app-sub text-zinc-400 mt-1">
+            Candidate details, technical skills, and resume used for AI job
+            matching
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {/* Full Name */}
-          <div className="space-y-2">
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          {!isEditing ? (
+            <button
+              type="button"
+              onClick={() => setDraft({ ...savedSnapshot })}
+              className="h-9 px-3.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border border-white/15 text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+            >
+              <FiEdit3 size={13} className="text-emerald-400" />
+              <span>Edit Profile</span>
+            </button>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={handleCancelEdit}
+                className="h-9 px-3.5 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-white/10 text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+              >
+                <FiX size={13} />
+                <span>Cancel</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleSaveProfile()}
+                disabled={!canSave}
+                className={`h-9 px-4 rounded text-xs font-semibold inline-flex items-center gap-1.5 transition-all ${
+                  canSave
+                    ? "bg-emerald-400 hover:bg-emerald-300 text-zinc-950 cursor-pointer"
+                    : "bg-zinc-800/80 text-zinc-500 border border-white/5 cursor-not-allowed opacity-60"
+                }`}
+              >
+                {isSaving ? (
+                  <>
+                    <FiLoader size={13} className="animate-spin" />
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <FiSave size={13} />
+                    <span>Save Changes</span>
+                  </>
+                )}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="glass-panel p-5 sm:p-6 space-y-5">
+        <h2 className="app-card-title text-zinc-100 flex items-center gap-2 pb-2 border-b border-white/5">
+          <FiUser className="text-zinc-400" />
+          <span>Personal &amp; Target Role</span>
+        </h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
             <label className="block app-label text-zinc-200">Full Name *</label>
-            <div className="relative">
-              <input
-                type="text"
-                disabled={!isEditing}
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="e.g. Arjun Sharma"
-                className="w-full h-10 px-3.5 app-input rounded glass-input placeholder-zinc-500 transition-all border border-white/10 disabled:opacity-75 disabled:cursor-not-allowed disabled:bg-zinc-950/40"
-              />
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none">
-                <FiUser size={14} />
-              </div>
-            </div>
+            <input
+              type="text"
+              disabled={!isEditing}
+              value={current.fullName}
+              onChange={(e) => updateDraft({ fullName: e.target.value })}
+              placeholder="e.g. Arjun Sharma"
+              className="w-full h-10 px-3.5 app-input rounded glass-input placeholder-zinc-500 border border-white/10 disabled:opacity-75 disabled:cursor-not-allowed"
+            />
           </div>
 
-          {/* Target Role Dropdown */}
-          <div className="space-y-2 relative" ref={roleDropdownRef}>
+          <div className="space-y-1.5 relative" ref={roleDropdownRef}>
             <label className="block app-label text-zinc-200">
-              Target Role / Job Title *
+              Target Role *
             </label>
             <div className="relative">
               <input
                 type="text"
                 disabled={!isEditing}
-                value={roleSearchTerm}
+                value={current.role}
                 onChange={(e) => {
-                  if (!isEditing) return;
-                  setRoleSearchTerm(e.target.value);
-                  setRole(e.target.value);
+                  updateDraft({ role: e.target.value });
                   setIsRoleDropdownOpen(true);
                 }}
                 onFocus={() => {
                   if (isEditing) setIsRoleDropdownOpen(true);
                 }}
-                placeholder="e.g. Frontend Developer, DevOps..."
-                className="w-full h-10 px-3.5 pr-10 app-input rounded glass-input placeholder-zinc-500 transition-all border border-white/10 disabled:opacity-75 disabled:cursor-not-allowed disabled:bg-zinc-950/40"
+                placeholder="e.g. Full Stack Developer"
+                className="w-full h-10 px-3.5 pr-9 app-input rounded glass-input placeholder-zinc-500 border border-white/10 disabled:opacity-75 disabled:cursor-not-allowed"
               />
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none">
-                <FiSearch size={14} />
-              </div>
+              <FiSearch
+                size={14}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none"
+              />
             </div>
 
-            {isEditing && isRoleDropdownOpen && (
-              <div className="absolute z-50 left-0 right-0 mt-1 max-h-56 overflow-y-auto rounded bg-zinc-900 border border-white/10 shadow-2xl divide-y divide-white/[0.04]">
-                {filteredRoles.slice(0, 20).map((r) => (
+            {isEditing && isRoleDropdownOpen && filteredRoles.length > 0 && (
+              <div className="absolute z-50 left-0 right-0 mt-1 max-h-52 overflow-y-auto rounded bg-zinc-900 border border-white/10 shadow-2xl divide-y divide-white/[0.04]">
+                {filteredRoles.slice(0, 15).map((r) => (
                   <button
                     key={r}
                     type="button"
                     onMouseDown={() => {
-                      setRole(r);
-                      setRoleSearchTerm(r);
+                      updateDraft({ role: r });
                       setIsRoleDropdownOpen(false);
                     }}
-                    className="w-full px-3.5 py-2 text-left text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors flex items-center justify-between cursor-pointer"
+                    className="w-full px-3.5 py-2 text-left text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white flex items-center justify-between cursor-pointer"
                   >
                     <span>{r}</span>
-                    {r.toLowerCase() === role.toLowerCase() && (
-                      <FiCheck
-                        className="text-emerald-400 shrink-0"
-                        size={13}
-                      />
+                    {r.toLowerCase() === current.role.toLowerCase() && (
+                      <FiCheck className="text-emerald-400" size={13} />
                     )}
                   </button>
                 ))}
-                {filteredRoles.length === 0 && (
-                  <div className="px-3.5 py-2 text-xs text-zinc-400 italic">
-                    Custom role:{" "}
-                    <strong className="text-zinc-200">
-                      "{roleSearchTerm}"
-                    </strong>
-                  </div>
-                )}
               </div>
             )}
           </div>
 
-          {/* Email Address */}
-          <div className="space-y-2">
-            <label className="block app-label text-zinc-200">
-              Email Address
-            </label>
+          <div className="space-y-1.5">
+            <label className="block app-label text-zinc-200">Email</label>
             <div className="relative">
               <input
                 type="email"
                 disabled={!isEditing}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={current.email}
+                onChange={(e) => updateDraft({ email: e.target.value })}
                 placeholder="candidate@example.com"
-                className="w-full h-10 px-3.5 app-input rounded glass-input placeholder-zinc-500 transition-all border border-white/10 disabled:opacity-75 disabled:cursor-not-allowed disabled:bg-zinc-950/40"
+                className="w-full h-10 px-3.5 pr-9 app-input rounded glass-input placeholder-zinc-500 border border-white/10 disabled:opacity-75 disabled:cursor-not-allowed"
               />
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none">
-                <FiMail size={14} />
-              </div>
+              <FiMail
+                size={14}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none"
+              />
             </div>
           </div>
 
-          {/* Phone Number */}
-          <div className="space-y-2">
-            <label className="block app-label text-zinc-200">
-              Phone Number
-            </label>
+          <div className="space-y-1.5">
+            <label className="block app-label text-zinc-200">Phone</label>
             <div className="relative">
               <input
                 type="tel"
                 disabled={!isEditing}
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                value={current.phone}
+                onChange={(e) => updateDraft({ phone: e.target.value })}
                 placeholder="+91 98765 43210"
-                className="w-full h-10 px-3.5 app-input rounded glass-input placeholder-zinc-500 transition-all border border-white/10 disabled:opacity-75 disabled:cursor-not-allowed disabled:bg-zinc-950/40"
+                className="w-full h-10 px-3.5 pr-9 app-input rounded glass-input placeholder-zinc-500 border border-white/10 disabled:opacity-75 disabled:cursor-not-allowed"
               />
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none">
-                <FiPhone size={14} />
-              </div>
+              <FiPhone
+                size={14}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none"
+              />
             </div>
           </div>
         </div>
       </div>
 
-      {/* SECTION 2: Professional & Social Links */}
       <div className="glass-panel p-5 sm:p-6 space-y-4">
-        <div className="pb-2 border-b border-white/5">
+        <div className="flex items-center justify-between pb-2 border-b border-white/5">
           <h2 className="app-card-title text-zinc-100 flex items-center gap-2">
-            <FiGlobe className="text-zinc-400" />
-            <span>Professional &amp; Social Links ({links.length})</span>
+            <FiCheck className="text-emerald-400" />
+            <span>Technical Skills ({current.skills.length})</span>
           </h2>
-          <p className="app-sub text-zinc-500 mt-0.5">
-            Attached GitHub, LinkedIn, portfolio, and personal links.
-          </p>
         </div>
 
         {isEditing && (
-          <div className="flex gap-2">
-            <input
-              type="url"
-              value={newLinkInput}
-              onChange={(e) => setNewLinkInput(e.target.value)}
-              onKeyDown={handleLinkKeyDown}
-              placeholder="https://github.com/your-handle or https://linkedin.com/in/..."
-              className="flex-1 h-10 px-3.5 app-input rounded glass-input placeholder-zinc-500 transition-all border border-white/10"
-            />
-            <button
-              type="button"
-              onClick={() => addLink(newLinkInput)}
-              className="h-10 px-4 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded text-xs font-medium cursor-pointer transition-colors flex items-center gap-1.5 shrink-0"
-            >
-              <FiPlus size={13} />
-              <span>Add Link</span>
-            </button>
+          <div className="space-y-3">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newSkillInput}
+                onChange={(e) => setNewSkillInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === ",") {
+                    e.preventDefault();
+                    addSkill(newSkillInput);
+                  }
+                }}
+                placeholder="Add skill (press Enter or comma)"
+                className="flex-1 h-9 px-3.5 app-input rounded glass-input placeholder-zinc-500 border border-white/10"
+              />
+              <button
+                type="button"
+                onClick={() => addSkill(newSkillInput)}
+                className="h-9 px-3.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded text-xs font-medium cursor-pointer flex items-center gap-1.5"
+              >
+                <FiPlus size={13} />
+                <span>Add</span>
+              </button>
+            </div>
+
+            <div className="flex flex-wrap gap-1.5">
+              {POPULAR_SKILLS.filter(
+                (s) =>
+                  !current.skills.some(
+                    (existing) => existing.toLowerCase() === s.toLowerCase(),
+                  ),
+              )
+                .slice(0, 8)
+                .map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => addSkill(s)}
+                    className="px-2.5 py-1 rounded bg-zinc-900/60 hover:bg-zinc-800 text-[11px] text-zinc-400 hover:text-zinc-200 border border-white/5 cursor-pointer"
+                  >
+                    + {s}
+                  </button>
+                ))}
+            </div>
           </div>
         )}
 
-        {links.length > 0 ? (
-          <div className="space-y-2 pt-1">
-            {links.map((link) => {
-              const isGithub = link.includes("github.com");
-              const isLinkedin = link.includes("linkedin.com");
-              return (
-                <div
-                  key={link}
-                  className="flex items-center justify-between p-3 rounded bg-zinc-900/60 border border-white/5 text-xs"
-                >
-                  <div className="flex items-center gap-2.5 truncate mr-3">
-                    {isGithub ? (
-                      <FaGithub className="text-zinc-300 shrink-0" size={15} />
-                    ) : isLinkedin ? (
-                      <FaLinkedin
-                        className="text-blue-400 shrink-0"
-                        size={15}
-                      />
-                    ) : (
-                      <FiGlobe className="text-zinc-400 shrink-0" size={15} />
-                    )}
-                    <span className="font-mono text-zinc-200 truncate">
-                      {link}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-2 shrink-0">
-                    <a
-                      href={link}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="p-1 text-zinc-400 hover:text-zinc-200 transition-colors"
-                      title="Open link in new tab"
-                    >
-                      <FiExternalLink size={13} />
-                    </a>
-                    {isEditing && (
-                      <button
-                        type="button"
-                        onClick={() => removeLink(link)}
-                        className="p-1 text-zinc-500 hover:text-red-400 transition-colors cursor-pointer"
-                        title="Remove link"
-                      >
-                        <FiTrash2 size={13} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+        {current.skills.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {current.skills.map((skill) => (
+              <span
+                key={skill}
+                className="h-8 pl-3 pr-2 rounded text-xs font-medium inline-flex items-center gap-1.5 bg-zinc-800/90 text-zinc-200 border border-white/10"
+              >
+                <span>{skill}</span>
+                {isEditing && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateDraft({
+                        skills: current.skills.filter((s) => s !== skill),
+                      })
+                    }
+                    className="text-zinc-400 hover:text-red-400 cursor-pointer p-0.5"
+                    title={`Remove ${skill}`}
+                  >
+                    ✕
+                  </button>
+                )}
+              </span>
+            ))}
           </div>
         ) : (
-          <div className="p-4 rounded bg-zinc-900/40 border border-white/[0.04] text-center text-xs text-zinc-500">
-            No professional links attached yet.
-          </div>
+          <p className="text-xs text-zinc-500">No skills configured yet.</p>
         )}
       </div>
 
-      {/* SECTION 3: Resume Document Management */}
       <div className="glass-panel p-5 sm:p-6 space-y-4">
-        <div className="pb-2 border-b border-white/5">
-          <h2 className="app-card-title text-zinc-100 flex items-center gap-2">
-            <FiFileText className="text-emerald-400" />
-            <span>Resume Document Management</span>
-          </h2>
-          <p className="app-sub text-zinc-500 mt-0.5">
-            Upload or replace your resume. Files are saved to Cloudinary and scanned for technical skills.
-          </p>
-        </div>
+        <h2 className="app-card-title text-zinc-100 flex items-center gap-2 pb-2 border-b border-white/5">
+          <FiFileText className="text-emerald-400" />
+          <span>Resume</span>
+        </h2>
 
-        {/* Current Active Resume Details */}
-        {(resumeFileName || resumeUrl) && (
-          <div className="p-4 rounded bg-zinc-900/70 border border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded bg-emerald-950/40 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
-                <FiFileText size={18} />
+        {(current.resumeFileName || current.resumeUrl) && (
+          <div className="p-3.5 rounded bg-zinc-900/70 border border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 rounded bg-emerald-950/40 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
+                <FiFileText size={16} />
               </div>
-              <div>
-                <h4 className="text-xs font-semibold text-zinc-200 truncate max-w-sm">
-                  {resumeFileName || "Candidate Resume.pdf"}
-                </h4>
-                <p className="text-[11px] text-zinc-500 font-mono">
-                  Cloudinary Managed • Extracted &amp; Linked
-                </p>
-              </div>
+              <span className="text-xs font-medium text-zinc-200 truncate">
+                {current.resumeFileName || "Candidate Resume.pdf"}
+              </span>
             </div>
 
-            <div className="flex items-center gap-2">
-              {resumeUrl && (
+            <div className="flex items-center gap-2 shrink-0">
+              {current.resumeUrl && (
                 <a
-                  href={resumeUrl}
+                  href={current.resumeUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium border border-white/10 flex items-center gap-1.5 transition-colors"
+                  className="px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium border border-white/10 inline-flex items-center gap-1.5"
                 >
                   <FiExternalLink size={12} />
-                  <span>View File</span>
+                  <span>View</span>
                 </a>
               )}
-
               {isEditing && (
                 <button
                   type="button"
                   onClick={() => {
-                    setResumeUrl("");
-                    setResumeFileName("");
+                    updateDraft({ resumeUrl: "", resumeFileName: "" });
                     setSelectedResumeFile(null);
-                    notifyInfo("Resume unlinked. Save changes at bottom to commit.");
                   }}
-                  className="px-3 py-1.5 rounded bg-red-950/30 hover:bg-red-900/40 text-red-300 text-xs font-medium border border-red-900/40 flex items-center gap-1.5 transition-colors cursor-pointer"
+                  className="px-3 py-1.5 rounded bg-red-950/30 hover:bg-red-900/40 text-red-300 text-xs font-medium border border-red-900/40 inline-flex items-center gap-1.5 cursor-pointer"
                 >
                   <FiTrash2 size={12} />
                   <span>Remove</span>
@@ -978,13 +574,12 @@ export const ProfilePage: React.FC = () => {
           </div>
         )}
 
-        {/* Resume Upload Dropzone */}
-        {isEditing ? (
+        {isEditing && (
           <label
-            className={`relative flex items-center justify-center gap-2.5 h-32 w-full rounded-lg border-2 border-dashed transition-all cursor-pointer group ${
+            className={`flex items-center justify-center gap-2.5 h-24 w-full rounded-lg border border-dashed transition-all cursor-pointer ${
               selectedResumeFile
-                ? "border-emerald-500/50 bg-emerald-500/10 hover:border-emerald-500/70"
-                : "border-zinc-700/60 bg-zinc-900/30 hover:border-zinc-500/60 hover:bg-zinc-800/20"
+                ? "border-emerald-500/50 bg-emerald-500/10"
+                : "border-zinc-700/60 bg-zinc-900/30 hover:border-zinc-500/60"
             }`}
           >
             <input
@@ -997,285 +592,114 @@ export const ProfilePage: React.FC = () => {
               }}
             />
             {isExtractingResume ? (
-              <div className="flex flex-col items-center gap-2">
-                <FiLoader size={22} className="text-zinc-300 animate-spin" />
-                <span className="text-xs text-zinc-300 font-medium">
-                  Scanning resume &amp; extracting skills...
-                </span>
-              </div>
+              <span className="text-xs text-zinc-300 flex items-center gap-2">
+                <FiLoader size={16} className="animate-spin" />
+                Scanning resume...
+              </span>
             ) : selectedResumeFile ? (
-              <div className="flex flex-col items-center gap-1">
-                <FiCheck size={22} className="text-emerald-400" />
-                <span className="text-xs text-emerald-300 font-medium truncate max-w-xs">
-                  {selectedResumeFile.name} (Ready to upload on save)
-                </span>
-                <span className="text-[11px] text-zinc-500">
-                  Click to choose a different resume file
-                </span>
-              </div>
+              <span className="text-xs text-emerald-300 font-medium truncate max-w-xs">
+                {selectedResumeFile.name} (ready to upload on save)
+              </span>
             ) : (
-              <div className="flex flex-col items-center gap-1.5">
-                <FiUpload
-                  size={22}
-                  className="text-zinc-500 group-hover:text-zinc-300 transition-colors"
-                />
-                <span className="text-xs text-zinc-400 group-hover:text-zinc-200 font-medium transition-colors">
-                  Click or drop new resume to update (.pdf, .docx, .txt)
-                </span>
-                <span className="text-[11px] text-zinc-600">
-                  Uploads to Cloudinary and merges newly discovered skills
-                </span>
-              </div>
+              <span className="text-xs text-zinc-400 flex items-center gap-2">
+                <FiUpload size={15} />
+                Upload replacement resume (.pdf, .docx, .txt)
+              </span>
             )}
           </label>
-        ) : (
-          <div className="p-4 rounded border border-white/5 bg-zinc-950/40 text-center text-xs text-zinc-500">
-            Resume document is locked in read-only mode. Click Edit Profile below to upload or replace resume.
-          </div>
         )}
       </div>
 
-      {/* SECTION 4: Verified Technical Skills */}
       <div className="glass-panel p-5 sm:p-6 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-white/5">
-          <div>
-            <h2 className="app-card-title text-zinc-100 flex items-center gap-2">
-              <FiCheck className="text-emerald-400" />
-              <span>Verified Technical Skills ({skills.length})</span>
-            </h2>
-            <p className="app-sub text-zinc-500 mt-0.5">
-              Job scraping algorithms match portal postings against these skills.
-            </p>
-          </div>
-          <span className="app-caption px-2.5 py-1 rounded bg-zinc-900 border border-white/10 font-mono text-zinc-400 self-start sm:self-auto">
-            {skills.length} active tags
-          </span>
-        </div>
-
-        {isEditing && (
-          <>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newSkillInput}
-                onChange={(e) => setNewSkillInput(e.target.value)}
-                onKeyDown={handleSkillKeyDown}
-                placeholder="Add skill (e.g. React, Docker, Kubernetes) — press Enter or comma"
-                className="flex-1 h-10 px-3.5 app-input rounded glass-input placeholder-zinc-500 transition-all border border-white/10"
-              />
-              <button
-                type="button"
-                onClick={() => addSkill(newSkillInput)}
-                className="h-10 px-4 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded text-xs font-medium cursor-pointer transition-colors flex items-center gap-1.5 shrink-0"
-              >
-                <FiPlus size={13} />
-                <span>Add Skill</span>
-              </button>
-            </div>
-
-            {/* Quick Add Suggestions */}
-            <div className="space-y-1.5 pt-1">
-              <span className="text-[11px] text-zinc-500">
-                Quick-add common skills:
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                {POPULAR_SKILLS.filter(
-                  (s) =>
-                    !skills.some(
-                      (existing) => existing.toLowerCase() === s.toLowerCase(),
-                    ),
-                )
-                  .slice(0, 10)
-                  .map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => addSkill(s)}
-                      className="px-2.5 py-1 rounded bg-zinc-900/60 hover:bg-zinc-800 text-[11px] text-zinc-400 hover:text-zinc-200 border border-white/5 cursor-pointer transition-colors"
-                    >
-                      + {s}
-                    </button>
-                  ))}
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* Active Skills List */}
-        {skills.length > 0 ? (
-          <div className="flex flex-wrap gap-2 p-3.5 rounded bg-zinc-900/50 border border-white/[0.06] max-h-56 overflow-y-auto">
-            {skills.map((skill) => (
-              <span
-                key={skill}
-                className="h-8 pl-3 pr-2 rounded text-xs font-medium inline-flex items-center gap-1.5 bg-zinc-800/90 text-zinc-200 border border-white/10 group hover:border-white/20 transition-colors"
-              >
-                <span>{skill}</span>
-                {isEditing && (
-                  <button
-                    type="button"
-                    onClick={() => removeSkill(skill)}
-                    className="text-zinc-400 hover:text-red-400 cursor-pointer transition-colors leading-none p-0.5"
-                    title={`Remove ${skill}`}
-                  >
-                    ✕
-                  </button>
-                )}
-              </span>
-            ))}
-          </div>
-        ) : (
-          <div className="p-4 rounded bg-zinc-900/40 border border-white/[0.04] text-center text-xs text-zinc-500">
-            No technical skills configured yet. Click Edit Profile below to add skills.
-          </div>
-        )}
-      </div>
-      <div className="glass-panel p-5 sm:p-6 space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/5">
-          <div>
-            <h2 className="app-card-title text-zinc-100 flex items-center gap-2">
-              <FiClock className="text-emerald-400" />
-              <span>Automated Scraping Schedule</span>
-            </h2>
-            <p className="app-sub text-zinc-400 mt-1">
-              Background job scraping runs automatically at a fixed {SCRAPE_INTERVAL_MINUTES}-minute interval.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="app-caption px-2.5 py-1 rounded bg-zinc-900 border border-white/10 font-mono text-zinc-300">
-              Every {SCRAPE_INTERVAL_MINUTES}m
-            </span>
-            <span className="app-caption px-2.5 py-1 rounded border font-medium bg-emerald-950/40 border-emerald-800/40 text-emerald-400">
-              Active
-            </span>
-          </div>
-        </div>
-
-        <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="text-xs text-zinc-400">
-            Want to run an ad-hoc scraping cycle right now?
-          </div>
-          <button
-            type="button"
-            onClick={handleTriggerScrapeNow}
-            disabled={isScrapingNow}
-            className="px-4 py-2 rounded bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 border border-emerald-800/40 text-xs font-medium flex items-center gap-2 cursor-pointer transition-colors disabled:opacity-50"
-          >
-            <FiRefreshCw
-              className={isScrapingNow ? "animate-spin" : ""}
-              size={13}
-            />
-            <span>
-              {isScrapingNow ? "Scraping Portals..." : "Trigger Scrape Now"}
-            </span>
-          </button>
-        </div>
-      </div>
-
-      {/* SECTION 6: System & Appearance Preferences */}
-      <div className="glass-panel p-5 sm:p-6 space-y-5">
-        <h2 className="app-card-title text-zinc-100 flex items-center gap-2">
-          <FiSliders className="text-zinc-400" />
-          <span>Layout &amp; Appearance Preferences</span>
+        <h2 className="app-card-title text-zinc-100 flex items-center gap-2 pb-2 border-b border-white/5">
+          <FiGlobe className="text-zinc-400" />
+          <span>Links ({current.links.length})</span>
         </h2>
 
-        <div className="flex items-center justify-between p-4 rounded bg-zinc-900/60 border border-white/5">
-          <div className="space-y-0.5">
-            <span className="app-label text-zinc-200">
-              Navigation Dock Behavior
-            </span>
-            <p className="app-caption text-zinc-400">
-              Bottom-docked Apple macOS style with spring interactive scaling
-            </p>
+        {isEditing && (
+          <div className="flex gap-2">
+            <input
+              type="url"
+              value={newLinkInput}
+              onChange={(e) => setNewLinkInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addLink(newLinkInput);
+                }
+              }}
+              placeholder="https://github.com/..."
+              className="flex-1 h-9 px-3.5 app-input rounded glass-input placeholder-zinc-500 border border-white/10"
+            />
+            <button
+              type="button"
+              onClick={() => addLink(newLinkInput)}
+              className="h-9 px-3.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded text-xs font-medium cursor-pointer flex items-center gap-1.5"
+            >
+              <FiPlus size={13} />
+              <span>Add</span>
+            </button>
           </div>
-          <span className="app-caption text-zinc-400 flex items-center gap-1.5">
-            <FiCheck className="text-emerald-400" />
-            Active
-          </span>
-        </div>
-
-        <div className="flex items-center justify-between p-4 rounded bg-zinc-900/60 border border-white/5">
-          <div className="space-y-0.5">
-            <span className="app-label text-zinc-200">System Theme</span>
-            <p className="app-caption text-zinc-400">
-              Clean semi-transparent dark obsidian with neutral slate accents
-            </p>
-          </div>
-          <span className="app-caption text-zinc-400 flex items-center gap-1.5">
-            <FiCheck className="text-emerald-400" />
-            Active
-          </span>
-        </div>
-
-        <div className="flex items-center justify-between p-4 rounded bg-zinc-900/60 border border-white/5">
-          <div className="space-y-0.5">
-            <span className="app-label text-zinc-200">
-              Real-time Notifications
-            </span>
-            <p className="app-caption text-zinc-400">
-              Toast popups for scraping sessions, AI analysis, and error alerts
-            </p>
-          </div>
-          <span className="app-caption text-zinc-400 flex items-center gap-1.5">
-            <FiCheck className="text-emerald-400" />
-            Enabled
-          </span>
-        </div>
-      </div>
-
-      {/* BOTTOM ACTION BAR: Edit, Cancel, & Save Changes in ONE place */}
-      <div className="flex items-center justify-end gap-3 self-end sm:self-auto">
-        {/* Edit / Cancel Button */}
-        {!isEditing ? (
-          <button
-            type="button"
-            onClick={handleStartEditing}
-            className="h-10 px-4 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border border-white/15 text-xs font-semibold cursor-pointer transition-all flex items-center gap-1.5 shadow-sm active:scale-[0.99]"
-          >
-            <FiEdit3 size={13} className="text-emerald-400" />
-            <span>Edit Profile</span>
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={handleCancelEdit}
-            className="h-10 px-4 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-white/10 text-xs font-medium cursor-pointer transition-colors flex items-center gap-1.5"
-          >
-            <FiX size={13} />
-            <span>Cancel</span>
-          </button>
         )}
 
-        {/* Save Changes Button (Only enabled when isEditing && isDirty) */}
-        <button
-          type="button"
-          onClick={handleSaveProfile}
-          disabled={!canSave}
-          title={
-            !isEditing
-              ? "Click 'Edit Profile' to make changes"
-              : !isDirty
-                ? "No changes made yet"
-                : "Save your changes to backend"
-          }
-          className={`h-10 px-5 rounded text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-sm shrink-0 ${
-            canSave
-              ? "bg-emerald-400 hover:bg-emerald-300 text-zinc-950 cursor-pointer shadow-lg shadow-emerald-500/20 active:scale-[0.99]"
-              : "bg-zinc-800/80 text-zinc-500 border border-white/5 cursor-not-allowed opacity-50 shadow-none"
-          }`}
-        >
-          {isSaving ? (
-            <>
-              <FiLoader size={13} className="animate-spin" />
-              <span>Saving Changes...</span>
-            </>
-          ) : (
-            <>
-              <FiSave size={13} />
-              <span>Save Changes</span>
-            </>
-          )}
-        </button>
+        {current.links.length > 0 ? (
+          <div className="space-y-2">
+            {current.links.map((link) => {
+              const isGithub = link.includes("github.com");
+              const isLinkedin = link.includes("linkedin.com");
+              return (
+                <div
+                  key={link}
+                  className="flex items-center justify-between p-2.5 rounded bg-zinc-900/60 border border-white/5 text-xs"
+                >
+                  <div className="flex items-center gap-2.5 truncate mr-3">
+                    {isGithub ? (
+                      <FaGithub className="text-zinc-300 shrink-0" size={14} />
+                    ) : isLinkedin ? (
+                      <FaLinkedin
+                        className="text-blue-400 shrink-0"
+                        size={14}
+                      />
+                    ) : (
+                      <FiGlobe className="text-zinc-400 shrink-0" size={14} />
+                    )}
+                    <span className="font-mono text-zinc-200 truncate">
+                      {link}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <a
+                      href={link}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="p-1 text-zinc-400 hover:text-zinc-200"
+                      title="Open link"
+                    >
+                      <FiExternalLink size={13} />
+                    </a>
+                    {isEditing && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateDraft({
+                            links: current.links.filter((l) => l !== link),
+                          })
+                        }
+                        className="p-1 text-zinc-500 hover:text-red-400 cursor-pointer"
+                        title="Remove link"
+                      >
+                        <FiTrash2 size={13} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-xs text-zinc-500">No links attached.</p>
+        )}
       </div>
     </div>
   );

@@ -271,8 +271,55 @@ export async function updateUserController(
       }
     }
 
-    const existing = (await getUserDataFromFile()) ?? {};
-    const merged = { ...existing, ...updatePayload, updatedAt: new Date().toISOString() };
+    const existing = (await getUserDataFromFile()) ?? { personalDetails: {} };
+    const existingPersonal = existing.personalDetails ?? {};
+    const resolvedFullname = (
+      updatePayload.fullName ||
+      updatePayload.fullname ||
+      existingPersonal.fullName ||
+      existingPersonal.name ||
+      ""
+    ).trim();
+    const resolvedResumePath =
+      updatePayload.resume?.path ??
+      updatePayload.resumeUrl ??
+      existingPersonal.resumePath ??
+      "";
+    const resolvedResumeFileName =
+      updatePayload.resume?.fileName ??
+      updatePayload.resumeFileName ??
+      existingPersonal.resumeFileName ??
+      "";
+
+    const merged = {
+      ...existing,
+      personalDetails: {
+        ...existingPersonal,
+        ...(resolvedFullname
+          ? { name: resolvedFullname, fullName: resolvedFullname }
+          : {}),
+        ...(updatePayload.role !== undefined ? { role: updatePayload.role } : {}),
+        ...(updatePayload.email !== undefined
+          ? { email: updatePayload.email }
+          : {}),
+        ...(updatePayload.phone !== undefined
+          ? { phone: updatePayload.phone }
+          : {}),
+        ...(Array.isArray(updatePayload.links)
+          ? { links: updatePayload.links }
+          : {}),
+        ...(Array.isArray(updatePayload.skills)
+          ? { skills: updatePayload.skills }
+          : {}),
+        ...(resolvedResumePath
+          ? { resumePath: resolvedResumePath, resumeLink: resolvedResumePath }
+          : {}),
+        ...(resolvedResumeFileName
+          ? { resumeFileName: resolvedResumeFileName }
+          : {}),
+      },
+      updatedAt: new Date().toISOString(),
+    };
     await saveUserDataToFile(merged);
 
     res.status(200).json({

@@ -10,8 +10,11 @@ if (parentPid) {
 }
 import "../../../../config/load-env.js";
 import amqp, { type Message, type Channel } from "amqplib";
+import mongoose from "mongoose";
 import {
   Logger,
+  JobModel,
+  connectToDb,
   aiEvaluationExchange,
   aiEvaluationQueue,
   aiEvaluationDlx,
@@ -25,7 +28,12 @@ import {
   rateResumeAgainstJDs,
   displayRatingReportOnTerminal,
   type ScrapedJobDescription,
+  type JobRating,
 } from "../../../Scrapping/services/naukri/naukriJDScrap.js";
+import {
+  normalizeJobUrl,
+  saveMatchedJobsToFile,
+} from "../../../../helper/matchedJobsHelper.js";
 import { startSpinningLoader } from "../../../../utility/TerminalProgress.js";
 import { safeAssertQueue } from "../../helpers/safeAssertQueue.js";
 
@@ -36,7 +44,89 @@ let connection: Awaited<ReturnType<typeof amqp.connect>> | null = null;
 let channel: Channel | null = null;
 let shuttingDown = false;
 
+async function persistMatchedJobs(
+  ratedJobs: JobRating[],
+  sourceJds: ScrapedJobDescription[],
+): Promise<void> {
+  if (!Array.isArray(ratedJobs) || ratedJobs.length === 0) {
+    return;
+  }
+
+  const jdById = new Map(sourceJds.map((j) => [j.jobId, j]));
+  const now = new Date();
+
+  const enrichedJobs = ratedJobs.map((rj) => {
+    const jd = jdById.get(rj.jobId);
+    const matchingSkills = Array.isArray(rj.matchingSkills)
+      ? rj.matchingSkills
+      : [];
+    return {
+      ...rj,
+      jdURL: normalizeJobUrl(rj.jdURL || jd?.jdURL),
+      matchingSkills,
+      missingSkills: Array.isArray(rj.missingSkills) ? rj.missingSkills : [],
+      tagsAndSkills:
+        matchingSkills.length > 0 ? matchingSkills : jd?.tagsAndSkills ?? [],
+      aiSummary: rj.summary ?? "",
+      aiRecommendation: rj.recommendation ?? "",
+      aiEvaluatedAt: now,
+    };
+  });
+
+  await saveMatchedJobsToFile(enrichedJobs).catch((err) => {
+    log.warn(`[${workerId}] Failed saving matched jobs snapshot: ${err}`);
+  });
+
+  if (mongoose.connection.readyState === 1) {
+    await JobModel.bulkWrite(
+      enrichedJobs.map((job) => ({
+        updateOne: {
+          filter: { jobId: job.jobId },
+          update: {
+            $set: {
+              isAiMatch: true,
+              matchScore: job.matchScore,
+              fitVerdict: job.fitVerdict,
+              matchingSkills: job.matchingSkills,
+              missingSkills: job.missingSkills,
+              aiSummary: job.aiSummary,
+              aiRecommendation: job.aiRecommendation,
+              aiEvaluatedAt: job.aiEvaluatedAt,
+              ...(job.title ? { title: job.title } : {}),
+              ...(job.companyName ? { companyName: job.companyName } : {}),
+              ...(job.jdURL ? { jdURL: job.jdURL } : {}),
+            },
+            $setOnInsert: {
+              applied: false,
+              footerPlaceholderLabel: "AI Match",
+              footerPlaceholderColor: "green",
+              tagsAndSkills:
+                job.matchingSkills.length > 0 ? job.matchingSkills : ["AI Match"],
+              placeholders: [],
+              JD: job.aiSummary || `${job.title} at ${job.companyName}`,
+              createdDate: Date.now(),
+              minExp: "0",
+              maxExp: "0",
+              walkIn: false,
+            },
+          },
+          upsert: true,
+        },
+      })),
+      { ordered: false },
+    );
+
+    log.info(
+      `[${workerId}] Persisted ${enrichedJobs.length} AI-matched jobs to MongoDB.`,
+    );
+  }
+}
+
 async function start(): Promise<void> {
+  if (process.env.MONGO_URI && process.env.MONGO_URI.trim() !== "") {
+    await connectToDb();
+  }
+
   connection = await amqp.connect(process.env.RABBITMQ_URL_WITH_CREDENTIALS!);
   channel = await connection.createChannel();
 
@@ -140,6 +230,7 @@ async function start(): Promise<void> {
 
         try {
           const ratingResult = await rateResumeAgainstJDs(jds, resumeBuffer);
+          await persistMatchedJobs(ratingResult.ratedJobs, jds);
           aiLoader.stop(`Gemini AI evaluation completed (${ratingResult.ratedJobs.length} qualifying matches).`);
           displayRatingReportOnTerminal(ratingResult, resumeSource);
           channel?.ack(message);
@@ -258,6 +349,9 @@ async function shutdown(): Promise<void> {
   try {
     await channel?.close();
     await connection?.close();
+    if (mongoose.connection.readyState !== 0) {
+      await mongoose.connection.close();
+    }
   } catch (error) {
     log.error(`[${workerId}] Shutdown error: ${error}`);
   }

@@ -16,6 +16,15 @@ export interface JOB_DETAILS extends Document {
   readonly maxExp: string;
   readonly applyByTime: string;
   readonly walkIn: boolean;
+  applied?: boolean;
+  isAiMatch?: boolean;
+  matchScore?: number | null;
+  fitVerdict?: string;
+  matchingSkills?: string[];
+  missingSkills?: string[];
+  aiSummary?: string;
+  aiRecommendation?: string;
+  aiEvaluatedAt?: Date | null;
 }
 
 export interface RequestParams {

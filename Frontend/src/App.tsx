@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import { AppLayout } from "./components/layout/AppLayout";
@@ -6,6 +7,7 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { JobsPage } from "./pages/JobsPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { useCandidateStore } from "./store/useCandidateStore";
+import { useJobStore } from "./store/useJobStore";
 
 function AppRoutes() {
   const { isFormFilled } = useCandidateStore();
@@ -16,13 +18,6 @@ function AppRoutes() {
         path="/"
         element={
           isFormFilled ? <Navigate to="/dashboard" replace /> : <DetailsPage />
-        }
-      />
-
-      <Route
-        path="/details"
-        element={
-          isFormFilled ? <Navigate to="/profile" replace /> : <DetailsPage />
         }
       />
 
@@ -48,11 +43,6 @@ function AppRoutes() {
       />
 
       <Route
-        path="/settings"
-        element={<Navigate to={isFormFilled ? "/profile" : "/"} replace />}
-      />
-
-      <Route
         path="*"
         element={<Navigate to={isFormFilled ? "/dashboard" : "/"} replace />}
       />
@@ -61,6 +51,39 @@ function AppRoutes() {
 }
 
 function App() {
+  useEffect(() => {
+    const { hydrateFromBackend } = useCandidateStore.getState();
+    const { flushPendingApplied, fetchMatchedJobs } = useJobStore.getState();
+
+    const initializeAppState = async () => {
+      await hydrateFromBackend();
+      await flushPendingApplied();
+      await fetchMatchedJobs();
+    };
+
+    void initializeAppState();
+
+    const handleBeforeExit = () => {
+      void useJobStore.getState().flushPendingApplied({ keepalive: true });
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        handleBeforeExit();
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeExit);
+    window.addEventListener("pagehide", handleBeforeExit);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeExit);
+      window.removeEventListener("pagehide", handleBeforeExit);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
+
   return (
     <BrowserRouter>
       <Toaster

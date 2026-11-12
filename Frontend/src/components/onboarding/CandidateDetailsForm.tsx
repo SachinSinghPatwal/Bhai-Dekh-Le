@@ -18,91 +18,12 @@ import {
   FiPlus,
 } from "react-icons/fi";
 import { parseResumeFile } from "../../utils/resumeParser";
+import { getApiUrl } from "../../lib/api";
+import { FALLBACK_IT_ROLES, POPULAR_SKILLS } from "../../lib/candidateOptions";
 
 const INPUT_CLASS =
   "w-full h-10 px-3.5 app-input rounded glass-input placeholder-zinc-500 transition-all";
 const LABEL_CLASS = "block app-label";
-
-const FALLBACK_IT_ROLES = [
-  "Frontend Developer",
-  "Backend Developer",
-  "Full Stack Developer",
-  "React Developer",
-  "Angular Developer",
-  "Vue.js Developer",
-  "Node.js Developer",
-  "Python Developer",
-  "Java Developer",
-  "DevOps Engineer",
-  "Cloud Engineer",
-  "AWS Solutions Architect",
-  "Azure Developer",
-  "Data Scientist",
-  "Data Analyst",
-  "Machine Learning Engineer",
-  "AI Engineer",
-  "Mobile Developer",
-  "Android Developer",
-  "iOS Developer",
-  "React Native Developer",
-  "Flutter Developer",
-  "QA Engineer",
-  "Test Automation Engineer",
-  "Site Reliability Engineer (SRE)",
-  "Database Administrator",
-  "UI/UX Designer",
-  "Product Manager",
-  "Scrum Master",
-  "Technical Lead",
-  "Software Architect",
-  "Security Engineer",
-  "Penetration Tester",
-  "Blockchain Developer",
-  "Embedded Systems Engineer",
-  "Game Developer",
-  "Unity Developer",
-  "Data Engineer",
-  "ETL Developer",
-  "Business Intelligence Developer",
-  "SAP Consultant",
-  "Salesforce Developer",
-  "Shopify Developer",
-  "WordPress Developer",
-  "TypeScript Developer",
-  "Go Developer",
-  "Rust Developer",
-  "C++ Developer",
-  "Kotlin Developer",
-  "Spring Boot Developer",
-  ".NET Developer",
-  "PHP Developer",
-  "Laravel Developer",
-  "Ruby on Rails Developer",
-  "GraphQL Developer",
-  "Microservices Developer",
-  "Systems Programmer",
-  "Network Engineer",
-  "IT Support Engineer",
-  "Cybersecurity Analyst",
-];
-
-const POPULAR_SKILLS = [
-  "React",
-  "Node.js",
-  "TypeScript",
-  "JavaScript",
-  "Python",
-  "Tailwind CSS",
-  "Next.js",
-  "MongoDB",
-  "PostgreSQL",
-  "Docker",
-  "AWS",
-  "Redux",
-  "Zustand",
-  "REST API",
-  "Git",
-];
 
 const SLIDE_STEPS = [
   { id: 0, title: "Personal Info" },
@@ -268,10 +189,15 @@ export const CandidateDetailsForm: React.FC<CandidateDetailsFormProps> = ({
   onCompleted,
 }) => {
   const navigate = useNavigate();
-  const { profile, isFormFilled, setDraftProfile, confirmProfileSaved } =
-    useCandidateStore();
+  const {
+    profile,
+    isFormFilled,
+    currentSlide,
+    setCurrentSlide,
+    setDraftProfile,
+    confirmProfileSaved,
+  } = useCandidateStore();
 
-  const [currentSlide, setCurrentSlide] = useState(0);
   const [attemptedSteps, setAttemptedSteps] = useState<Record<number, boolean>>(
     {},
   );
@@ -297,6 +223,7 @@ export const CandidateDetailsForm: React.FC<CandidateDetailsFormProps> = ({
     setValue,
     watch,
     trigger,
+    reset,
     formState: { errors },
   } = useForm<CandidateFormValues>({
     resolver: zodResolver(candidateSchema),
@@ -311,6 +238,26 @@ export const CandidateDetailsForm: React.FC<CandidateDetailsFormProps> = ({
       resumeUrl: profile?.resumeUrl || "",
     },
   });
+
+  const hasSyncedFromStoreRef = useRef(false);
+  useEffect(() => {
+    if (!profile || hasSyncedFromStoreRef.current) return;
+    hasSyncedFromStoreRef.current = true;
+    reset({
+      fullName: profile.fullName || "",
+      role: profile.role || "",
+      skills: profile.skills || [],
+      email: profile.email || "",
+      phone: profile.phone || "",
+      links: profile.links || [],
+      resumeFileName: profile.resumeFileName || "",
+      resumeUrl: profile.resumeUrl || "",
+    });
+    if (profile.resumeFileName) setUploadedFileName(profile.resumeFileName);
+    if (profile.email) setExtractedEmail(profile.email);
+    if (profile.phone) setExtractedPhone(profile.phone);
+    if (profile.links?.length) setExtractedLinks(profile.links);
+  }, [profile, reset]);
 
   const formValues = watch();
   const skillsList = watch("skills") || [];
@@ -454,10 +401,10 @@ export const CandidateDetailsForm: React.FC<CandidateDetailsFormProps> = ({
       email: formValues.email?.trim() || extractedEmail,
       phone: formValues.phone?.trim() || extractedPhone,
     });
-    setCurrentSlide((prev) => Math.min(prev + 1, SLIDE_STEPS.length - 1));
+    setCurrentSlide(Math.min(currentSlide + 1, SLIDE_STEPS.length - 1));
   };
 
-  const prevSlide = () => setCurrentSlide((prev) => Math.max(prev - 1, 0));
+  const prevSlide = () => setCurrentSlide(Math.max(currentSlide - 1, 0));
 
   const handleStepClick = async (targetId: number) => {
     if (targetId === currentSlide) return;
@@ -520,8 +467,7 @@ export const CandidateDetailsForm: React.FC<CandidateDetailsFormProps> = ({
         formData.append("resumeUrl", profile.resumeUrl);
       }
 
-      const apiUrl =
-        (import.meta as any).env?.VITE_API_URL || "http://localhost:8000";
+      const apiUrl = getApiUrl();
       let res: Response;
 
       try {
@@ -704,7 +650,7 @@ export const CandidateDetailsForm: React.FC<CandidateDetailsFormProps> = ({
                   type="text"
                   placeholder="e.g. Arjun Sharma"
                   className={INPUT_CLASS}
-                  defaultValue={profile?.fullName || ""}
+                  value={formValues.fullName || ""}
                   onChange={(e) => {
                     setValue("fullName", e.target.value, {
                       shouldValidate: !!attemptedSteps[0],

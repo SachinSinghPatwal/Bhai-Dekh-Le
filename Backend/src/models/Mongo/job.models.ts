@@ -4,7 +4,7 @@ import { type JOB_DETAILS } from "../../types.js";
 
 export type { JOB_DETAILS };
 
-const jobSchema = new Schema<Required<JOB_DETAILS>>(
+const jobSchema = new Schema<JOB_DETAILS>(
   {
     title: {
       type: String,
@@ -75,6 +75,46 @@ const jobSchema = new Schema<Required<JOB_DETAILS>>(
     walkIn: {
       type: Boolean,
       required: true,
+    },
+    applied: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    isAiMatch: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    matchScore: {
+      type: Number,
+      default: null,
+    },
+    fitVerdict: {
+      type: String,
+      default: "",
+    },
+    matchingSkills: [
+      {
+        type: String,
+      },
+    ],
+    missingSkills: [
+      {
+        type: String,
+      },
+    ],
+    aiSummary: {
+      type: String,
+      default: "",
+    },
+    aiRecommendation: {
+      type: String,
+      default: "",
+    },
+    aiEvaluatedAt: {
+      type: Date,
+      default: null,
     },
   },
   {

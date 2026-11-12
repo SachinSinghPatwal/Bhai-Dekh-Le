@@ -13,12 +13,24 @@ export interface CandidateProfile {
   searchKeywords?: string[];
 }
 
-export interface JobMetricStats {
-  appliedCount: number;
-  inReviewCount: number;
-  interviewsCount: number;
-  offersCount: number;
-  rejectionsCount: number;
+export interface MatchedJob {
+  jobId: string;
+  title: string;
+  companyName: string;
+  jdURL: string;
+  keySkills: string[];
+  matchingSkills: string[];
+  missingSkills: string[];
+  matchScore: number | null;
+  fitVerdict: string;
+  aiSummary: string;
+  aiRecommendation: string;
+  applied: boolean;
+  aiEvaluatedAt: string | null;
+  minExp: string;
+  maxExp: string;
+  placeholders: Record<string, string>[];
+  createdDate: number | null;
 }
 
 export type { CandidateFormValues } from "../schema/candidateSchema";

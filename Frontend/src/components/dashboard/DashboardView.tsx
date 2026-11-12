@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   AreaChart,
   Area,
@@ -9,206 +10,215 @@ import {
   ResponsiveContainer,
   BarChart,
   Bar,
+  Cell,
 } from "recharts";
 import {
   FiBriefcase,
   FiTrendingUp,
   FiCheckCircle,
   FiClock,
-  FiActivity,
-  FiHelpCircle,
+  FiArrowRight,
+  FiUploadCloud,
+  FiRefreshCw,
 } from "react-icons/fi";
 import { useCandidateStore } from "../../store/useCandidateStore";
+import { useJobStore } from "../../store/useJobStore";
+import { MatchedJobCard } from "../jobs/MatchedJobCard";
+import { getApiUrl } from "../../lib/api";
+import { notifyError, notifyInfo, notifySuccess } from "../../utils/toast";
 
-const SCRAPE_INTERVAL_MINUTES = 5;
+const WEEK_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+const JS_DAY_TO_LABEL = [
+  "Sun",
+  "Mon",
+  "Tue",
+  "Wed",
+  "Thu",
+  "Fri",
+  "Sat",
+] as const;
+
+const getJobDayLabel = (
+  aiEvaluatedAt?: string | null,
+  createdDate?: number | null,
+): string => {
+  const rawTimestamp = aiEvaluatedAt
+    ? Date.parse(aiEvaluatedAt)
+    : typeof createdDate === "number"
+      ? createdDate
+      : Date.now();
+  const parsedDate = Number.isNaN(rawTimestamp)
+    ? new Date()
+    : new Date(rawTimestamp);
+  return JS_DAY_TO_LABEL[parsedDate.getDay()];
+};
 
 export const DashboardView: React.FC = () => {
-  const { profile, jobStats } = useCandidateStore();
+  const navigate = useNavigate();
+  const { profile } = useCandidateStore();
+  const {
+    jobs,
+    pendingApplied,
+    isSyncing,
+    toggleApplied,
+    flushPendingApplied,
+    fetchMatchedJobs,
+  } = useJobStore();
 
-  const searchKeywords = profile?.searchKeywords?.filter(Boolean) || [];
-  const currentScrapeJob =
-    searchKeywords[0] || profile?.role || "Software Engineer";
-  const nextScrapeJob =
-    searchKeywords[1] ||
-    (profile?.role && profile.role !== currentScrapeJob
-      ? profile.role
-      : searchKeywords[0]
-        ? "Full Stack Developer"
-        : "Backend Developer");
-
-  const [nextScrapeAt, setNextScrapeAt] = useState<Date>(
-    () => new Date(Date.now() + SCRAPE_INTERVAL_MINUTES * 60 * 1000),
+  const [stageFilter, setStageFilter] = useState<"all" | "saved" | "applied">(
+    "all",
   );
-  const [countdownSeconds, setCountdownSeconds] = useState<number>(
-    SCRAPE_INTERVAL_MINUTES * 60,
-  );
-
-  const formatScheduleDateTime = (date: Date): string => {
-    const hours24 = date.getHours();
-    const period = hours24 >= 12 ? "PM" : "AM";
-    const hours = String(hours24 % 12 || 12).padStart(2, "0");
-    const minutes = String(date.getMinutes()).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const year = date.getFullYear();
-    return `${hours}:${minutes} ${period} ${day}-${month}-${year}`;
-  };
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [isTriggeringScrape, setIsTriggeringScrape] = useState(false);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      const remaining = Math.max(
-        0,
-        Math.floor((nextScrapeAt.getTime() - Date.now()) / 1000),
-      );
-      if (remaining === 0) {
-        const nextTarget = new Date(
-          Date.now() + SCRAPE_INTERVAL_MINUTES * 60 * 1000,
-        );
-        setNextScrapeAt(nextTarget);
-        setCountdownSeconds(SCRAPE_INTERVAL_MINUTES * 60);
-      } else {
-        setCountdownSeconds(remaining);
+    void fetchMatchedJobs();
+    return () => {
+      void useJobStore.getState().flushPendingApplied({ keepalive: true });
+    };
+  }, [fetchMatchedJobs]);
+
+  const pendingCount = Object.keys(pendingApplied).length;
+  const totalMatchedCount = jobs.length;
+  const appliedMatchedCount = useMemo(
+    () => jobs.filter((j) => j.applied).length,
+    [jobs],
+  );
+  const unappliedMatchedCount = totalMatchedCount - appliedMatchedCount;
+
+  const avgMatchScore = useMemo(() => {
+    const scored = jobs
+      .map((j) => j.matchScore)
+      .filter((score): score is number => typeof score === "number");
+    if (scored.length === 0) return null;
+    return Math.round(scored.reduce((sum, s) => sum + s, 0) / scored.length);
+  }, [jobs]);
+
+  const activityData = useMemo(() => {
+    const countsByDay = new Map<string, { matched: number; applied: number }>();
+    for (const day of WEEK_DAYS) {
+      countsByDay.set(day, { matched: 0, applied: 0 });
+    }
+
+    for (const job of jobs) {
+      const dayLabel = getJobDayLabel(job.aiEvaluatedAt, job.createdDate);
+      const entry = countsByDay.get(dayLabel);
+      if (entry) {
+        entry.matched += 1;
+        if (job.applied) {
+          entry.applied += 1;
+        }
       }
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [nextScrapeAt]);
+    }
 
-  const formatCountdown = (totalSeconds: number) => {
-    const mins = Math.floor(totalSeconds / 60);
-    const secs = totalSeconds % 60;
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+    return WEEK_DAYS.map((day) => {
+      const counts = countsByDay.get(day) ?? { matched: 0, applied: 0 };
+      return {
+        day,
+        matched: counts.matched,
+        applied: counts.applied,
+      };
+    });
+  }, [jobs]);
+
+  const pipelineData = useMemo(
+    () => [
+      { stage: "Matched", filterKey: "all" as const, count: totalMatchedCount },
+      {
+        stage: "Not Applied",
+        filterKey: "saved" as const,
+        count: unappliedMatchedCount,
+      },
+      {
+        stage: "Applied",
+        filterKey: "applied" as const,
+        count: appliedMatchedCount,
+      },
+    ],
+    [totalMatchedCount, unappliedMatchedCount, appliedMatchedCount],
+  );
+
+  const filteredDashboardJobs = useMemo(() => {
+    return jobs.filter((job) => {
+      if (stageFilter === "saved" && job.applied) return false;
+      if (stageFilter === "applied" && !job.applied) return false;
+      if (selectedDay) {
+        const dayLabel = getJobDayLabel(job.aiEvaluatedAt, job.createdDate);
+        if (dayLabel !== selectedDay) return false;
+      }
+      return true;
+    });
+  }, [jobs, stageFilter, selectedDay]);
+
+  const handleRunScrape = async () => {
+    if (isTriggeringScrape) return;
+    setIsTriggeringScrape(true);
+    notifyInfo("Triggering job scrape...");
+    try {
+      const res = await fetch(`${getApiUrl()}/api/v1/job/trigger-now`, {
+        method: "POST",
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json?.message || "Failed to trigger scrape");
+      }
+      notifySuccess("Scrape queued. Matched jobs will appear once scored.");
+    } catch (err: unknown) {
+      notifyError(
+        err instanceof Error ? err.message : "Failed to trigger scrape",
+      );
+    } finally {
+      setIsTriggeringScrape(false);
+    }
   };
-
-  const activityData = [
-    { day: "Mon", applied: 0, responses: 0 },
-    { day: "Tue", applied: 0, responses: 0 },
-    { day: "Wed", applied: 0, responses: 0 },
-    { day: "Thu", applied: 0, responses: 0 },
-    { day: "Fri", applied: 0, responses: 0 },
-    { day: "Sat", applied: 0, responses: 0 },
-    { day: "Sun", applied: 0, responses: 0 },
-  ];
-
-  const pipelineData = [
-    { stage: "Saved", count: 0 },
-    { stage: "Applied", count: 0 },
-    { stage: "Screening", count: 0 },
-    { stage: "Interview", count: 0 },
-    { stage: "Offer", count: 0 },
-  ];
 
   const statCards = [
     {
-      title: "Applications Sent",
-      value: jobStats.appliedCount,
-      subtext: "0 in the last 7 days",
+      title: "AI-Matched Jobs",
+      value: totalMatchedCount,
       icon: FiBriefcase,
     },
     {
-      title: "In Review / Screening",
-      value: jobStats.inReviewCount,
-      subtext: "Awaiting recruiter response",
+      title: "Not Applied",
+      value: unappliedMatchedCount,
       icon: FiClock,
     },
     {
-      title: "Interviews Scheduled",
-      value: jobStats.interviewsCount,
-      subtext: "0% conversion rate",
-      icon: FiTrendingUp,
+      title: "Applied",
+      value: appliedMatchedCount,
+      icon: FiCheckCircle,
     },
     {
-      title: "Offers Received",
-      value: jobStats.offersCount,
-      subtext: "Target: 1 accepted offer",
-      icon: FiCheckCircle,
+      title: "Avg Fit Score",
+      value: avgMatchScore !== null ? `${avgMatchScore}%` : "—",
+      icon: FiTrendingUp,
     },
   ];
 
   return (
-    <div className="space-y-5 px-1 sm:px-4 md:px-8 mx-0">
-      <div className="glass-panel p-4 sm:p-5 border border-white/[0.07] space-y-3.5 relative overflow-visible z-30">
-        <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-400/30 to-transparent pointer-events-none rounded-t" />
-
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1.5 min-w-0">
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <div className="flex items-center gap-2">
-                <h3 className="app-heading-section text-zinc-100">Scraper</h3>
-              </div>
-              <span className="app-caption text-emerald-400 px-2.5 py-0.5 rounded bg-emerald-950/40 border border-emerald-800/40 font-medium">
-                Active (3/4 Workers Running)
-              </span>
-            </div>
-            <div className="text-[11px] font-mono text-zinc-400">
-              Next scheduled:{" "}
-              <span className="text-zinc-200">
-                {formatScheduleDateTime(nextScrapeAt)}
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
-            <div
-              className="h-8 px-3 rounded bg-zinc-900/80 border border-white/10 text-xs font-mono text-zinc-300 flex items-center gap-1.5"
-              title="Fixed automated scraping interval"
-            >
-              <FiClock className="text-emerald-400 text-xs shrink-0" />
-              <span>Every {SCRAPE_INTERVAL_MINUTES}m</span>
-            </div>
-
-            <div className="bg-zinc-900/80 border border-white/10 rounded px-3 py-1.5 flex items-center gap-2 h-8">
-              <span className="text-[13px] font-bold font-mono tracking-tight text-zinc-100 leading-tight">
-                {formatCountdown(countdownSeconds)}
-              </span>
-              <span
-                className="text-zinc-400 hover:text-zinc-200 transition-colors relative cursor-help inline-flex items-center"
-                title={`Next scrape: ${nextScrapeAt.toISOString()} (${formatScheduleDateTime(nextScrapeAt)})`}
-              >
-                <FiHelpCircle className="text-xs" />
-              </span>
-            </div>
-          </div>
+    <div className="space-y-6 px-1 sm:px-4 md:px-8 mx-0">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/[0.07]">
+        <div>
+          <h1 className="app-heading-page text-zinc-100">Dashboard</h1>
+          <p className="app-sub text-zinc-400 mt-1">
+            {profile?.role
+              ? `Resume-matched openings for ${profile.role}`
+              : "Resume-matched openings & application progress"}
+          </p>
         </div>
 
-        <div className="rounded bg-zinc-900/60 border border-white/[0.06] p-3 sm:px-4 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
-          <div className="flex flex-wrap items-center gap-3 sm:gap-4">
-            <div className="flex items-center gap-2 pr-3 sm:border-r sm:border-white/10 shrink-0">
-              <FiActivity className="text-emerald-400 text-xs shrink-0" />
-              <span className="text-zinc-400 font-medium">Scrape Queue:</span>
-              <span className="font-semibold text-zinc-200">12 Tasks</span>
-            </div>
-
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-              <span className="text-zinc-400 font-medium shrink-0">
-                Current:
-              </span>
-              <span
-                className="font-medium text-zinc-100 truncate max-w-[200px] sm:max-w-[280px]"
-                title={currentScrapeJob}
-              >
-                "{currentScrapeJob}"
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="w-1.5 h-1.5 rounded-full bg-zinc-500 shrink-0" />
-              <span className="text-zinc-400 font-medium shrink-0">Next:</span>
-              <span
-                className="font-medium text-zinc-300 truncate max-w-[200px] sm:max-w-[280px]"
-                title={nextScrapeJob}
-              >
-                "{nextScrapeJob}"
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0 text-zinc-400 text-[11px] font-mono">
-            <span>RabbitMQ</span>
-            <span>•</span>
-            <span className="text-emerald-400">Worker Active</span>
-          </div>
-        </div>
+        <button
+          type="button"
+          onClick={() => void handleRunScrape()}
+          disabled={isTriggeringScrape}
+          className="h-9 px-3.5 rounded bg-emerald-950/50 hover:bg-emerald-900/60 text-emerald-300 border border-emerald-700/40 text-xs font-medium inline-flex items-center gap-2 transition-colors cursor-pointer disabled:opacity-60 self-start sm:self-auto"
+        >
+          <FiRefreshCw
+            size={13}
+            className={isTriggeringScrape ? "animate-spin" : ""}
+          />
+          <span>{isTriggeringScrape ? "Queueing..." : "Run Scrape Now"}</span>
+        </button>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -217,21 +227,18 @@ export const DashboardView: React.FC = () => {
           return (
             <div
               key={card.title}
-              className="glass-panel p-3.5 sm:p-4 border border-white/[0.07] space-y-1.5 relative group transition-all duration-200 hover:border-white/15"
+              className="glass-panel p-3.5 sm:p-4 border border-white/[0.07] space-y-1.5 hover:border-white/15 transition-colors"
             >
               <div className="flex items-center justify-between">
-                <span className="app-caption text-zinc-400 font-medium ">
+                <span className="app-caption text-zinc-400 font-medium">
                   {card.title}
                 </span>
                 <div className="w-7 h-7 rounded bg-zinc-900/80 border border-white/10 flex items-center justify-center text-zinc-400 shrink-0">
                   <Icon className="text-xs" />
                 </div>
               </div>
-
-              <div>
-                <span className="text-2xl font-bold tracking-tight text-zinc-100">
-                  {card.value}
-                </span>
+              <div className="text-2xl font-bold tracking-tight text-zinc-100">
+                {card.value}
               </div>
             </div>
           );
@@ -240,31 +247,45 @@ export const DashboardView: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-11 gap-6">
         <div className="lg:col-span-7 glass-panel p-4 sm:p-6 border border-white/[0.07] space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <div className="space-y-1">
               <h3 className="app-heading-section text-zinc-100">
-                Application & Interview Velocity
+                Weekly Match Velocity
               </h3>
               <p className="app-sub text-zinc-400">
-                Weekly pacing of sent submissions and inbound recruiter
-                responses
+                AI-matched openings vs. applied submissions (click a day to filter)
               </p>
             </div>
             <span className="app-caption text-zinc-400 px-2.5 py-1 rounded bg-zinc-900/60 border border-white/5 font-medium shrink-0">
-              Current Week
+              {selectedDay ? `Day: ${selectedDay}` : "Weekly"}
             </span>
           </div>
 
-          <div className="h-64 w-full pt-4">
+          <div className="h-60 w-full pt-2">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart
                 data={activityData}
                 margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                onClick={(state) => {
+                  const clickedDay =
+                    typeof state?.activeLabel === "string"
+                      ? state.activeLabel
+                      : undefined;
+                  if (clickedDay) {
+                    setSelectedDay((prev) =>
+                      prev === clickedDay ? null : clickedDay,
+                    );
+                  }
+                }}
               >
                 <defs>
+                  <linearGradient id="matchedArea" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#34d399" stopOpacity={0.28} />
+                    <stop offset="95%" stopColor="#34d399" stopOpacity={0} />
+                  </linearGradient>
                   <linearGradient id="appliedArea" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#71717a" stopOpacity={0.25} />
-                    <stop offset="95%" stopColor="#71717a" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.25} />
+                    <stop offset="95%" stopColor="#38bdf8" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid
@@ -279,7 +300,7 @@ export const DashboardView: React.FC = () => {
                   axisLine={{ stroke: "rgba(255,255,255,0.08)" }}
                 />
                 <YAxis
-                  domain={[0, 5]}
+                  domain={[0, "auto"]}
                   allowDecimals={false}
                   stroke="#71717a"
                   fontSize={11}
@@ -297,8 +318,18 @@ export const DashboardView: React.FC = () => {
                 />
                 <Area
                   type="monotone"
+                  dataKey="matched"
+                  name="AI Matched"
+                  stroke="#34d399"
+                  strokeWidth={2}
+                  fillOpacity={1}
+                  fill="url(#matchedArea)"
+                />
+                <Area
+                  type="monotone"
                   dataKey="applied"
-                  stroke="#a1a1aa"
+                  name="Applied"
+                  stroke="#38bdf8"
                   strokeWidth={2}
                   fillOpacity={1}
                   fill="url(#appliedArea)"
@@ -309,23 +340,19 @@ export const DashboardView: React.FC = () => {
         </div>
 
         <div className="lg:col-span-4 glass-panel p-4 sm:p-6 border border-white/[0.07] space-y-4 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <h3 className="app-heading-section text-zinc-100">
-                  Pipeline Funnel
-                </h3>
-                <p className="app-sub text-zinc-400">
-                  Distribution across stages
-                </p>
-              </div>
-              <span className="app-caption text-zinc-400 px-2.5 py-1 rounded bg-zinc-900/60 border border-white/5 font-medium shrink-0">
-                0 Total
-              </span>
+          <div className="flex items-center justify-between gap-2">
+            <div className="space-y-1">
+              <h3 className="app-heading-section text-zinc-100">
+                Application Funnel
+              </h3>
+              <p className="app-sub text-zinc-400">Click a bar to filter</p>
             </div>
+            <span className="app-caption text-zinc-400 px-2.5 py-1 rounded bg-zinc-900/60 border border-white/5 font-medium shrink-0">
+              {totalMatchedCount} Total
+            </span>
           </div>
 
-          <div className="h-64 w-full pt-4">
+          <div className="h-60 w-full pt-2">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={pipelineData}
@@ -344,7 +371,7 @@ export const DashboardView: React.FC = () => {
                   axisLine={{ stroke: "rgba(255,255,255,0.08)" }}
                 />
                 <YAxis
-                  domain={[0, 4]}
+                  domain={[0, "auto"]}
                   allowDecimals={false}
                   stroke="#71717a"
                   fontSize={11}
@@ -362,14 +389,142 @@ export const DashboardView: React.FC = () => {
                 />
                 <Bar
                   dataKey="count"
-                  fill="#52525b"
                   radius={[2, 2, 0, 0]}
                   maxBarSize={44}
-                />
+                  className="cursor-pointer"
+                  onClick={(entry) => {
+                    const key = (
+                      entry as { filterKey?: "all" | "saved" | "applied" }
+                    )?.filterKey;
+                    if (key) {
+                      setStageFilter((prev) =>
+                        prev === key && key !== "all" ? "all" : key,
+                      );
+                    }
+                  }}
+                >
+                  {pipelineData.map((entry) => {
+                    const isSelected = stageFilter === entry.filterKey;
+                    const fill = isSelected
+                      ? "#34d399"
+                      : entry.filterKey === "applied"
+                        ? "#38bdf8"
+                        : entry.filterKey === "saved"
+                          ? "#a1a1aa"
+                          : "#52525b";
+                    return <Cell key={entry.stage} fill={fill} />;
+                  })}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
+      </div>
+
+      <div className="glass-panel p-4 sm:p-6 border border-white/[0.07] space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="space-y-1">
+            <h3 className="app-heading-section text-zinc-100">
+              AI-Matched Openings ({filteredDashboardJobs.length}
+              {stageFilter !== "all" || selectedDay
+                ? ` of ${totalMatchedCount}`
+                : ""}
+              )
+            </h3>
+            <p className="app-sub text-zinc-400">
+              Toggling Applied updates charts locally and batch-syncs via Zustand
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center bg-zinc-900/70 border border-white/10 rounded p-0.5 text-xs">
+              {(
+                [
+                  { id: "all", label: `All (${totalMatchedCount})` },
+                  { id: "saved", label: `Not Applied (${unappliedMatchedCount})` },
+                  { id: "applied", label: `Applied (${appliedMatchedCount})` },
+                ] as const
+              ).map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setStageFilter(tab.id)}
+                  className={`px-2.5 py-1 rounded transition-colors cursor-pointer ${
+                    stageFilter === tab.id
+                      ? "bg-zinc-700 text-white"
+                      : "text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+            {selectedDay && (
+              <button
+                type="button"
+                onClick={() => setSelectedDay(null)}
+                className="h-8 px-2.5 rounded bg-emerald-950/50 hover:bg-emerald-950/80 text-emerald-300 border border-emerald-500/30 text-xs font-medium cursor-pointer"
+              >
+                Day: {selectedDay} ×
+              </button>
+            )}
+            {pendingCount > 0 && (
+              <button
+                type="button"
+                disabled={isSyncing}
+                onClick={() => void flushPendingApplied()}
+                className="h-8 px-3 rounded bg-amber-950/50 hover:bg-amber-950/80 text-amber-300 border border-amber-500/30 text-xs font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60"
+              >
+                <FiUploadCloud size={13} />
+                <span>
+                  {isSyncing ? "Syncing..." : `Sync Pending (${pendingCount})`}
+                </span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => navigate("/jobs")}
+              className="h-8 px-3 rounded bg-zinc-800/80 hover:bg-zinc-700/80 text-zinc-200 border border-white/10 text-xs font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <span>All Jobs</span>
+              <FiArrowRight size={12} />
+            </button>
+          </div>
+        </div>
+
+        {jobs.length === 0 ? (
+          <div className="py-8 text-center text-xs text-zinc-400 border border-dashed border-white/10 rounded-lg">
+            No AI-matched jobs yet. Trigger a scrape or wait for AI evaluation to finish.
+          </div>
+        ) : filteredDashboardJobs.length === 0 ? (
+          <div className="py-8 text-center text-xs text-zinc-400 border border-dashed border-white/10 rounded-lg space-y-2">
+            <p>No matched jobs in this filter.</p>
+            <button
+              type="button"
+              onClick={() => {
+                setStageFilter("all");
+                setSelectedDay(null);
+              }}
+              className="px-3 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs cursor-pointer"
+            >
+              Reset Filter
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {filteredDashboardJobs.slice(0, 6).map((job) => (
+              <MatchedJobCard
+                key={job.jobId}
+                job={job}
+                isPending={Object.prototype.hasOwnProperty.call(
+                  pendingApplied,
+                  job.jobId,
+                )}
+                onToggleApplied={toggleApplied}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
